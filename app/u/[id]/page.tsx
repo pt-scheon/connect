@@ -1,0 +1,261 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { all, get, type Row } from "@/lib/db";
+import { currentUser, standings } from "@/lib/auth";
+import { EMPTY } from "@/lib/credit";
+import { ties, pathTo, type Tie } from "@/lib/graph";
+import { resumeFacts } from "@/lib/resume";
+import * as A from "../../actions";
+import { CopyLink, Count } from "../../client";
+import { Av, F, Pill, Stamp, Who, initials, inr, skillsOf, statusLabel } from "../../ui";
+
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> };
+const find = (id: number) => get("SELECT * FROM users WHERE id=? AND onboarded=1 AND suspended=0", id);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const u = find(Number((await params).id));
+  if (!u) return { title: "Profile" };
+  const s = standings().get(u.id) ?? EMPTY;
+  const description = u.role === "alum" ? `${u.name}, class of ${u.grad_year}.` : `${s.credit} credit. ${s.shipped} shipped of ${s.joined} joined. Every line signed by teammates.`;
+  return { title: u.name, description, openGraph: { title: `${u.name} on Connect`, description } };
+}
+
+/* Who this person has worked with, drawn as a small network. */
+function Graph({ center, mates }: { center: Row; mates: { u: Row; list: Tie[] }[] }) {
+  const W = 560, H = 300, cx = W / 2, cy = H / 2;
+  const hue = (id: number) => `hsl(${(id * 67) % 360} 55% 42%)`;
+  const nodes = mates.slice(0, 12).map((m, i, a) => {
+    const t = -Math.PI / 2 + (i * 2 * Math.PI) / a.length;
+    return { ...m, x: cx + 215 * Math.cos(t), y: cy + 100 * Math.sin(t) };
+  });
+  return (
+    <div className="tw">
+      <svg viewBox={`0 0 ${W} ${H}`} className="graph" role="img" aria-label={`${center.name} has worked with ${mates.length} people`} style={{ width: "100%", minWidth: 420 }}>
+        {nodes.map((n) => (
+          <line key={n.u.id} x1={cx} y1={cy} x2={n.x} y2={n.y} stroke="var(--accent)" strokeOpacity={0.45}
+            strokeWidth={1 + n.list.length * 1.5} strokeDasharray={n.list.some((t) => t.shipped) ? undefined : "4 4"} />
+        ))}
+        <circle cx={cx} cy={cy} r={26} fill={hue(center.id)} stroke="var(--surface)" strokeWidth={3} />
+        <text x={cx} y={cy + 5} textAnchor="middle" style={{ fill: "#fff", fontSize: 14, fontWeight: 700 }}>{initials(center.name)}</text>
+        {nodes.map((n) => (
+          <a key={n.u.id} href={`/u/${n.u.id}`}>
+            <title>{n.list.map((t) => `${t.project} (${t.shipped ? "shipped" : "in progress"})`).join(", ")}</title>
+            <circle cx={n.x} cy={n.y} r={18} fill={hue(n.u.id)} stroke="var(--surface)" strokeWidth={2} />
+            <text x={n.x} y={n.y + 4} textAnchor="middle" style={{ fill: "#fff", fontWeight: 700 }}>{initials(n.u.name)}</text>
+            <text x={n.x} y={n.y + 34} textAnchor="middle">{n.u.name.split(" ")[0]} · {n.list.length}</text>
+          </a>
+        ))}
+      </svg>
+      <p className="small muted">Thicker lines mean more projects together. Dashed means nothing shipped yet.</p>
+    </div>
+  );
+}
+
+export default async function Profile({ params, searchParams }: Props) {
+  const me = await currentUser();
+  const id = Number((await params).id);
+  const u = find(id);
+  // Signed-out visitors can see verified students only. This is the link a student sends to a recruiter.
+  if (!u || (!me && !(u.verified && u.role === "student"))) notFound();
+  const viewer = me?.onboarded ? me : null;
+  const tab = (await searchParams).tab ?? (viewer ? "work" : "resume");
+  const back = `/u/${id}?tab=${tab}`;
+  const self = viewer?.id === id, alum = u.role === "alum";
+  const s = standings().get(id) ?? EMPTY;
+  const T = ties();
+  const users = new Map(all("SELECT * FROM users").map((x) => [x.id, x]));
+  const names = new Map([...users].map(([k, v]) => [k, v.name]));
+  const mates = [...(T.get(id) ?? [])].map(([oid, list]) => ({ u: users.get(oid), list }));
+  const claims = all("SELECT * FROM claims WHERE user_id=?", id);
+  const clubs = all("SELECT c.id, c.name, cm.role FROM club_members cm JOIN clubs c ON c.id=cm.club_id WHERE cm.user_id=? AND cm.confirmed=1", id);
+  const projects = all("SELECT p.*, m.role mrole, m.did, m.status mstatus FROM members m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND p.hidden=0 ORDER BY p.created_at DESC", id);
+  const shippedWithMe = viewer && T.get(viewer.id)?.get(id)?.some((t) => t.shipped);
+  const vouched = viewer && !!get("SELECT 1 FROM vouches WHERE from_id=? AND to_id=?", viewer.id, id);
+  const skills = skillsOf(u);
+  const signedIn = (all("SELECT sub FROM identities WHERE user_id=?", id)).map((r) => String(r.sub).split(":")[0]);
+
+  let body;
+  if (alum) {
+    const grants = all("SELECT g.*, p.name FROM grants g JOIN projects p ON p.id=g.project_id WHERE g.alum_id=?", id);
+    const calls = all("SELECT * FROM calls WHERE alum_id=? AND open=1", id);
+    body = (
+      <div className="card">
+        <h2>Funding</h2>
+        {grants.length + calls.length === 0 && <span className="muted">Nothing funded yet.</span>}
+        {grants.map((g) => {
+          const paid = get("SELECT COALESCE(SUM(amount),0) n FROM grant_parts WHERE grant_id=? AND paid=1", g.id).n;
+          return <div key={g.id} className="row between"><Link href={`/projects/${g.project_id}`}>{g.name}</Link><span className="mono">{inr(paid)} paid of {inr(g.amount)}</span></div>;
+        })}
+        {calls.map((c) => <div key={c.id} className="row between"><span>{c.title} <span className="pill info">Open call</span></span><span className="mono">up to {inr(c.amount)}</span></div>)}
+      </div>
+    );
+  } else if (tab === "people") {
+    body = mates.length ? (
+      <div className="card">
+        <h2>Everyone {self ? "you have" : `${u.name.split(" ")[0]} has`} worked with</h2>
+        <Graph center={u} mates={mates} />
+        {mates.map(({ u: o, list }) => (
+          <div key={o.id} className="row between">
+            <Who u={o} />
+            <span className="small muted">{list.map((t) => `${t.project} (${t.shipped ? "shipped" : "in progress"})`).join(", ")}</span>
+          </div>
+        ))}
+      </div>
+    ) : <div className="note">No shared projects on record yet.</div>;
+  } else if (tab === "resume") {
+    const facts = resumeFacts(id);
+    body = (
+      <div className="card">
+        <div className="row between">
+          <div><h2>{u.name}</h2><span className="muted">{u.branch}, class of {u.grad_year}</span></div>
+          {self && <div className="row noprint">
+            <F action={A.aiResume} back={back}><button className="btn ghost">{u.resume ? "Rewrite with AI" : "Write with AI"}</button></F>
+            {u.resume && <F action={A.clearResume} back={back}><button className="linkbtn small">Use plain version</button></F>}
+          </div>}
+        </div>
+        {u.resume ? (
+          <>
+            <div className="pre">{u.resume}</div>
+            <span><Stamp>Written only from {facts.projects.length} signed project{facts.projects.length === 1 ? "" : "s"}</Stamp></span>
+          </>
+        ) : (
+          <>
+            <span className="label">Projects</span>
+            {facts.projects.length === 0 && <span className="muted">No shipped projects yet.</span>}
+            {facts.projects.map((p) => (
+              <div key={p.name}>
+                <div className="row between"><b>{p.name} · {p.role} · {p.shipped}</b>
+                  {p.teammatesWhoSigned > 0 ? <Stamp>Signed by {p.teammatesWhoSigned} teammate{p.teammatesWhoSigned > 1 ? "s" : ""}</Stamp> : <Stamp kind="no">Solo</Stamp>}</div>
+                <ul className="plain"><li>{p.did}</li><li>{p.about}</li>{p.proof.length > 0 && <li>Proof: {p.proof.join("; ")}</li>}</ul>
+              </div>
+            ))}
+            {facts.clubs.length > 0 && <><span className="label">Clubs</span><div>{facts.clubs.map((c) => `${c.name}, ${c.role}`).join(" · ")} <span className="muted small">(confirmed by club leads)</span></div></>}
+            <span className="label">Skills used in the projects above</span>
+            <div className="row">{facts.skills.length ? facts.skills.map((k) => <span key={k} className="chip">{k}</span>) : <span className="muted">None backed by a project yet.</span>}</div>
+          </>
+        )}
+        {claims.length > 0 && <span className="label">Not backed by anything</span>}
+        {claims.map((c) => (
+          <div key={c.id} className="row between">
+            <span className="muted">{c.text}</span>
+            <span className="row"><Stamp kind="no">No proof</Stamp>{self && <F action={A.removeClaim} back={back} hidden={{ claim: c.id }}><button className="linkbtn small">Remove</button></F>}</span>
+          </div>
+        ))}
+        {self && (
+          <div className="stack tight noprint">
+            <F action={A.addClaim} back={back} className="row">
+              <input type="text" name="text" id="claim" maxLength={140} placeholder="Add a line yourself, e.g. “Won the state hackathon”" aria-label="Add a resume line" required />
+              <button className="btn ghost">Add</button>
+            </F>
+            <p className="small muted">The AI is only given projects your teammates signed and club roles the lead confirmed. Lines you add yourself always show as “No proof”. Anyone with your profile link can see this page.</p>
+          </div>
+        )}
+      </div>
+    );
+  } else {
+    body = (
+      <>
+        <div className="card">
+          <h2>Credit ledger</h2>
+          <div className="tw"><table><tbody>
+            {s.ledger.length === 0 && <tr><td className="muted">Nothing yet.</td></tr>}
+            {s.ledger.map((l, i) => (
+              <tr key={i}><td><b>{l.what}</b><br /><span className="small muted">{l.why}</span></td><td className={`n ${l.n < 0 ? "neg" : ""}`}>{l.n > 0 ? "+" : "−"}{Math.abs(l.n)}</td></tr>
+            ))}
+          </tbody></table></div>
+        </div>
+        {projects.map((p) => (
+          <Link key={p.id} className="card lift" href={`/projects/${p.id}`}>
+            <span className="row between"><b>{p.name}</b>
+              {p.mstatus === "left" ? <Stamp kind="bad">Left mid-project</Stamp> : p.status === "dropped" && p.lead_id === id ? <Stamp kind="bad">Dropped it</Stamp> : <Pill status={p.status} />}</span>
+            <span className="small muted">{p.mstatus === "left" ? "No contribution recorded" : [p.mrole, p.did].filter(Boolean).join(" — ") || statusLabel(p.status)}</span>
+          </Link>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {!me && (
+        <div className="strip" style={{ borderRadius: 10 }}><div className="wrap">
+          This is a Connect profile. Every project on it was reviewed by outsiders and signed by teammates. <Link href="/rules">How that works</Link>
+        </div></div>
+      )}
+      <div className="card">
+        <div className="row" style={{ alignItems: "start" }}>
+          <Av u={u} lg />
+          <div className="stack tight" style={{ flex: "1 1 240px" }}>
+            <h1>{u.name}</h1>
+            <span className="muted">{u.branch}, class of {u.grad_year}{alum ? " · alum" : ""}</span>
+            {u.about && <span>{u.about}</span>}
+            <div className="row">
+              {signedIn.includes("google") && <Stamp>Google sign-in</Stamp>}
+              {signedIn.includes("linkedin") && <Stamp>LinkedIn sign-in</Stamp>}
+              {u.verified ? <Stamp>{alum ? "Alum approved" : "College email"}</Stamp> : <Stamp kind="no">Not verified</Stamp>}
+            </div>
+            {viewer && !self && !alum && <span className="small muted">{pathTo(T, viewer.id, id, names)}</span>}
+          </div>
+          <div className="stack tight noprint" style={{ alignItems: "end" }}>
+            {self && <Link className="btn ghost sm" href="/onboarding?edit=1">Edit profile</Link>}
+            {!alum && u.verified ? <CopyLink path={`/u/${id}?tab=resume`} label={self ? "Copy resume link" : "Copy link"} /> : null}
+            {viewer && !self && !alum && viewer.role === "student" && (
+              <>
+                <F action={A.vouch} back={back} hidden={{ to: id }}><button className="btn" disabled={!shippedWithMe || !!vouched}>{vouched ? "Vouched" : "Vouch"}</button></F>
+                <span className="small muted" style={{ maxWidth: "22ch", textAlign: "right" }}>{shippedWithMe ? "One vouch per person, ever." : "Only people who shipped with them can vouch."}</span>
+              </>
+            )}
+          </div>
+        </div>
+        {!alum && (
+          <>
+            <div className="stats">
+              <div className="stat"><b><Count to={s.credit} /></b><span className="small muted">credit</span></div>
+              <div className="stat"><b>{s.shipped}<span className="muted" style={{ fontSize: "1rem" }}> / {s.joined}</span></b><span className="small muted">shipped of joined</span></div>
+              <div className="stat"><b>{mates.length}</b><span className="small muted">people worked with</span></div>
+              <div className="stat"><b>{claims.length}</b><span className="small muted">claims with no proof</span></div>
+            </div>
+            {s.left > 0 && <div className="alert">Left or dropped {s.left} of {s.joined} projects. Teams see this before accepting a join request.</div>}
+            {s.circle && <div className="alert">Closed circle: all of this credit comes from projects with the same {s.mates.size} {s.mates.size === 1 ? "person" : "people"}.</div>}
+          </>
+        )}
+      </div>
+      {!alum && (
+        <div className="filters">
+          {[["work", "Work"], ["people", "Worked with"], ["resume", "Resume"]].map(([k, label]) => (
+            <Link key={k} href={`/u/${id}?tab=${k}`} aria-current={tab === k ? "true" : undefined}>{label}</Link>
+          ))}
+        </div>
+      )}
+      <div className="cols">
+        <div className="stack">{body}</div>
+        <aside className="stack">
+          {clubs.length > 0 && (
+            <div className="card">
+              <span className="label">Clubs</span>
+              {clubs.map((c) => <div key={c.id} className="row between"><Link href={`/clubs/${c.id}`}>{c.name}</Link><span className="small muted">{c.role}</span></div>)}
+            </div>
+          )}
+          {!alum && skills.length > 0 && (
+            <div className="card">
+              <span className="label">Skills</span>
+              <div className="row">{skills.map((k) => <span key={k} className="chip">{k}</span>)}</div>
+              <span className="small muted">{s.shipped ? "Used in shipped projects." : "Self-listed. No shipped project backs them yet."}</span>
+            </div>
+          )}
+          {!me && <div className="card"><h3>Are you a student here?</h3><p className="small muted">Join your college on Connect and build a record like this one.</p><Link className="btn" href="/signin">Sign in</Link></div>}
+          {viewer && !self && viewer.verified ? (
+            <details className="small">
+              <summary className="muted" style={{ cursor: "pointer" }}>Report this profile</summary>
+              <F action={A.report} back={back} hidden={{ kind: "user", target: id }} className="stack tight" >
+                <input type="text" name="reason" id="report-reason" placeholder="What is wrong?" maxLength={300} required />
+                <button className="btn ghost sm">Send to admins</button>
+              </F>
+            </details>
+          ) : null}
+        </aside>
+      </div>
+    </>
+  );
+}

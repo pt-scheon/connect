@@ -1,0 +1,30 @@
+import { all } from "@/lib/db";
+import { requireUser, standings } from "@/lib/auth";
+import { EMPTY } from "@/lib/credit";
+import { ties, pathTo } from "@/lib/graph";
+import { PeopleList, type Person } from "../client";
+import { skillsOf } from "../ui";
+
+export const metadata = { title: "People" };
+
+export default async function People() {
+  const me = await requireUser();
+  const S = standings(), T = ties();
+  const names = new Map(all("SELECT id, name FROM users").map((u) => [u.id, u.name]));
+  const people: Person[] = all("SELECT * FROM users WHERE onboarded=1 AND role='student' AND suspended=0 AND id<>?", me.id).map((u) => {
+    const s = S.get(u.id) ?? EMPTY;
+    return {
+      id: u.id, name: u.name, picture: u.picture, branch: u.branch, year: u.grad_year, verified: !!u.verified, skills: skillsOf(u),
+      credit: s.credit, shipped: s.shipped, joined: s.joined, left: s.left, path: pathTo(T, me.id, u.id, names),
+    };
+  });
+  return (
+    <>
+      <div className="head"><div className="stack tight">
+        <h1>People</h1>
+        <p>Everyone at your college on Connect. Each person shows how you are connected through projects.</p>
+      </div></div>
+      <PeopleList people={people} />
+    </>
+  );
+}
