@@ -150,6 +150,30 @@ export async function verifyCode(fd: FormData) {
   }
   done("/", `Verified at ${college.name}. You start with ${RULES.starter} credit.`);
 }
+/* The email Google or LinkedIn confirmed at sign-in is already proof. If it is on a college domain, the student can join
+   that college with it (adding the college, with a name they give, if it is new on Connect). */
+export async function joinWithSignInEmail(fd: FormData) {
+  const { me, s, fail } = await ctx(fd, false);
+  if (me.role !== "student") fail("Alumni are approved by an admin of their college.");
+  if (me.verified && me.college_id) fail("You are already verified.");
+  const email = String(me.email ?? "").toLowerCase(), domain = domainOf(email);
+  if (!me.email_verified || !isEmail(email) || isPublicMail(domain)) fail("Your sign-in email is not a college email. Use a code instead.");
+  if (get("SELECT 1 FROM users WHERE college_email=? AND id<>?", email, me.id)) fail("That college email is already linked to another account.");
+  const name = s("college_name", 80);
+  const known = collegeForEmail(email);
+  if (!known && name.length < 3) fail("Add your college's full name.");
+  const college = db.transaction(() => {
+    const col = known ?? addCollege(name, email, me.id);
+    run("UPDATE users SET verified=1, college_email=?, college_id=? WHERE id=?", email, col.id, me.id);
+    return col;
+  })();
+  if (college.status !== "active") {
+    for (const a of all("SELECT id FROM users WHERE super=1")) notify(a.id, `New college waiting for approval: ${college.name} (@${college.domains})`, "/admin/colleges");
+    done("/onboarding", `Email confirmed. ${college.name} is new on Connect, so the team checks it first.`);
+  }
+  done("/", `Verified at ${college.name}. You start with ${RULES.starter} credit.`);
+}
+
 /* No email code available: the student names their college and waits for one of its admins to vouch for them. */
 export async function askCollegeAdmin(fd: FormData) {
   const { me, n, fail } = await ctx(fd, false);

@@ -115,7 +115,20 @@ function open() {
   for (const ix of ["users_college ON users (college_id)", "projects_college ON projects (college_id)", "clubs_college ON clubs (college_id)"])
     d.exec(`CREATE INDEX IF NOT EXISTS ${ix}`);
   assignColleges(d);
+  ensureHomeCollege(d);
   return d;
+}
+
+/* The college named in COLLEGE_EMAIL_DOMAIN (and COLLEGE_NAME) always exists, so a brand-new server has one to join. */
+function ensureHomeCollege(d: Database.Database) {
+  const dom = (process.env.COLLEGE_EMAIL_DOMAIN || "").toLowerCase().trim();
+  if (!dom) return;
+  const rows = d.prepare("SELECT id, domains FROM colleges").all() as { id: number; domains: string }[];
+  if (matchCollege(dom, rows)) return;
+  const name = process.env.COLLEGE_NAME || guessName(dom);
+  let slug = slugify(name);
+  for (let i = 2; d.prepare("SELECT 1 FROM colleges WHERE slug=?").get(slug); i++) slug = `${slugify(name)}-${i}`;
+  d.prepare("INSERT INTO colleges (slug, name, domains, status, created_at) VALUES (?,?,?,?,?)").run(slug, name, dom, "active", Math.floor(Date.now() / 1000));
 }
 
 /* Upgrades a database from before colleges existed. Each verified college email becomes a college (named from

@@ -5,7 +5,9 @@ import { currentUser } from "@/lib/auth";
 import { RULES } from "@/lib/credit";
 import { mailReady } from "@/lib/mail";
 import { activeColleges, collegeById, domainsOf, isMember } from "@/lib/college";
-import { askCollegeAdmin, saveProfile, sendCode, verifyCode } from "../actions";
+import { askCollegeAdmin, joinWithSignInEmail, saveProfile, sendCode, verifyCode } from "../actions";
+import { collegeForEmail } from "@/lib/college";
+import { domainOf, isAcademic, isPublicMail } from "@/lib/domains";
 import { F } from "../ui";
 import { EmailField } from "./email-field";
 
@@ -18,6 +20,8 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const editing = !me.onboarded || sp.edit;
   const pending = get("SELECT * FROM codes WHERE user_id=? AND expires>?", me.id, now());
   const colleges = activeColleges();
+  const signInDomain = domainOf(String(me.email ?? "").toLowerCase());
+  const signInProof = me.role === "student" && !!me.email_verified && !!signInDomain && !isPublicMail(signInDomain);
   const mine = collegeById(me.college_id);
   const prod = process.env.NODE_ENV === "production";
   const showCode = !prod && !mailReady();
@@ -72,10 +76,27 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
       <span className="label">Step 2 of 2</span>
       <h1>Prove your college</h1>
       <p className="muted">Each college on Connect is its own space. You get into yours, and only yours, by proving an email address your college gave you. You get {RULES.starter} starter credit once it is done.</p>
-      <div className="proof-ways">
+      {signInProof && (() => {
+        // Signed in with a confirmed email on a college domain: that is proof enough, no code needed.
+        const email = String(me.email ?? "").toLowerCase(), d = domainOf(email);
+        const known = collegeForEmail(email);
+        return (
+          <F action={joinWithSignInEmail} back="/onboarding" className="card stack tight sign-in-proof">
+            <span className="label">Quickest</span>
+            <span>You signed in as <b>{email}</b>.{known ? <> That is a {known.name} address.</> : <> @{d} is new on Connect.</>}</span>
+            {!known && (
+              <label className="field"><span>Your college&rsquo;s full name</span>
+                <input type="text" name="college_name" id="signin-college-name" placeholder="e.g. Nirma University" minLength={3} maxLength={80} required />
+                <small>{isAcademic(d) ? "Academic domain: your college opens straight away." : "The Connect team checks new non-academic domains before the college opens."}</small></label>
+            )}
+            <div><button className="btn">{known ? `Join ${known.name}` : "Add my college and join"}</button></div>
+          </F>
+        );
+      })()}
+      {!signInProof && <div className="proof-ways">
         <div><b>Fastest</b><span className="small muted">Sign out and sign in with your college Google account. Its verified email is the proof.</span></div>
         <div><b>Or</b><span className="small muted">Get a 6-digit code at your college email below.</span></div>
-      </div>
+      </div>}
       {noMail ? (
         <div className="note">Email codes are not switched on for this site yet. Use your college Google account, or ask your college&rsquo;s admins below.</div>
       ) : <>
