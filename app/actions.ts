@@ -187,7 +187,7 @@ export async function closeRole(fd: FormData) {
   done(back);
 }
 export async function requestJoin(fd: FormData) {
-  const { me, back, n, fail } = await ctx(fd);
+  const { me, back, n, s, fail } = await ctx(fd);
   const r = get("SELECT * FROM roles WHERE id=? AND open=1", n("role"));
   const p = r && project(r.project_id);
   if (!p || !open(p)) fail("That role is no longer open.");
@@ -195,8 +195,9 @@ export async function requestJoin(fd: FormData) {
   if (member(p.id, me.id)) fail("You have already been on this project.");
   if (get("SELECT 1 FROM requests WHERE project_id=? AND user_id=?", p.id, me.id)) fail("You have already asked to join this project.");
   if ((compute().get(me.id)?.credit ?? 0) < RULES.stake) fail(`You need ${RULES.stake} free credit to stake. Finish what you have joined first.`);
-  run("INSERT INTO requests (role_id, project_id, user_id) VALUES (?,?,?)", r.id, p.id, me.id);
-  notify(p.lead_id, `${me.name} asked to join ${p.name} as ${r.title}`, `/projects/${p.id}`);
+  const note = s("note", 400);
+  run("INSERT INTO requests (role_id, project_id, user_id, note) VALUES (?,?,?,?)", r.id, p.id, me.id, note);
+  notify(p.lead_id, `${me.name} asked to join ${p.name} as ${r.title}${note ? `: "${note.length > 80 ? note.slice(0, 77) + "..." : note}"` : ""}`, `/projects/${p.id}#requests`);
   done(back, `Request sent. ${RULES.stake} credit is held until the team answers.`);
 }
 export async function withdrawRequest(fd: FormData) {

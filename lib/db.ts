@@ -55,6 +55,7 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["users", "email_notes", "INTEGER DEFAULT 1"],
   ["users", "open_to_join", "INTEGER DEFAULT 0"],
   ["users", "deleted", "INTEGER DEFAULT 0"],
+  ["requests", "note", "TEXT DEFAULT ''"],
 ];
 
 const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");

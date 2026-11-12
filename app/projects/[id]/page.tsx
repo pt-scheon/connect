@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { all, get } from "@/lib/db";
+import { all, get, now } from "@/lib/db";
 import { requireUser, standings } from "@/lib/auth";
 import { EMPTY, RULES, projectShares } from "@/lib/credit";
 import { timeAgo } from "@/lib/notify";
 import { suggest } from "@/lib/match";
 import { skillsOf } from "../../ui";
 import * as A from "../../actions";
-import { ProofHelp, SplitForm } from "../../client";
+import { JoinAsk, ProofHelp, SplitForm } from "../../client";
 import { F, Meter, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -44,7 +44,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
     .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.credit, shipped: st.shipped, left: st.left, open: !!u.open_to_join } }; }) : [];
   const fits = new Map(roles.map((r) => [r.id, suggest(r.title, pool.map((x) => x.c)).map((sg) => ({ ...sg, u: pool.find((x) => x.u.id === sg.id)!.u, st: S.get(sg.id) ?? EMPTY }))]));
   const myRequest = get("SELECT * FROM requests WHERE project_id=? AND user_id=?", id, me.id);
-  const requests = lead ? all("SELECT q.id rid, r.title, u.* FROM requests q JOIN roles r ON r.id=q.role_id JOIN users u ON u.id=q.user_id WHERE q.project_id=? AND q.status='pending'", id) : [];
+  const requests = lead ? all("SELECT u.*, q.id rid, q.note pitch, r.title FROM requests q JOIN roles r ON r.id=q.role_id JOIN users u ON u.id=q.user_id WHERE q.project_id=? AND q.status='pending'", id) : [];
   const proofs = all("SELECT * FROM proofs WHERE project_id=?", id);
   const ms = all("SELECT * FROM milestones WHERE project_id=?", id);
   const done = ms.filter((m) => m.done).length;
@@ -57,6 +57,8 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const myVotes = new Set(all("SELECT target_id FROM gone_votes WHERE project_id=? AND voter_id=?", id, me.id).map((v) => v.target_id));
   const canReview = p.status === "review" && !mine && me.verified && (me.admin || (S.get(me.id)?.credit ?? 0) >= RULES.reviewerMin);
   const iReviewed = reviews.some((r) => r.reviewer_id === me.id);
+  const lastMove = get("SELECT MAX(created_at) t FROM updates WHERE project_id=?", id)?.t ?? p.created_at;
+  const quietDays = Math.floor((now() - lastMove) / 86400);
   const missing = [
     !proofs.length && "a proof link",
     done < ms.length && "every milestone ticked",
@@ -66,6 +68,11 @@ export default async function Project({ params }: { params: Promise<{ id: string
   return (
     <>
       <Link href="/">← All projects</Link>
+      {onTeam && open && quietDays >= 14 && (
+        <div className="note quiet-note">
+          Nothing has moved here for {quietDays} days. Projects that go quiet lose their people. <a href="#update-text">Post what moved</a>, even if it is small, or tick a milestone.
+        </div>
+      )}
       <div className="head">
         <div className="stack tight">
           <div className="row"><h1>{p.name}</h1><Pill status={p.status} /></div>
@@ -162,7 +169,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
                     : myRequest?.status === "pending" ? (myRequest.role_id === r.id
                         ? <F action={A.withdrawRequest} back={back} hidden={{ id }}><button className="btn ghost">Withdraw request</button></F> : null)
                     : myRequest ? <span className="small muted">Your request was declined</span>
-                    : me.role === "student" ? <F action={A.requestJoin} back={back} hidden={{ role: r.id }}><button className="btn">Ask to join · stake {RULES.stake}</button></F> : null}
+                    : me.role === "student" ? <JoinAsk action={A.requestJoin} back={back} role={r.id} stake={RULES.stake} title={r.title} /> : null}
                   {lead && (fits.get(r.id)?.length ?? 0) > 0 && (
                     <div className="suggest">
                       <span className="label">People who might fit</span>
@@ -195,7 +202,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
           )}
 
           {requests.length > 0 && (
-            <div className="card">
+            <div className="card" id="requests">
               <h2>Join requests</h2>
               {requests.map((u) => {
                 const s = S.get(u.id) ?? EMPTY;
@@ -204,6 +211,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
                     <div className="stack" style={{ gap: 2 }}>
                       <span><UserLink u={u} /> <span className="muted small">for {u.title}</span></span>
                       <span className="small mono muted">{s.credit} credit · {s.shipped} shipped of {s.joined} joined{s.left ? <span className="neg"> · left {s.left}</span> : null}</span>
+                      {u.pitch ? <span className="pitch">{u.pitch}</span> : <span className="small muted">No note.</span>}
                     </div>
                     <div className="row">
                       <F action={A.answerRequest} back={back} hidden={{ request: u.rid, answer: "accept" }}><button className="btn sm">Accept</button></F>

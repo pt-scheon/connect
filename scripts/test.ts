@@ -119,3 +119,10 @@ test("teammate suggestions rank proven skills above listed ones", async () => {
   assert.deepEqual(s.map((x) => x.id), [2, 1, 4]);
   assert.equal(s.find((x) => x.id === 3), undefined);
 });
+
+test("the board's Fits you filter matches a role to the skills a person listed", async () => {
+  const { fitFor } = await import("../lib/match");
+  assert.deepEqual(fitFor("Search / ML", ["Python", "ML", "FastAPI"]), ["Python", "ML"]);
+  assert.deepEqual(fitFor("React frontend", ["React", "Node", "Figma"]), ["React"]);
+  assert.deepEqual(fitFor("RFID hardware", ["Flutter", "Firebase"]), []);
+});

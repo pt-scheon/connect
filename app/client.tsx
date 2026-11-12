@@ -109,11 +109,12 @@ export function CopyLink({ path, label = "Copy profile link" }: { path: string; 
 export type BoardItem = {
   id: number; name: string; pitch: string; status: string; done: number; total: number;
   team: { id: number; name: string; picture: string | null }[]; open: string[]; funded: boolean; mine: boolean; hidden?: number;
+  fit: string[]; active: string; quiet: boolean;
 };
 export function Board({ items, canReview, initial }: { items: BoardItem[]; canReview: boolean; initial: string }) {
   const [f, setF] = useState(initial);
   const [q, setQ] = useState("");
-  const filters: [string, string][] = [["all", "All"], ["open", "Needs people"], ["building", "Building"], ["shipped", "Shipped"], ["mine", "Mine"]];
+  const filters: [string, string][] = [["all", "All"], ...(items.some((p) => p.fit.length) ? [["fit", "Fits you"] as [string, string]] : []), ["open", "Needs people"], ["building", "Building"], ["shipped", "Shipped"], ["mine", "Mine"]];
   if (canReview) filters.push(["review", "To review"]);
   const count = (k: string) => items.filter((p) => match(p, k)).length;
   const list = items.filter((p) => match(p, f) && (!q || `${p.name} ${p.pitch} ${p.open.join(" ")}`.toLowerCase().includes(q.toLowerCase())));
@@ -136,8 +137,9 @@ export function Board({ items, canReview, initial }: { items: BoardItem[]; canRe
             <span className="avs">{p.team.map((u) => <Av key={u.id} u={u} />)}</span>
             <Meter done={p.done} total={p.total} />
             <span className="small muted mono">{p.done}/{p.total} milestones</span>
+            {p.active && <span className={`small muted ${p.quiet ? "quiet-tag" : ""}`}>{p.quiet ? "Quiet · " : "Active "}{p.active}</span>}
           </span>
-          {p.open.length > 0 && <span className="row">{p.open.map((r) => <span key={r} className="chip">Needs: {r}</span>)}</span>}
+          {p.open.length > 0 && <span className="row">{p.open.map((r) => <span key={r} className="chip">Needs: {r}</span>)}{p.fit.length > 0 && !p.mine && <span className="pill ok">Fits your {p.fit.slice(0, 2).join(", ")}</span>}</span>}
           {p.funded && <span><span className="pill ok">Alumni funded</span></span>}
         </Link>
       ))}
@@ -145,11 +147,30 @@ export function Board({ items, canReview, initial }: { items: BoardItem[]; canRe
   );
 }
 function match(p: BoardItem, k: string) {
+  if (k === "fit") return p.fit.length > 0 && !p.mine;
   if (k === "open") return p.open.length > 0;
   if (k === "mine") return p.mine;
   if (k === "review") return p.status === "review" && !p.mine;
   if (k === "all") return p.status !== "dropped" || p.mine;
   return p.status === k;
+}
+
+/* ---------- ask to join: a button that opens a short pitch for the lead ---------- */
+export function JoinAsk({ action, back, role, stake, title }: { action: Action; back: string; role: number; stake: number; title: string }) {
+  const [openForm, setOpen] = useState(false);
+  if (!openForm) return <button type="button" className="btn" onClick={() => setOpen(true)}>Ask to join · stake {stake}</button>;
+  return (
+    <F action={action} back={back} hidden={{ role }} className="stack join-ask">
+      <label className="field"><span>Why you, for {title}?</span>
+        <textarea name="note" id={`join-note-${role}`} rows={3} maxLength={400} autoFocus
+          placeholder="What you would do, and something you built that shows it. A link helps." />
+        <small>Optional, but leads say yes far more often when they can see what you have done.</small></label>
+      <span className="row">
+        <button className="btn">Send request · stake {stake}</button>
+        <button type="button" className="btn ghost" onClick={() => setOpen(false)}>Cancel</button>
+      </span>
+    </F>
+  );
 }
 
 /* ---------- people: instant search, branch and skill filters, sorting ---------- */

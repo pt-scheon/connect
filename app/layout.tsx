@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Bricolage_Grotesque, Hanken_Grotesk, DM_Mono } from "next/font/google";
@@ -20,6 +20,10 @@ export const metadata: Metadata = {
   title: { default: "Connect", template: "%s · Connect" },
   description: about,
   openGraph: { title: "Connect", description: about, type: "website" },
+  appleWebApp: { capable: true, title: "Connect", statusBarStyle: "black-translucent" },
+};
+export const viewport: Viewport = {
+  themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0A0B14" }, { media: "(prefers-color-scheme: light)", color: "#F2F3F8" }],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

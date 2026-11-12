@@ -340,3 +340,10 @@ td{padding-block:11px}
 .check{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
 .check input{width:18px;height:18px;margin-top:3px;flex:none;accent-color:var(--accent)}
 .foot .row a{color:inherit}
+
+/* ---------- join pitch, quiet projects ---------- */
+.join-ask{flex:1 1 100%;max-width:520px}
+.join-ask textarea{width:100%}
+.pitch{border-left:2px solid var(--accent);padding:2px 0 2px 10px;font-size:.92rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.quiet-tag{color:var(--warn)}
+.quiet-note{border-color:color-mix(in srgb,var(--warn) 50%,transparent);color:var(--ink)}

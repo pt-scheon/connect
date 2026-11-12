@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { all } from "@/lib/db";
+import { all, now } from "@/lib/db";
 import { currentUser, standings } from "@/lib/auth";
 import { EMPTY, RULES } from "@/lib/credit";
 import { ties, pathTo } from "@/lib/graph";
 import { timeAgo } from "@/lib/notify";
+import { fitFor } from "@/lib/match";
 import { Board, Count, type BoardItem } from "./client";
 import { Landing } from "./landing";
-import { Av } from "./ui";
+import { Av, skillsOf } from "./ui";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   const me = await currentUser();
@@ -20,14 +21,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
   const roles = all("SELECT project_id, title FROM roles WHERE open=1");
   const ms = new Map(all("SELECT project_id, COUNT(*) total, SUM(done) done FROM milestones GROUP BY project_id").map((m) => [m.project_id, m]));
   const funded = new Set(all("SELECT project_id FROM grants").map((g) => g.project_id));
+  const last = new Map(all("SELECT project_id, MAX(created_at) t FROM updates GROUP BY project_id").map((x) => [x.project_id, x.t]));
+  const mySkills = me.role === "student" ? skillsOf(me) : [];
   const items: BoardItem[] = all("SELECT * FROM projects ORDER BY created_at DESC")
     .map((p) => {
       const team = members.filter((m) => m.project_id === p.id).map(({ id, name, picture }) => ({ id, name, picture }));
+      const open = roles.filter((r) => r.project_id === p.id).map((r) => r.title);
+      const t = Math.max(last.get(p.id) ?? 0, p.created_at ?? 0);
+      const live = p.status === "recruiting" || p.status === "building";
       return {
         id: p.id, name: p.name, pitch: p.pitch, status: p.status, hidden: p.hidden,
         done: ms.get(p.id)?.done ?? 0, total: ms.get(p.id)?.total ?? 0, team,
-        open: roles.filter((r) => r.project_id === p.id).map((r) => r.title),
-        funded: funded.has(p.id), mine: team.some((u) => u.id === me.id),
+        open, funded: funded.has(p.id), mine: team.some((u) => u.id === me.id),
+        fit: [...new Set(open.flatMap((r) => fitFor(r, mySkills)))],
+        active: live && t ? timeAgo(t) : "", quiet: live && t > 0 && now() - t > 14 * 86400,
       };
     })
     .filter((p) => !p.hidden || p.mine || me.admin);

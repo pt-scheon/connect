@@ -57,3 +57,9 @@ export function suggest(title: string, people: Candidate[], limit = 3): Suggesti
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }
+
+/* The skills from a person's list that an open role asks for. Used for the board's "Fits you" filter. */
+export function fitFor(title: string, skills: string[]): string[] {
+  const wanted = roleSkills(title);
+  return skills.filter((k) => matches(k, wanted));
+}
