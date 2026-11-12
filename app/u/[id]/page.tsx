@@ -198,6 +198,7 @@ export default async function Profile({ params, searchParams }: Props) {
           <Av u={u} lg />
           <div className="stack tight" style={{ flex: "1 1 240px" }}>
             <h1>{u.name}</h1>
+            {!alum && u.open_to_join ? <span><span className="pill ok">Open to projects</span></span> : null}
             <span className="muted">{u.branch}, class of {u.grad_year}{alum ? " · alum" : ""}</span>
             {u.about && <span>{u.about}</span>}
             <Links u={u} />
@@ -210,6 +211,10 @@ export default async function Profile({ params, searchParams }: Props) {
           </div>
           <div className="stack tight noprint profile-actions" style={{ alignItems: "end" }}>
             {self && <Link className="btn ghost sm" href="/onboarding?edit=1">Edit profile</Link>}
+            {self && !alum && (
+              <F action={A.toggleOpen} back={back}><button className="btn ghost sm">{u.open_to_join ? "Stop showing as open" : "Mark me open to projects"}</button></F>
+            )}
+            {self && <Link className="small" href="/settings">Settings</Link>}
             {!alum && u.verified ? <CopyLink path={`/u/${id}?tab=resume`} label={self ? "Copy resume link" : "Copy link"} /> : null}
             {viewer && !self && !alum && viewer.role === "student" && (
               <>

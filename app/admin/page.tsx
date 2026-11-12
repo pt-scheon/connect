@@ -11,16 +11,28 @@ export default async function Admin() {
   const me = await requireUser();
   if (!me.admin) notFound();
   const alumni = all("SELECT * FROM users WHERE role='alum' AND verified=0 AND onboarded=1");
+  const waiting = all("SELECT * FROM users WHERE role='student' AND verified=0 AND onboarded=1 AND suspended=0 ORDER BY created_at DESC LIMIT 50");
   const students = all("SELECT id, name, branch FROM users WHERE role='student' AND verified=1 ORDER BY name");
   const review = all("SELECT * FROM projects WHERE status='review'");
   const reports = all("SELECT r.*, u.name by_name FROM reports r JOIN users u ON u.id=r.by_id WHERE r.open=1 ORDER BY r.id DESC");
   const label = (r: { kind: string; target_id: number }) =>
     r.kind === "user" ? all("SELECT name FROM users WHERE id=?", r.target_id)[0]?.name : all("SELECT name FROM projects WHERE id=?", r.target_id)[0]?.name;
-  const suspended = all("SELECT * FROM users WHERE suspended=1");
+  const suspended = all("SELECT * FROM users WHERE suspended=1 AND deleted=0");
   return (
     <>
-      <div className="head"><div className="stack tight"><h1>Admin</h1><p>Approve alumni, register clubs, and clear the review queue. One admin review is enough to ship a project.</p></div></div>
+      <div className="head"><div className="stack tight"><h1>Admin</h1><p>Verify students and alumni, register clubs, and clear the review queue. One admin review is enough to ship a project.</p></div></div>
       <div className="grid">
+        <div className="card">
+          <h2>Students not verified</h2>
+          <span className="small muted">Most verify themselves with a college email. Verify someone here only if you know they study at your college.</span>
+          {waiting.length === 0 && <span className="muted">No one is waiting.</span>}
+          {waiting.map((u) => (
+            <div key={u.id} className="row between">
+              <span className="stack" style={{ gap: 0 }}><Who u={u} /><span className="small muted">{u.branch}, class of {u.grad_year} · {u.email}</span></span>
+              <F action={A.verifyStudent} back="/admin" hidden={{ user: u.id }}><button className="btn ghost sm">Verify</button></F>
+            </div>
+          ))}
+        </div>
         <div className="card">
           <h2>Alumni waiting</h2>
           {alumni.length === 0 && <span className="muted">No one is waiting.</span>}

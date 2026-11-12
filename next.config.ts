@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   // Dev only: lets http://127.0.0.1:3000 load scripts as well as localhost.
-  allowedDevOrigins: ["127.0.0.1"],
+  allowedDevOrigins: ["127.0.0.1", "*.localhost"],
   async headers() {
     return [{ source: "/:path*", headers: security }];
   },

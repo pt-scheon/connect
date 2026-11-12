@@ -30,6 +30,8 @@ db.transaction(() => {
   person("meera", "Meera Joshi", "CSE", 2016, "", { role: "alum", about: "Senior engineer, payments" });
   person("rohan", "Rohan Bhosale", "Mech", 2012, "", { role: "alum", about: "Founder, EV components" });
   person("priya", "Priya Nair", "ECE", 2019, "", { role: "alum", verified: 0, about: "Hardware engineer" });
+  // Students who said they are free to join something.
+  for (const k of ["sneha", "omkar"]) run("UPDATE users SET open_to_join=1 WHERE id=?", ids[k]);
 
   for (const c of ["Founder at a stealth AI startup", "Built 10+ full-stack apps", "Web3 expert", "Led a 200-member tech community"])
     run("INSERT INTO claims (user_id, text) VALUES (?,?)", ids.dev, c);

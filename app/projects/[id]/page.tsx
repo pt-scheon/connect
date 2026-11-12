@@ -41,7 +41,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const asked = new Set<number>(all("SELECT user_id FROM requests WHERE project_id=?", id).map((q) => q.user_id));
   const pool = lead ? all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND onboarded=1")
     .filter((u) => !team.some((t) => t.id === u.id) && !asked.has(u.id))
-    .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.credit, shipped: st.shipped, left: st.left } }; }) : [];
+    .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.credit, shipped: st.shipped, left: st.left, open: !!u.open_to_join } }; }) : [];
   const fits = new Map(roles.map((r) => [r.id, suggest(r.title, pool.map((x) => x.c)).map((sg) => ({ ...sg, u: pool.find((x) => x.u.id === sg.id)!.u, st: S.get(sg.id) ?? EMPTY }))]));
   const myRequest = get("SELECT * FROM requests WHERE project_id=? AND user_id=?", id, me.id);
   const requests = lead ? all("SELECT q.id rid, r.title, u.* FROM requests q JOIN roles r ON r.id=q.role_id JOIN users u ON u.id=q.user_id WHERE q.project_id=? AND q.status='pending'", id) : [];
@@ -172,7 +172,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
                           <div key={sg.id} className="row between">
                             <span className="stack" style={{ gap: 0 }}>
                               <Who u={sg.u} />
-                              <span className="small muted">{sg.matched.join(", ")} · {sg.backed ? `${sg.st.shipped} shipped` : "listed, not yet shipped"} · {sg.st.credit} credit</span>
+                              <span className="small muted">{sg.matched.join(", ")} · {sg.backed ? `${sg.st.shipped} shipped` : "listed, not yet shipped"} · {sg.st.credit} credit{sg.open ? " · open to projects" : ""}</span>
                             </span>
                             {done ? <span className="small muted">Invited</span>
                               : <F action={A.inviteToRole} back={back} hidden={{ role: r.id, to: sg.id }}><button className="btn ghost sm">Invite to apply</button></F>}

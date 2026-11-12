@@ -20,8 +20,8 @@ const RELATED: Record<string, string[]> = {
   mechanical: ["cad", "3d printing", "mechanisms"],
 };
 
-export type Candidate = { id: number; skills: string[]; credit: number; shipped: number; left: number };
-export type Suggestion = { id: number; score: number; matched: string[]; backed: boolean };
+export type Candidate = { id: number; skills: string[]; credit: number; shipped: number; left: number; open?: boolean };
+export type Suggestion = { id: number; score: number; matched: string[]; backed: boolean; open: boolean };
 
 const norm = (s: string) => s.toLowerCase().trim();
 const words = (s: string) => norm(s).split(/[^a-z0-9.+#]+/).filter(Boolean);
@@ -49,9 +49,9 @@ export function suggest(title: string, people: Candidate[], limit = 3): Suggesti
     .map((p) => {
       const matched = p.skills.filter((k) => matches(k, wanted));
       const backed = p.shipped > 0;
-      // A listed skill with nothing shipped is worth a third of a proven one.
-      const score = matched.length * (backed ? 3 : 1) + Math.min(p.credit, 200) / 100 - p.left * 1.5;
-      return { id: p.id, score, matched, backed };
+      // A listed skill with nothing shipped is worth a third of a proven one. Saying you are open to join adds a little.
+      const score = matched.length * (backed ? 3 : 1) + Math.min(p.credit, 200) / 100 - p.left * 1.5 + (p.open ? 1 : 0);
+      return { id: p.id, score, matched, backed, open: !!p.open };
     })
     .filter((s) => s.matched.length > 0)
     .sort((a, b) => b.score - a.score)

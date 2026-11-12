@@ -3,6 +3,7 @@ import Link from "next/link";
 import { get, now } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { RULES } from "@/lib/credit";
+import { mailReady } from "@/lib/mail";
 import { saveProfile, sendCode, verifyCode } from "../actions";
 import { F } from "../ui";
 
@@ -14,7 +15,9 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const editing = !me.onboarded || (await searchParams).edit;
   const pending = get("SELECT * FROM codes WHERE user_id=? AND expires>?", me.id, now());
   const domain = process.env.COLLEGE_EMAIL_DOMAIN;
-  const showCode = process.env.NODE_ENV !== "production" && !process.env.RESEND_API_KEY;
+  const prod = process.env.NODE_ENV === "production";
+  const showCode = !prod && !mailReady();
+  const noMail = prod && !mailReady();
 
   if (editing) return (
     <div className="card narrow">
@@ -51,7 +54,13 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
     <div className="card narrow">
       <h1>Verify your college email</h1>
       <p className="muted">This is what proves you study here. You get {RULES.starter} starter credit once it is done.</p>
-      {domain && <p className="small muted">Tip: if you sign in with your @{domain} Google account, this step is skipped.</p>}
+      {domain && !noMail && <p className="small muted">Tip: if you sign in with your @{domain} Google account, this step is skipped.</p>}
+      {noMail ? (
+        <div className="note">
+          {domain ? <>Sign out, then sign in with your <b>@{domain}</b> Google account. That proves you study here and verifies you straight away.</>
+            : <>Email codes are not switched on for this site yet. An admin can verify you.</>}
+        </div>
+      ) : <>
       <F action={sendCode} back="/onboarding" className="row">
         <input type="email" name="email" id="email" placeholder={domain ? `you@${domain}` : "you@college.ac.in"} defaultValue={pending?.email ?? ""} required />
         <button className="btn ghost">{pending ? "Send again" : "Send code"}</button>
@@ -62,6 +71,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
           <button className="btn">Verify</button>
         </F>
       )}
+      </>}
       {pending && showCode && <div className="note">Development mode: no email service is set up, so the code is shown here: <b className="mono">{pending.code}</b></div>}
       <Link href="/" className="small">Skip for now</Link>
     </div>

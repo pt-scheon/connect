@@ -8,6 +8,7 @@ import { compute, RULES } from "@/lib/credit";
 import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify } from "@/lib/auth";
 import { notify, logUpdate, allow } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
+import { mailReady, sendMail } from "@/lib/mail";
 
 /* ---------- plumbing ---------- */
 function safeBack(v: FormDataEntryValue | null) {
@@ -99,13 +100,13 @@ export async function sendCode(fd: FormData) {
   if (!allow(`code:${me.id}`, 3, 600)) fail("Too many codes requested. Wait ten minutes.");
   const code = String(crypto.randomInt(100000, 1000000));
   run("INSERT OR REPLACE INTO codes (user_id, email, code, expires, tries) VALUES (?,?,?,?,0)", me.id, email, code, now() + 900);
-  if (process.env.RESEND_API_KEY) {
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: process.env.MAIL_FROM, to: email, subject: "Your Connect code", text: `Your Connect verification code is ${code}. It expires in 15 minutes.` }),
-    });
-    if (!r.ok) fail("Could not send the email. Try again.");
+  if (mailReady()) {
+    if (!(await sendMail(email, "Your Connect code", `Your Connect verification code is ${code}. It expires in 15 minutes.\n\nIf you did not ask for this, ignore this email.`)))
+      fail("Could not send the email. Try again in a minute.");
+  } else if (process.env.NODE_ENV === "production") {
+    run("DELETE FROM codes WHERE user_id=?", me.id);
+    fail(domain ? `Email codes are not switched on yet. Sign out and sign in with your @${domain} Google account instead; that verifies you straight away.`
+      : "Email codes are not switched on yet. Ask an admin to verify you.");
   } else {
     console.log(`[connect] verification code for ${email}: ${code}`);
   }
@@ -524,6 +525,14 @@ export async function approveAlum(fd: FormData) {
   notify(n("user"), "Your alumni account is approved. You can open funding calls now.", "/funding");
   done(back, "Approved.");
 }
+/* For colleges without email codes: an admin who knows the student verifies them by hand. */
+export async function verifyStudent(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd, false);
+  if (!me.admin) fail("Admins only.");
+  run("UPDATE users SET verified=1 WHERE id=? AND role='student' AND deleted=0", n("user"));
+  notify(n("user"), `An admin verified you as a student. You start with ${RULES.starter} credit and can join projects now.`, "/");
+  done(back, "Verified.");
+}
 export async function setSuspended(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
@@ -606,4 +615,33 @@ export async function summariseProof(projectId: number): Promise<{ text?: string
   if (!allow(`ai:${me.id}`, 10, 3600)) return { error: "You have asked for several summaries. Try again in an hour." };
   const { proofSummary } = await import("@/lib/review-help");
   return proofSummary(p.id);
+}
+
+/* ---------- settings and your data ---------- */
+export async function saveSettings(fd: FormData) {
+  const { me, back } = await ctx(fd, false);
+  run("UPDATE users SET email_notes=?, open_to_join=? WHERE id=?", fd.get("email_notes") ? 1 : 0, fd.get("open_to_join") ? 1 : 0, me.id);
+  done(back, "Settings saved.");
+}
+export async function toggleOpen(fd: FormData) {
+  const { me, back } = await ctx(fd, false);
+  run("UPDATE users SET open_to_join=1-open_to_join WHERE id=?", me.id);
+  done(back, me.open_to_join ? "You are no longer marked as open to projects." : "Project leads can now see you are open to join.");
+}
+/* Deleting an account removes everything about the person. Their place in past teams stays, shown as
+   "Deleted user", and so do vouches they gave, because teammates' signed history and credit depend on them. */
+export async function deleteAccount(fd: FormData) {
+  const { me, s, fail } = await ctx(fd, false);
+  if (s("confirm").toLowerCase() !== "delete") fail('Type "delete" to confirm.');
+  if (me.admin && get("SELECT COUNT(*) n FROM users WHERE admin=1 AND deleted=0").n <= 1) fail("You are the only admin. Make someone else an admin first.");
+  db.transaction(() => {
+    run(`UPDATE users SET name='Deleted user', email=NULL, college_email=NULL, picture=NULL, about='', skills='', resume=NULL,
+         github='', linkedin='', website='', sub=?, admin=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
+    for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
+      "DELETE FROM claims WHERE user_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
+      "DELETE FROM requests WHERE user_id=? AND status='pending'"]) run(q, me.id);
+  })();
+  await clearSession();
+  revalidatePath("/", "layout");
+  redirect("/?ok=" + encodeURIComponent("Your account is deleted."));
 }

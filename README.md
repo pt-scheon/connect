@@ -30,7 +30,8 @@ Someone who uses both with the same verified email lands on one account.
 - `APP_URL`: the public address, e.g. `https://connect.yourcollege.in`.
 - `SESSION_SECRET`: a long random string (`openssl rand -hex 32`).
 - `COLLEGE_EMAIL_DOMAIN`: e.g. `college.ac.in`. A student who signs in with a Google account on this domain is verified at once. Everyone else gets a code by email.
-- `RESEND_API_KEY` and `MAIL_FROM`: so the code is emailed. Without them the code is only printed in the server log.
+- `SMTP_URL` (a Gmail app password works) or `RESEND_API_KEY`, plus `MAIL_FROM`: sends verification codes and inbox alerts by email. Without them, codes are printed in the server log in development, and in production students verify by signing in with a Google account on `COLLEGE_EMAIL_DOMAIN` (or an admin verifies them on /admin).
+- `CONTACT_EMAIL`: optional, shown on the privacy page.
 - `ADMIN_EMAILS`: your own sign-in email. Admins approve alumni, register clubs, handle reports and can ship a project with a single review.
 - `GEMINI_API_KEY`: turns on "Write with AI" for resumes.
 
@@ -94,7 +95,6 @@ npm run build
 ## Not built yet
 
 - Real payments. Funding records promises and "paid" marks. Money moves outside the app.
-- Email notifications. The inbox is in-app only.
 - More than one college per install.
 - A privacy policy and terms page. Write these for your college before inviting people.
 - Rate limits are kept in memory, which is fine for one server.

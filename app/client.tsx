@@ -155,13 +155,14 @@ function match(p: BoardItem, k: string) {
 /* ---------- people: instant search, branch and skill filters, sorting ---------- */
 export type Person = {
   id: number; name: string; picture: string | null; branch: string; year: number; verified: boolean;
-  skills: string[]; credit: number; shipped: number; joined: number; left: number; path: string;
+  skills: string[]; credit: number; shipped: number; joined: number; left: number; path: string; open: boolean;
 };
 export function PeopleList({ people }: { people: Person[] }) {
   const [q, setQ] = useState("");
   const [branch, setBranch] = useState("");
   const [skill, setSkill] = useState("");
   const [sort, setSort] = useState("credit");
+  const [onlyOpen, setOnlyOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -178,7 +179,7 @@ export function PeopleList({ people }: { people: Person[] }) {
     return [...n].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([s]) => s);
   }, [people]);
   const list = people
-    .filter((p) => (!branch || p.branch === branch) && (!skill || p.skills.includes(skill)) &&
+    .filter((p) => (!onlyOpen || p.open) && (!branch || p.branch === branch) && (!skill || p.skills.includes(skill)) &&
       (!q || `${p.name} ${p.branch} ${p.skills.join(" ")}`.toLowerCase().includes(q.toLowerCase())))
     .sort((a, b) => sort === "shipped" ? b.shipped - a.shipped || b.credit - a.credit : sort === "name" ? a.name.localeCompare(b.name) : b.credit - a.credit);
   return (
@@ -190,6 +191,7 @@ export function PeopleList({ people }: { people: Person[] }) {
         </select>
       </div>
       <div className="filters">
+        <button type="button" aria-pressed={onlyOpen} onClick={() => setOnlyOpen(!onlyOpen)}>Open to projects · {people.filter((p) => p.open).length}</button>
         <button type="button" aria-pressed={!branch} onClick={() => setBranch("")}>All branches</button>
         {branches.map((b) => <button key={b} type="button" aria-pressed={branch === b} onClick={() => setBranch(branch === b ? "" : b)}>{b}</button>)}
       </div>
@@ -203,7 +205,7 @@ export function PeopleList({ people }: { people: Person[] }) {
       {list.map((u) => (
         <Link key={u.id} className="card lift" href={`/u/${u.id}`}>
           <span className="row between">
-            <span className="row"><Av u={u} /><span><b>{u.name}</b> <span className="muted small">{u.branch} · {u.year}{u.verified ? "" : " · not verified"}</span></span></span>
+            <span className="row"><Av u={u} /><span><b>{u.name}</b> <span className="muted small">{u.branch} · {u.year}{u.verified ? "" : " · not verified"}</span>{u.open ? <> <span className="pill ok">Open to projects</span></> : null}</span></span>
             <span className="bal">{u.credit} credit</span>
           </span>
           {u.skills.length > 0 && <span className="row">{u.skills.map((k) => <span key={k} className="chip">{k}</span>)}</span>}

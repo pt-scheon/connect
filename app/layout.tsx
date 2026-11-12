@@ -65,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="wrap">{children}</main>
         <footer className="foot"><div className="wrap">
           <span>Connect. Credit comes only from what ships.</span>
-          <span className="row"><Link href="/rules">How credit works</Link>{!signedIn && <Link href="/signin">Sign in</Link>}</span>
+          <span className="row"><Link href="/rules">How credit works</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <Link href="/settings">Settings</Link> : <Link href="/signin">Sign in</Link>}</span>
         </div></footer>
         <Suspense><Toast /></Suspense>
       </body>

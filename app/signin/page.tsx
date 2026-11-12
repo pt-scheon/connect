@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { all } from "@/lib/db";
 import { currentUser, devLogin } from "@/lib/auth";
@@ -18,7 +19,7 @@ export default async function SignIn() {
         <h1>Sign in to Connect</h1>
         <p className="muted">For students and alumni of one college. Build things with each other, and let the record speak.</p>
         <SignInButtons />
-        <p className="small muted">We get your name, photo and email. Students then confirm a college email, unless they signed in with it. Alumni are approved by an admin.</p>
+        <p className="small muted">We get your name, photo and email. Students then confirm a college email, unless they signed in with it. Alumni are approved by an admin. By continuing you agree to the <Link href="/terms">terms</Link> and <Link href="/privacy">privacy policy</Link>.</p>
         {missing && <div className="note">Development note: a button without keys in <code>.env.local</code> sends you back here with a message. See the README for the two-minute setup.</div>}
       </div>
       {devLogin && (

@@ -1,8 +1,10 @@
 import { run, now } from "./db";
+import { emailNote } from "./mail";
 
 /* An entry in someone's inbox. */
 export function notify(userId: number, text: string, href: string) {
   run("INSERT INTO notifications (user_id, text, href, created_at) VALUES (?,?,?,?)", userId, text, href, now());
+  emailNote(userId, text, href);
 }
 
 /* A line on a project's timeline. kind "event" is written by the app, "post" by a teammate. */
