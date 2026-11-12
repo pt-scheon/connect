@@ -2,13 +2,13 @@
 
 Team: Connectors · Product: Connect
 
-## Team description (245 characters)
+## Team description (236 characters)
 
-In a tier 3 college, finding people who actually want to build something is the hardest part. Connect puts every project and builder on one campus board and shows who really ships, so serious students find each other instead of waiting for luck.
+In college, finding people who actually want to build something is the hardest part. Connect puts every project and builder on one campus board and shows who really ships, so serious students find each other instead of waiting for luck.
 
 ## Problem Statement
 
-In tier 3 colleges, students who want to build things cannot find each other. There is no strong peer culture of building, so the few serious students are scattered across 50+ WhatsApp groups and clubs. Posts asking for teammates get lost, and there is no way to tell who will actually do the work from who only talks about it. Profiles and resumes are self-written, so someone who lists "AI, Web3, Founder" looks the same as someone who shipped three projects. The result: good ideas die for lack of a team, teams break when members disappear midway, and students graduate with no proof of what they built. Alumni who want to fund student work have no way to know which teams are real.
+In colleges, students who want to build things cannot find each other. Most campuses have no strong peer culture of building, so the serious students are scattered across 50+ WhatsApp groups and clubs. Posts asking for teammates get lost, and there is no way to tell who will actually do the work from who only talks about it. Profiles and resumes are self-written, so someone who lists "AI, Web3, Founder" looks the same as someone who shipped three projects. The result: good ideas die for lack of a team, teams break when members disappear midway, and students graduate with no proof of what they built. Alumni who want to fund student work have no way to know which teams are real.
 
 ## Proposed Solution
 
@@ -21,6 +21,8 @@ A credit system keeps it honest. Credit is earned only when a project ships. Two
 Every student gets a shareable resume where each line is signed by the teammates who were there, with AI writing it only from verified records. Clubs keep confirmed rosters, and alumni can fund projects milestone by milestone, with teams needing real credit to apply.
 
 A working version is already built, with Google sign-in and college email verification.
+
+Growth: the same model works inside corporates. Employees team up on internal projects, credit comes only from work colleagues sign off, and managers see who actually delivers. A student's signed record from college carries straight into hiring.
 
 ## Solution Architecture
 
@@ -50,11 +52,13 @@ The template has 9 pages. Make your editable copy, delete page 1 (the guidelines
 
 - Team Name: Connectors
 - Team Size: (number of people on your hack2skill team)
-- Problem Statement: In tier 3 colleges, students who want to build cannot find each other, and nothing shows who actually ships.
+- Problem Statement: In colleges, students who want to build cannot find each other, and nothing shows who actually ships.
 
 ### Slide 3: Problem Statement
 
-- In a tier 3 college, the few students who want to build are scattered across 50+ WhatsApp groups and clubs. Requests for teammates get lost.
+Builders exist in every college. They just never find each other.
+
+- In a college, the students who want to build are scattered across 50+ WhatsApp groups and clubs. Requests for teammates get lost.
 - Nobody can tell who will do the work. Profiles are self-written, so "AI | Web3 | Founder" looks the same as three shipped projects.
 - Teams break when members disappear midway, and nothing records it.
 - Students graduate with no proof of what they built. Alumni who want to fund student work cannot tell which teams are real.
@@ -83,9 +87,9 @@ See the finished deck: Connect-Idea-Submission.pdf
 
 See the finished deck: Connect-Idea-Submission.pdf
 
-### Slide 8
+### Slide 8: Already built, and where it grows
 
-Blank in the template. If it is blank in your editable copy too, delete it or use it for a screenshot of the product.
+Two product screenshots, plus the growth band: the same model works inside corporates.
 
 ### Slide 9
 

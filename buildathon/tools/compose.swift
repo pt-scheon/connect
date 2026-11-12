@@ -87,16 +87,16 @@ page(2) {
   let v = font(13, .semibold)
   text("Connectors  ·  product: Connect", CGRect(x: 137, y: 263, width: 520, height: 18), v)
   text(teamSize, CGRect(x: 125, y: 296, width: 200, height: 18), v)
-  text("In tier 3 colleges, students who want to build cannot find each other, and nothing shows who actually ships.",
+  text("In colleges, students who want to build cannot find each other, and nothing shows who actually ships.",
        CGRect(x: 183, y: 330, width: 480, height: 40), v, lineGap: 3)
 }
 
 // ---------- page 3: problem ----------
 page(3) {
   coverPrompt()
-  text("Builders exist in every tier 3 college. They just never find each other.", CGRect(x: 39, y: 135, width: 640, height: 18), font(12.5, .semibold))
+  text("Builders exist in every college. They just never find each other.", CGRect(x: 39, y: 135, width: 640, height: 18), font(12.5, .semibold))
   let items: [(String, String, NSColor)] = [
-    ("Builders are scattered", "The few students who want to build are spread across 50+ WhatsApp groups and clubs. A post asking for teammates is buried within hours.", blue),
+    ("Builders are scattered", "Students who want to build are spread across 50+ WhatsApp groups and clubs. A post asking for teammates is buried within hours.", blue),
     ("No way to tell who delivers", "Profiles are self-written. \u{201C}AI | Web3 | Founder\u{201D} looks exactly like someone who shipped three real projects.", red),
     ("Teams fall apart midway", "Members disappear once the work gets hard. Nothing records it, so the same thing happens to the next team.", yellow),
     ("No proof at the end", "Students graduate with nothing that shows what they built. Alumni who want to back student work can\u{2019}t tell which teams are real.", green),
@@ -196,14 +196,19 @@ page(7) {
 
 // ---------- page 8: the product today ----------
 page(8) {
-  pageTitle("Already built", "Connect is a working web app today, not a mock-up.")
-  let w: CGFloat = 313, h = w * 455 / 800, y: CGFloat = 138
+  pageTitle("Already built, and where it grows", "A working web app today, not a mock-up. The same model scales from colleges to companies.")
+  let w: CGFloat = 300, h = w * 455 / 800, y: CGFloat = 133, x2: CGFloat = 39 + 642 - w
   image("deck/shot-landing.jpg", CGRect(x: 39, y: y, width: w, height: h), radius: 10, border: true)
-  image("deck/shot-project.jpg", CGRect(x: 39 + w + 16, y: y, width: w, height: h), radius: 10, border: true)
-  text("Sign in with Google, and see why bios earn nothing", CGRect(x: 39, y: y + h + 8, width: w, height: 14), font(10, .semibold))
-  text("A shipped project: outside review, teammate split, proof", CGRect(x: 39 + w + 16, y: y + h + 8, width: w, height: 14), font(10, .semibold))
-  text("Also built: profiles with a who-worked-with-whom graph, clubs, alumni funding, inbox, admin moderation, light and dark modes.",
-       CGRect(x: 39, y: y + h + 30, width: 642, height: 30), font(9.5), muted, lineGap: 2)
+  image("deck/shot-project.jpg", CGRect(x: x2, y: y, width: w, height: h), radius: 10, border: true)
+  text("Sign in with Google, and see why bios earn nothing", CGRect(x: 39, y: y + h + 6, width: w, height: 14), font(10, .semibold))
+  text("A shipped project: outside review, teammate split, proof", CGRect(x: x2, y: y + h + 6, width: w, height: 14), font(10, .semibold))
+  // growth: companies
+  let by: CGFloat = 330, bh: CGFloat = 62
+  fill(CGRect(x: 39, y: by, width: 642, height: bh), hex("E8F0FE"), radius: 12)
+  let pw = pill("NEXT: COMPANIES", 53, by + 11, blueDark, .white)
+  text("The same model works inside corporates.", CGRect(x: 53 + pw + 10, y: by + 10, width: 560 - pw, height: 16), font(11.5, .semibold))
+  text("Employees team up on internal projects, credit comes only from work colleagues sign off, and managers see who actually delivers. A student\u{2019}s signed record carries straight into hiring.",
+       CGRect(x: 53, y: by + 31, width: 614, height: 30), font(9.5), ink, lineGap: 2)
 }
 
 // ---------- page 9: thank you, unchanged ----------
