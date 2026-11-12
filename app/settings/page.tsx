@@ -44,7 +44,7 @@ export default async function Settings() {
       <F action={deleteAccount} back="/settings" className="card stack">
         <span className="label">Delete account</span>
         <p className="small muted">
-          Your name, photo, emails, skills, links, resume, inbox and questions are erased, and you are signed out. Projects you were part of
+          Your name, photo, emails, skills, links, resume, inbox, questions, messages and the files in them are erased, and you are signed out. Projects you were part of
           keep a “Deleted user” in their team, so your teammates&rsquo; signed history stays true. This cannot be undone.
         </p>
         <label className="field"><span>Type delete to confirm</span><input type="text" name="confirm" id="confirm" autoComplete="off" required pattern="[Dd][Ee][Ll][Ee][Tt][Ee]" /></label>

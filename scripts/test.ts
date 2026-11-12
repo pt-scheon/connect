@@ -142,3 +142,18 @@ test("a college email only counts for the college that owns that domain", async 
   assert.equal(baseDomain("students.mit.edu"), "mit.edu");
   assert.equal(baseDomain("mit.edu"), "mit.edu");
 });
+
+test("chat attachments are accepted by what the bytes are, not by their name", async () => {
+  const { sniff, cleanName } = await import("../lib/files");
+  const B = (s: string | number[]) => Buffer.from(s as never);
+  assert.equal(sniff(B([0xff, 0xd8, 0xff, 0xe0, 0, 0]), "a.png")?.mime, "image/jpeg", "a JPEG named .png is still a JPEG");
+  assert.equal(sniff(B([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]), "x")?.kind, "image");
+  assert.equal(sniff(B("%PDF-1.7 ..."), "notes.pdf")?.mime, "application/pdf");
+  assert.equal(sniff(B("MZ\u0090 program"), "notes.pdf"), null, "a program renamed .pdf is refused");
+  assert.equal(sniff(B('<svg xmlns="http://www.w3.org/2000/svg"><script/></svg>'), "a.svg"), null, "SVG can carry scripts");
+  assert.equal(sniff(B("<html><script></script></html>"), "a.html"), null);
+  assert.equal(sniff(B("<html><script></script></html>"), "a.txt")?.mime, "text/plain", "text is fine; it is served as plain text");
+  assert.equal(sniff(B([0x50, 0x4b, 0x03, 0x04, 0]), "report.docx")?.ext, "docx");
+  assert.equal(sniff(B([0x50, 0x4b, 0x03, 0x04, 0]), "archive.zip"), null, "other zip files are refused");
+  assert.equal(cleanName("../../etc/passwd<script>.pdf", "pdf"), ".._.._etc_passwd_script_.pdf");
+});

@@ -76,6 +76,13 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["calls", "college_id", "INTEGER"],
   ["reports", "college_id", "INTEGER"],
   ["codes", "college_name", "TEXT DEFAULT ''"],
+  // Chat attachments: one per message, stored on disk under file_key.
+  ["messages", "file_key", "TEXT"],
+  ["messages", "file_name", "TEXT"],
+  ["messages", "file_type", "TEXT"],
+  ["messages", "file_size", "INTEGER"],
+  ["messages", "file_w", "INTEGER"],
+  ["messages", "file_h", "INTEGER"],
 ];
 
 const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");

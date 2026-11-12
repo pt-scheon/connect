@@ -7,6 +7,60 @@ import { loadChat, sendMessage, type Msg } from "../chat-actions";
 
 type Person = { id: number; name: string; picture: string | null };
 
+/* Same limits as the server (lib/files.ts); checked here first so people find out before uploading. */
+const MAX_IMAGE = 8 * 1024 * 1024, MAX_FILE = 10 * 1024 * 1024, AT_ONCE = 4;
+const ACCEPT = ".jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv";
+const OK_EXT = /\.(jpe?g|png|webp|gif|pdf|docx|pptx|xlsx|txt|md|csv)$/i;
+const mb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+type Pending = { id: string; file: File; url: string | null; w?: number; h?: number; progress: number; error?: string };
+
+/* Photos are shrunk to 2000px and re-saved before upload. That keeps them small and drops hidden data such as
+   the GPS location phones write into photos. GIFs are left alone so they keep moving. */
+async function prepare(file: File): Promise<{ file: File; w?: number; h?: number }> {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+    if (file.type === "image/gif") {
+      const img = new Image(); img.src = URL.createObjectURL(file);
+      await img.decode().catch(() => {});
+      return { file, w: img.naturalWidth || undefined, h: img.naturalHeight || undefined };
+    }
+    return { file };
+  }
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const keep = file.type !== "image/jpeg" && scale === 1 && file.size < 2 * 1024 * 1024;
+    if (keep) return { file, w, h };
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
+    const type = file.type === "image/png" ? "image/webp" : "image/jpeg";
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, type, 0.85));
+    if (!blob) return { file, w, h };
+    const name = file.name.replace(/\.[a-z0-9]+$/i, "") + (type === "image/webp" ? ".webp" : ".jpg");
+    return { file: new File([blob], name, { type }), w, h };
+  } catch { return { file }; }
+}
+
+/* Uploads one attachment with progress. */
+function upload(to: number, p: { file: File; w?: number; h?: number }, caption: string, onProgress: (n: number) => void): Promise<{ message?: Msg; error?: string }> {
+  return new Promise((resolve) => {
+    const fd = new FormData();
+    fd.append("to", String(to)); fd.append("file", p.file); fd.append("caption", caption);
+    if (p.w) fd.append("w", String(p.w)); if (p.h) fd.append("h", String(p.h));
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api/messages/attach");
+    x.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch { resolve({ error: "Upload failed." }); } };
+    x.onerror = () => resolve({ error: "Upload failed. Check your connection." });
+    x.send(fd);
+  });
+}
+
+function FileIcon({ type }: { type: string }) {
+  const label = type.includes("pdf") ? "PDF" : type.includes("word") ? "DOC" : type.includes("presentation") ? "PPT" : type.includes("sheet") ? "XLS" : "TXT";
+  return <span className={`file-ico ${label.toLowerCase()}`} aria-hidden="true">{label}</span>;
+}
+
 const initials = (n: string) => n.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 function Face({ u, size = 36 }: { u: Person; size?: number }) {
   return u.picture
@@ -32,6 +86,11 @@ export function Chat({ other, initial, initialSeen, canSend, reason }: {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const [sending, start] = useTransition();
+  const [files, setFiles] = useState<Pending[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [view, setView] = useState<Msg | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const last = msgs.length ? msgs[msgs.length - 1].id : 0;
@@ -70,7 +129,44 @@ export function Chat({ other, initial, initialSeen, canSend, reason }: {
     el.style.height = Math.min(el.scrollHeight + 2, 140) + "px";
   }, [text]);
 
+  const addFiles = (list: FileList | File[]) => {
+    setErr("");
+    const incoming = [...list];
+    const room = AT_ONCE - files.length;
+    if (incoming.length > room) setErr(`Up to ${AT_ONCE} files at a time.`);
+    const next: Pending[] = [];
+    for (const f of incoming.slice(0, Math.max(0, room))) {
+      const image = f.type.startsWith("image/");
+      if (!OK_EXT.test(f.name) && !/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { setErr(`${f.name}: send photos, PDFs, Word, PowerPoint, Excel or text files.`); continue; }
+      if (f.size > (image ? MAX_IMAGE * 3 : MAX_FILE)) { setErr(`${f.name} is ${mb(f.size)}. The limit is ${mb(image ? MAX_IMAGE : MAX_FILE)}.`); continue; }
+      next.push({ id: `${Date.now()}-${Math.random()}`, file: f, url: image ? URL.createObjectURL(f) : null, progress: 0 });
+    }
+    if (next.length) setFiles((x) => [...x, ...next]);
+  };
+  const drop = (id: string) => setFiles((x) => { const gone = x.find((p) => p.id === id); if (gone?.url) URL.revokeObjectURL(gone.url); return x.filter((p) => p.id !== id); });
+
+  const sendFiles = async () => {
+    setUploading(true); setErr("");
+    let caption = text.trim();
+    for (const p of files) {
+      const ready = await prepare(p.file);
+      if (ready.file.size > (ready.file.type.startsWith("image/") ? MAX_IMAGE : MAX_FILE)) {
+        setFiles((x) => x.map((y) => (y.id === p.id ? { ...y, error: "Too big" } : y)));
+        setErr(`${p.file.name} is too big even after shrinking.`); continue;
+      }
+      const r = await upload(other.id, ready, caption, (n) => setFiles((x) => x.map((y) => (y.id === p.id ? { ...y, progress: n } : y))));
+      if (r.error || !r.message) { setErr(r.error ?? "Upload failed."); setFiles((x) => x.map((y) => (y.id === p.id ? { ...y, error: r.error } : y))); break; }
+      caption = "";
+      setText("");
+      setMsgs((m) => (m.some((x) => x.id === r.message!.id) ? m : [...m, r.message!]));
+      drop(p.id);
+    }
+    setUploading(false);
+    box.current?.focus();
+  };
+
   const send = () => {
+    if (files.length) { if (!uploading) void sendFiles(); return; }
     const body = text.trim();
     if (!body || sending) return;
     setErr("");
@@ -87,7 +183,11 @@ export function Chat({ other, initial, initialSeen, canSend, reason }: {
   let prevDay = "";
 
   return (
-    <section className="chat" aria-label={`Conversation with ${other.name}`}>
+    <section className={`chat ${dragging ? "dragging" : ""}`} aria-label={`Conversation with ${other.name}`}
+      onDragOver={(e) => { if (canSend && e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
+      onDrop={(e) => { if (!canSend) return; e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); }}>
+      {dragging && <div className="drop-hint">Drop to attach</div>}
       <header className="chat-head">
         <Link href="/messages" className="chat-back" aria-label="All conversations">←</Link>
         <Link href={`/u/${other.id}`} className="row nowrap chat-who">
@@ -122,6 +222,28 @@ export function Chat({ other, initial, initialSeen, canSend, reason }: {
                     {m.project_id && <Link className="btn sm" href={`/projects/${m.project_id}`}>{m.mine ? "Open project" : "See the project and ask to join"}</Link>}
                     <span className="bubble-time">{time(m.created_at)}</span>
                   </div>
+                ) : m.file && m.kind === "image" ? (
+                  <div className="photo-msg">
+                    <button type="button" className="photo" onClick={() => setView(m)} aria-label={`Open photo ${m.file.name}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/api/files/${m.file.key}`} alt={m.text || m.file.name} loading="lazy"
+                        onLoad={() => { if (i >= msgs.length - 3) end.current?.scrollIntoView({ block: "end" }); }}
+                        width={m.file.w ?? undefined} height={m.file.h ?? undefined}
+                        style={m.file.w && m.file.h ? { aspectRatio: `${m.file.w} / ${m.file.h}` } : undefined} />
+                    </button>
+                    {m.text && <div className="bubble caption">{m.text}</div>}
+                    <span className="bubble-time">{time(m.created_at)}</span>
+                  </div>
+                ) : m.file ? (
+                  <div className="file-msg">
+                    <a className="file-card" href={`/api/files/${m.file.key}`} target="_blank" rel="noopener">
+                      <FileIcon type={m.file.type} />
+                      <span className="stack" style={{ gap: 0, minWidth: 0 }}><b className="ellipsis">{m.file.name}</b><span className="small muted">{mb(m.file.size)}</span></span>
+                    </a>
+                    <a className="small file-dl" href={`/api/files/${m.file.key}?download=1`}>Download</a>
+                    {m.text && <div className="bubble caption">{m.text}</div>}
+                    <span className="bubble-time">{time(m.created_at)}</span>
+                  </div>
                 ) : (
                   <div className="bubble" title={new Date(m.created_at * 1000).toLocaleString("en-IN")}>
                     {m.text}
@@ -138,17 +260,47 @@ export function Chat({ other, initial, initialSeen, canSend, reason }: {
 
       {canSend ? (
         <form className="chat-input" onSubmit={(e) => { e.preventDefault(); send(); }}>
+          {files.length > 0 && (
+            <div className="tray" aria-label="Attachments to send">
+              {files.map((p) => (
+                <div key={p.id} className={`tray-item ${p.error ? "bad" : ""}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {p.url ? <img src={p.url} alt="" /> : <span className="tray-file"><FileIcon type={p.file.name.split(".").pop() === "pdf" ? "pdf" : p.file.name.match(/\.(docx)$/i) ? "word" : p.file.name.match(/\.(pptx)$/i) ? "presentation" : p.file.name.match(/\.(xlsx)$/i) ? "sheet" : "text"} /><span className="ellipsis small">{p.file.name}</span></span>}
+                  {uploading && !p.error ? <span className="tray-bar"><b style={{ width: `${Math.round(p.progress * 100)}%` }} /></span>
+                    : <button type="button" className="tray-x" onClick={() => drop(p.id)} aria-label={`Remove ${p.file.name}`}>×</button>}
+                </div>
+              ))}
+            </div>
+          )}
+          <button type="button" className="attach" onClick={() => picker.current?.click()} disabled={uploading || files.length >= AT_ONCE} aria-label="Attach photos or files" title={`Photos up to ${mb(MAX_IMAGE)}, files up to ${mb(MAX_FILE)}`}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+          </button>
+          <input ref={picker} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
           <textarea
-            ref={box} rows={1} value={text} maxLength={2000} placeholder={`Message ${other.name.split(" ")[0]}`} aria-label="Message"
+            ref={box} rows={1} value={text} maxLength={2000} placeholder={files.length ? "Add a caption (optional)" : `Message ${other.name.split(" ")[0]}`} aria-label="Message"
             onChange={(e) => setText(e.target.value)}
+            onPaste={(e) => { const f = [...e.clipboardData.files]; if (f.length) { e.preventDefault(); addFiles(f); } }}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
           />
-          <button className="send" disabled={!text.trim() || sending} aria-label="Send">
+          <button className="send" disabled={(!text.trim() && !files.length) || sending || uploading} aria-label="Send">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4 20-7z" /></svg>
           </button>
           {err && <span className="chat-err" role="alert">{err}</span>}
         </form>
       ) : <div className="chat-input note">{reason}</div>}
+
+      {view?.file && (
+        <div className="lightbox" role="dialog" aria-modal="true" aria-label={view.file.name} onClick={() => setView(null)}
+          onKeyDown={(e) => e.key === "Escape" && setView(null)} tabIndex={-1} ref={(el) => el?.focus()}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/files/${view.file.key}`} alt={view.text || view.file.name} onClick={(e) => e.stopPropagation()} />
+          <div className="lightbox-bar" onClick={(e) => e.stopPropagation()}>
+            <span className="small">{view.text || view.file.name}</span>
+            <a className="btn sm ghost" href={`/api/files/${view.file.key}?download=1`}>Download</a>
+            <button type="button" className="btn sm" onClick={() => setView(null)}>Close</button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -11,6 +11,7 @@ import { domainOf, isEmail, isPublicMail } from "@/lib/domains";
 import { notify, logUpdate, allow } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { mailReady, sendMail } from "@/lib/mail";
+import { remove as removeFile } from "@/lib/files";
 
 /* ---------- plumbing ---------- */
 function safeBack(v: FormDataEntryValue | null) {
@@ -680,7 +681,10 @@ export async function deleteAccount(fd: FormData) {
          github='', linkedin='', website='', sub=?, admin=0, super=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
       "DELETE FROM claims WHERE user_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
-      "DELETE FROM requests WHERE user_id=? AND status='pending'"]) run(q, me.id);
+      "DELETE FROM requests WHERE user_id=? AND status='pending'", "DELETE FROM blocks WHERE user_id=? OR blocked_id=?"]) run(q, ...(q.includes("OR") ? [me.id, me.id] : [me.id]));
+    // Their conversations go too, attachments included.
+    for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);
+    run("DELETE FROM messages WHERE from_id=? OR to_id=?", me.id, me.id);
   })();
   await clearSession();
   revalidatePath("/", "layout");

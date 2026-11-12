@@ -1,4 +1,5 @@
 import { all, get, type Row } from "./db";
+import { isMember } from "./college";
 
 /* Your conversations, newest first: who, the last message, and how many you have not read. */
 export function conversations(me: Row): { u: Row; last: Row; unread: number }[] {
@@ -23,4 +24,30 @@ export function unreadMessages(userId: number): number {
   return get(
     "SELECT COUNT(*) n FROM messages WHERE to_id=? AND seen=0 AND from_id NOT IN (SELECT blocked_id FROM blocks WHERE user_id=?)", userId, userId,
   )?.n ?? 0;
+}
+
+/* Whether `me` may send to `to` right now. Returns the other person, or why not.
+   Same college, both verified, nobody blocked, and a newcomer gets five messages before the other person replies. */
+export function canMessage(me: Row | null, to: number): { them: Row } | { error: string } {
+  if (!me?.onboarded || !isMember(me)) return { error: "Verify your college email first." };
+  const them = to !== me.id ? get("SELECT * FROM users WHERE id=? AND college_id=? AND verified=1 AND suspended=0 AND deleted=0", to, me.college_id) : undefined;
+  if (!them) return { error: "You can only message verified people at your college." };
+  if (get("SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)", me.id, to, to, me.id)) return { error: "You cannot message this person." };
+  const replied = get("SELECT 1 FROM messages WHERE from_id=? AND to_id=? LIMIT 1", to, me.id);
+  if (!replied && get("SELECT COUNT(*) n FROM messages WHERE from_id=? AND to_id=?", me.id, to).n >= 5)
+    return { error: `Wait for ${them.name.split(" ")[0]} to reply before sending more.` };
+  return { them };
+}
+
+/* A message as the chat screen shows it. */
+export type Msg = {
+  id: number; mine: boolean; text: string; kind: string; project_id: number | null; project_name: string | null; created_at: number; seen: boolean;
+  file: { key: string; name: string; type: string; size: number; w: number | null; h: number | null } | null;
+};
+export function toMsg(m: Row, meId: number): Msg {
+  return {
+    id: m.id, mine: m.from_id === meId, text: m.text, kind: m.kind, project_id: m.project_id, project_name: m.project_name ?? null,
+    created_at: m.created_at, seen: !!m.seen,
+    file: m.file_key ? { key: m.file_key, name: m.file_name, type: m.file_type, size: m.file_size, w: m.file_w, h: m.file_h } : null,
+  };
 }

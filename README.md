@@ -58,6 +58,7 @@ Google and LinkedIn only share name, photo and email. Neither shares education. 
 - A student's college comes only from an email they prove: a Google sign-in with that address, or a code sent to it. Personal mail (Gmail, Yahoo...) is refused, lookalike domains do not match, and a verified account never moves college.
 - A new college on an academic domain (.edu, .ac.in, .edu.in ...) opens the first time someone proves an address on it. Other domains wait for a site admin. Alumni pick their college and are approved by that college's admins.
 - Direct messages between verified people at the same college, with project invites as cards, blocking, and a limit of five messages before the other person replies.
+- Photos and files in chat: JPG, PNG, WebP, GIF up to 8 MB (shrunk to 2000px in the browser, which also drops photo location data); PDF, Word, PowerPoint, Excel and text files up to 10 MB. Up to 4 at once, 30 an hour and 100 MB a day per person. Files are checked by their bytes, stored next to the database in `uploads/`, and only the two people in the chat can open them. Keep that folder on the same disk volume as the database.
 - Alumni are approved by an admin by hand.
 
 ## The credit rules

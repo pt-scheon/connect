@@ -16,7 +16,8 @@ const nextConfig: NextConfig = {
   // Dev only: lets http://127.0.0.1:3000 load scripts as well as localhost.
   allowedDevOrigins: ["127.0.0.1", "*.localhost"],
   async headers() {
-    return [{ source: "/:path*", headers: security }];
+    // Chat attachments set their own, stricter headers in app/api/files/[key]/route.ts.
+    return [{ source: "/((?!api/files/).*)", headers: security }];
   },
 };
 
