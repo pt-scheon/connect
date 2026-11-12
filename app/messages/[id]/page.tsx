@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { get } from "@/lib/db";
+import { all, get } from "@/lib/db";
+import { CallButtons } from "../../calls/ui";
 import { requireMember } from "@/lib/auth";
 import { loadChat, setBlocked } from "../../chat-actions";
 import { ConversationList } from "../list";
@@ -26,7 +27,10 @@ export default async function Conversation({ params }: { params: Promise<{ id: s
     <div className="dm open">
       <ConversationList me={me} active={id} />
       <div className="chat-wrap">
-        <Chat other={other} initial={iBlocked ? [] : msgs} initialSeen={seen} canSend={!reason} reason={reason} />
+        <Chat other={other} initial={iBlocked ? [] : msgs} initialSeen={seen} canSend={!reason} reason={reason}
+          projects={all(`SELECT DISTINCT p.id, p.name, p.status FROM projects p JOIN members m ON m.project_id=p.id
+            WHERE m.user_id=? AND p.college_id=? AND p.hidden=0 AND p.status<>'dropped' ORDER BY p.created_at DESC LIMIT 12`, me.id, me.college_id)}
+          callButtons={!reason ? <CallButtons to={id} name={other.name} /> : null} />
         <form action={setBlocked} className="chat-tools">
           <input type="hidden" name="user" value={id} />
           <input type="hidden" name="on" value={iBlocked ? "0" : "1"} />

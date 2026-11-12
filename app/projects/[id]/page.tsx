@@ -8,6 +8,7 @@ import { suggest } from "@/lib/match";
 import { skillsOf } from "../../ui";
 import * as A from "../../actions";
 import { JoinAsk, ProofHelp, SplitForm } from "../../client";
+import { ShareLink } from "../../messages/media";
 import { F, Meter, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -77,7 +78,8 @@ export default async function Project({ params }: { params: Promise<{ id: string
       )}
       <div className="head">
         <div className="stack tight">
-          <div className="row"><h1>{p.name}</h1><Pill status={p.status} /></div>
+          <div className="row"><h1>{p.name}</h1><Pill status={p.status} />
+            <ShareLink path={`/projects/${id}`} title={`${p.name} on Connect`} text={p.status === "shipped" ? `${p.name}: shipped and reviewed on Connect` : `${p.name} is looking for people on Connect`} /></div>
           <p>{p.pitch}</p>
           {lead && open && (
             <details className="small">

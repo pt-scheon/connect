@@ -11,13 +11,29 @@ export async function GET(req: Request, { params }: { params: Promise<{ key: str
   const m = me ? get("SELECT * FROM messages WHERE file_key=? AND (from_id=? OR to_id=?)", key, me.id, me.id) : null;
   const bytes = m ? read(key) : null;
   if (!m || !bytes) return new Response("Not found", { status: 404 });
-  const inline = m.kind === "image" || m.file_type === "application/pdf";
+  const inline = ["image", "video", "voice"].includes(m.kind) || m.file_type === "application/pdf";
   const download = new URL(req.url).searchParams.has("download");
   const name = encodeURIComponent(m.file_name);
-  return new Response(new Uint8Array(bytes), {
+  // Videos and voice notes are played in pieces (and Safari insists on it), so answer byte ranges.
+  const range = req.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/);
+  let body = bytes, status = 200;
+  const extra: Record<string, string> = { "Accept-Ranges": "bytes" };
+  if (range) {
+    const size = bytes.length;
+    let start = range[1] ? Number(range[1]) : size - Number(range[2]);
+    let end = range[1] && range[2] ? Number(range[2]) : size - 1;
+    if (!range[1] && !range[2]) { start = 0; end = size - 1; }
+    end = Math.min(end, size - 1);
+    if (start < 0 || start > end || start >= size) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+    body = bytes.subarray(start, end + 1); status = 206;
+    extra["Content-Range"] = `bytes ${start}-${end}/${size}`;
+  }
+  return new Response(new Uint8Array(body), {
+    status,
     headers: {
+      ...extra,
       "Content-Type": m.file_type,
-      "Content-Length": String(bytes.length),
+      "Content-Length": String(body.length),
       "Content-Disposition": `${inline && !download ? "inline" : "attachment"}; filename*=UTF-8''${name}`,
       "Cache-Control": "private, max-age=604800, immutable",
       "X-Content-Type-Options": "nosniff",

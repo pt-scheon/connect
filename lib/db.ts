@@ -48,6 +48,17 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_pair ON messages (from_id, to_id, id);
 CREATE INDEX IF NOT EXISTS messages_inbox ON messages (to_id, seen);
+CREATE TABLE IF NOT EXISTS voice_calls (
+  id INTEGER PRIMARY KEY, caller_id INTEGER NOT NULL, callee_id INTEGER NOT NULL, video INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'ringing', caller_device TEXT, callee_device TEXT,
+  created_at INTEGER NOT NULL, answered_at INTEGER, ended_at INTEGER, ended_by INTEGER
+);
+CREATE INDEX IF NOT EXISTS voice_calls_people ON voice_calls (callee_id, status);
+CREATE TABLE IF NOT EXISTS call_signals (
+  id INTEGER PRIMARY KEY, call_id INTEGER NOT NULL, to_id INTEGER NOT NULL, to_device TEXT, type TEXT NOT NULL, payload TEXT, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS call_signals_to ON call_signals (to_id, id);
+CREATE TABLE IF NOT EXISTS shares (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, files TEXT NOT NULL, text TEXT, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS blocks (user_id INTEGER, blocked_id INTEGER, PRIMARY KEY (user_id, blocked_id));
 CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
@@ -83,6 +94,7 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["messages", "file_size", "INTEGER"],
   ["messages", "file_w", "INTEGER"],
   ["messages", "file_h", "INTEGER"],
+  ["messages", "file_secs", "INTEGER"],
 ];
 
 const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");

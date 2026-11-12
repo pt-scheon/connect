@@ -54,6 +54,40 @@ export async function sendMessage(to: number, text: string): Promise<{ message: 
   return { message: rows(me!, to, id - 1, 1)[0] };
 }
 
+/* Sends what was shared from another app (see app/share/route.ts) to one person, then forgets the share. */
+export async function sendShare(fd: FormData) {
+  const me = await meOrNull();
+  if (!me) redirect("/onboarding");
+  const sh = get("SELECT * FROM shares WHERE id=? AND user_id=?", String(fd.get("share")), me.id);
+  const to = Number(fd.get("to"));
+  if (!sh) redirect("/messages?err=" + encodeURIComponent("That share has expired. Share it again."));
+  const ok = canMessage(me, to);
+  if ("error" in ok) redirect(`/share/${sh.id}?err=${encodeURIComponent(ok.error)}`);
+  const files: { key: string; name: string; type: string; kind: string; size: number }[] = JSON.parse(sh.files);
+  db.transaction(() => {
+    files.forEach((f, i) => run(
+      "INSERT INTO messages (from_id, to_id, text, kind, file_key, file_name, file_type, file_size, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+      me.id, to, i === 0 ? sh.text ?? "" : "", f.kind, f.key, f.name, f.type, f.size, now()));
+    if (!files.length && sh.text) run("INSERT INTO messages (from_id, to_id, text, created_at) VALUES (?,?,?,?)", me.id, to, sh.text, now());
+    run("DELETE FROM shares WHERE id=?", sh.id);
+  })();
+  revalidatePath("/", "layout");
+  redirect(`/messages/${to}`);
+}
+
+/* Share a project into the chat as a card. Any project at your college that is not hidden. */
+export async function shareProject(to: number, projectId: number): Promise<{ message: Msg } | { error: string }> {
+  const me = await meOrNull();
+  const ok = canMessage(me, to);
+  if ("error" in ok) return ok;
+  const p = get("SELECT id, name, pitch FROM projects WHERE id=? AND college_id=? AND hidden=0 AND status<>'dropped'", projectId, me!.college_id);
+  if (!p) return { error: "That project cannot be shared." };
+  if (!allow(`dm:${me!.id}`, 30, 60)) return { error: "You are sending a lot. Wait a minute." };
+  const id = Number(run("INSERT INTO messages (from_id, to_id, text, kind, project_id, created_at) VALUES (?,?,?,?,?,?)",
+    me!.id, to, p.pitch, "project", p.id, now()).lastInsertRowid);
+  return { message: rows(me!, to, id - 1, 1)[0] };
+}
+
 /* Invite someone to an open role on your project, straight from their profile or a chat. Shows up in the chat as a card. */
 export async function inviteToProject(fd: FormData) {
   const me = await meOrNull();

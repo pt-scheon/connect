@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { get } from "@/lib/db";
 import { collegeById, isMember } from "@/lib/college";
 import { unreadMessages } from "@/lib/chat";
+import { CallProvider } from "./calls/ui";
 import { baseUrl, currentUser, standings } from "@/lib/auth";
 import { signOut } from "./actions";
 import { NavLinks, ThemeToggle, Toast } from "./client";
@@ -84,6 +85,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <span className="row"><Link href="/rules">How credit works</Link><Link href="/colleges">Colleges</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <Link href="/settings">Settings</Link> : <Link href="/signin">Sign in</Link>}</span>
         </div></footer>
         <Suspense><Toast /></Suspense>
+        {member && <CallProvider />}
       </body>
     </html>
   );

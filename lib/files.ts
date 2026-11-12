@@ -8,12 +8,14 @@ import crypto from "crypto";
 export const LIMITS = {
   imageBytes: 8 * 1024 * 1024,
   fileBytes: 10 * 1024 * 1024,
+  videoBytes: 25 * 1024 * 1024,
+  voiceBytes: 6 * 1024 * 1024,
   perHour: 30,
   bytesPerDay: 100 * 1024 * 1024,
   atOnce: 4,
 };
 
-export type Kind = "image" | "file";
+export type Kind = "image" | "file" | "video" | "voice";
 export type Checked = { kind: Kind; mime: string; ext: string };
 
 const dbFile = () => process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");
@@ -30,13 +32,21 @@ const OFFICE: Record<string, string> = {
 const TEXT: Record<string, string> = { txt: "text/plain", md: "text/markdown", csv: "text/csv" };
 
 /* What the file really is, or null if it is not something we accept. SVG and HTML are never accepted:
-   both can carry scripts. */
-export function sniff(b: Buffer, name: string): Checked | null {
+   both can carry scripts. `voice` marks a recording made in the chat, so a WebM or MP4 container is audio. */
+export function sniff(b: Buffer, name: string, voice = false): Checked | null {
   const ext = (name.toLowerCase().match(/\.([a-z0-9]{1,5})$/)?.[1] ?? "");
   if (starts(b, [0xff, 0xd8, 0xff])) return { kind: "image", mime: "image/jpeg", ext: "jpg" };
   if (starts(b, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return { kind: "image", mime: "image/png", ext: "png" };
   if (ascii(b, "GIF87a") || ascii(b, "GIF89a")) return { kind: "image", mime: "image/gif", ext: "gif" };
   if (ascii(b, "RIFF") && ascii(b, "WEBP", 8)) return { kind: "image", mime: "image/webp", ext: "webp" };
+  // Video and audio. MP4 and MOV start with a size then "ftyp"; WebM with the EBML header; Ogg with "OggS".
+  if (ascii(b, "ftyp", 4)) {
+    const brand = b.subarray(8, 12).toString("latin1");
+    if (voice || brand === "M4A ") return { kind: "voice", mime: "audio/mp4", ext: "m4a" };
+    return brand === "qt  " ? { kind: "video", mime: "video/quicktime", ext: "mov" } : { kind: "video", mime: "video/mp4", ext: "mp4" };
+  }
+  if (starts(b, [0x1a, 0x45, 0xdf, 0xa3])) return voice ? { kind: "voice", mime: "audio/webm", ext: "webm" } : { kind: "video", mime: "video/webm", ext: "webm" };
+  if (ascii(b, "OggS")) return { kind: "voice", mime: "audio/ogg", ext: "ogg" };
   if (ascii(b, "%PDF-")) return { kind: "file", mime: "application/pdf", ext: "pdf" };
   // Word, PowerPoint and Excel files are zip archives; the name says which.
   if (starts(b, [0x50, 0x4b, 0x03, 0x04]) && OFFICE[ext]) return { kind: "file", mime: OFFICE[ext], ext };
@@ -68,3 +78,5 @@ export function remove(key: string | null | undefined) {
 }
 
 export const sizeText = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+export const maxFor = (k: Kind) => (k === "image" ? LIMITS.imageBytes : k === "video" ? LIMITS.videoBytes : k === "voice" ? LIMITS.voiceBytes : LIMITS.fileBytes);

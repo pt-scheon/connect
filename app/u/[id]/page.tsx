@@ -8,6 +8,8 @@ import { ties, pathTo, type Tie } from "@/lib/graph";
 import { resumeFacts } from "@/lib/resume";
 import { collegeById, isMember } from "@/lib/college";
 import { inviteToProject } from "../../chat-actions";
+import { CallButtons } from "../../calls/ui";
+import { ShareLink } from "../../messages/media";
 import * as A from "../../actions";
 import { CopyLink, Count } from "../../client";
 import { Av, F, Pill, Stamp, Who, initials, inr, skillsOf, statusLabel } from "../../ui";
@@ -229,6 +231,7 @@ export default async function Profile({ params, searchParams }: Props) {
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                   Message
                 </Link>
+                <span className="row nowrap profile-calls"><CallButtons to={id} name={u.name} picture={u.picture} /></span>
               </span>
             )}
             {canTalk && !alum && myRoles.length > 0 && (
@@ -256,7 +259,7 @@ export default async function Profile({ params, searchParams }: Props) {
               <F action={A.toggleOpen} back={back}><button className="btn ghost sm">{u.open_to_join ? "Stop showing as open" : "Mark me open to projects"}</button></F>
             )}
             {self && <Link className="small" href="/settings">Settings</Link>}
-            {!alum && u.verified ? <CopyLink path={`/u/${id}?tab=resume`} label={self ? "Copy resume link" : "Copy link"} /> : null}
+            {!alum && u.verified ? <span className="row nowrap"><ShareLink path={`/u/${id}?tab=resume`} title={`${u.name} on Connect`} text={self ? "My signed project record on Connect" : `${u.name}'s signed project record on Connect`} label={self ? "Share my profile" : "Share"} /><CopyLink path={`/u/${id}?tab=resume`} label={self ? "Copy resume link" : "Copy link"} /></span> : null}
             {viewer && !self && !alum && viewer.role === "student" && (
               <>
                 <F action={A.vouch} back={back} hidden={{ to: id }}><button className="btn" disabled={!shippedWithMe || !!vouched}>{vouched ? "Vouched" : "Vouch"}</button></F>

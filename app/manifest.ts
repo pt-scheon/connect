@@ -10,6 +10,16 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#0A0B14",
     theme_color: "#0A0B14",
+    // Lets you pick Connect in your phone's share sheet (Gallery, Files, Chrome...) and send it to someone.
+    share_target: {
+      action: "/share",
+      method: "POST",
+      enctype: "multipart/form-data",
+      params: {
+        title: "title", text: "text", url: "url",
+        files: [{ name: "files", accept: ["image/*", "video/*", "audio/*", "application/pdf", ".pdf", ".docx", ".pptx", ".xlsx", ".txt", ".csv", ".md"] }],
+      },
+    },
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml" },
       { src: "/app-icon/192", sizes: "192x192", type: "image/png", purpose: "maskable" },

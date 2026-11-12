@@ -42,12 +42,12 @@ export function canMessage(me: Row | null, to: number): { them: Row } | { error:
 /* A message as the chat screen shows it. */
 export type Msg = {
   id: number; mine: boolean; text: string; kind: string; project_id: number | null; project_name: string | null; created_at: number; seen: boolean;
-  file: { key: string; name: string; type: string; size: number; w: number | null; h: number | null } | null;
+  file: { key: string; name: string; type: string; size: number; w: number | null; h: number | null; secs: number | null } | null;
 };
 export function toMsg(m: Row, meId: number): Msg {
   return {
     id: m.id, mine: m.from_id === meId, text: m.text, kind: m.kind, project_id: m.project_id, project_name: m.project_name ?? null,
     created_at: m.created_at, seen: !!m.seen,
-    file: m.file_key ? { key: m.file_key, name: m.file_name, type: m.file_type, size: m.file_size, w: m.file_w, h: m.file_h } : null,
+    file: m.file_key ? { key: m.file_key, name: m.file_name, type: m.file_type, size: m.file_size, w: m.file_w, h: m.file_h, secs: m.file_secs ?? null } : null,
   };
 }
