@@ -172,3 +172,83 @@ test("videos and voice notes are recognised by their bytes too", async () => {
   assert.equal(sniff(B("OggS\0"), "a.ogg")?.kind, "voice");
   assert.ok(maxFor("video") > maxFor("file") && maxFor("voice") < maxFor("file"));
 });
+
+test("call relays: credentials come from Cloudflare or Metered, and calls still work if they are down", async () => {
+  const { iceServers, turnProvider } = await import("../lib/calls");
+  const realFetch = globalThis.fetch;
+  const env = { ...process.env };
+  const reset = () => { delete (globalThis as { __ice?: unknown }).__ice; };
+  try {
+    // Cloudflare: short-lived credentials, port 53 dropped.
+    Object.assign(process.env, { CLOUDFLARE_TURN_KEY_ID: "key", CLOUDFLARE_TURN_API_TOKEN: "token" });
+    let calls = 0, sent: RequestInit | undefined;
+    globalThis.fetch = (async (_u: string, init?: RequestInit) => { calls++; sent = init; return new Response(JSON.stringify({ iceServers: [{ urls: ["stun:stun.cloudflare.com:3478", "turn:turn.cloudflare.com:3478?transport=udp", "turn:turn.cloudflare.com:53?transport=udp", "turns:turn.cloudflare.com:443?transport=tcp"], username: "u", credential: "c" }] }), { status: 201 }); }) as typeof fetch;
+    reset();
+    assert.equal(turnProvider(), "cloudflare");
+    const cf = await iceServers();
+    const relay = cf.find((s) => s.username === "u")!;
+    assert.ok(([] as string[]).concat(relay.urls).includes("turns:turn.cloudflare.com:443?transport=tcp"));
+    assert.ok(!([] as string[]).concat(relay.urls).some((u) => u.includes(":53")), "port 53 is left out");
+    assert.equal((sent?.headers as Record<string, string>).Authorization, "Bearer token");
+    await iceServers();
+    assert.equal(calls, 1, "credentials are reused for an hour");
+
+    // Provider down: STUN only, and it tries again next time.
+    globalThis.fetch = (async () => new Response("nope", { status: 500 })) as typeof fetch;
+    reset();
+    const down = await iceServers();
+    assert.equal(down.length, 1, "falls back to STUN alone");
+    assert.ok(!(globalThis as { __ice?: unknown }).__ice, "a failure is not cached");
+
+    // Metered: only the relay entries are kept.
+    delete process.env.CLOUDFLARE_TURN_KEY_ID; delete process.env.CLOUDFLARE_TURN_API_TOKEN;
+    Object.assign(process.env, { METERED_DOMAIN: "https://demo.metered.live/", METERED_API_KEY: "k" });
+    let url = "";
+    globalThis.fetch = (async (u: string) => { url = u; return new Response(JSON.stringify([{ urls: "stun:stun.relay.metered.ca:80" }, { urls: "turn:global.relay.metered.ca:80", username: "m", credential: "p" }])); }) as typeof fetch;
+    reset();
+    const m = await iceServers();
+    assert.equal(url, "https://demo.metered.live/api/v1/turn/credentials?apiKey=k");
+    assert.deepEqual(m.slice(1).map((s) => s.urls), ["turn:global.relay.metered.ca:80"]);
+  } finally {
+    globalThis.fetch = realFetch;
+    process.env = env;
+    reset();
+  }
+});
+
+test("the service worker rings for calls when Connect is closed and stays quiet when it is on screen", async () => {
+  const vm = await import("node:vm");
+  const src = fs.readFileSync(path.join(process.cwd(), "public/sw.js"), "utf8");
+  type N = { title: string; tag: string; closed: boolean; requireInteraction?: boolean; actions?: unknown[]; data?: unknown; close(): void };
+  const make = (visible: boolean | null) => {
+    const L: Record<string, (e: unknown) => void> = {}, notes: N[] = [], opened: string[] = [], fetched: unknown[] = [];
+    const self = {
+      location: { origin: "https://c.app" }, addEventListener: (t: string, f: (e: unknown) => void) => (L[t] = f), skipWaiting() {},
+      registration: {
+        showNotification: async (title: string, o: object) => { notes.push({ title, ...o, closed: false, close() { this.closed = true; } } as N); },
+        getNotifications: async ({ tag }: { tag: string }) => notes.filter((n) => n.tag === tag && !n.closed),
+      },
+      clients: {
+        claim() {}, openWindow: async (u: string) => opened.push(u),
+        matchAll: async () => (visible === null ? [] : [{ url: "https://c.app/", visibilityState: visible ? "visible" : "hidden", focus: async () => {}, navigate: async (u: string) => opened.push(u) }]),
+      },
+    };
+    vm.runInContext(src, vm.createContext({ self, URL, JSON, fetch: async (_u: string, o: { body: string }) => fetched.push(JSON.parse(o.body)) }));
+    const fire = async (t: string, ev: object) => { let p: unknown; L[t]({ ...ev, waitUntil: (x: unknown) => (p = x) }); await p; };
+    return { notes, opened, fetched, push: (d: object) => fire("push", { data: { json: () => d } }), click: (n: N, action = "") => fire("notificationclick", { notification: n, action }) };
+  };
+  const call = { type: "call", id: 7, video: true, from: { id: 4, name: "Tanvi" } };
+  let t = make(null);
+  await t.push(call);
+  assert.ok(t.notes[0].requireInteraction && t.notes[0].actions?.length === 2, "closed app: a call notification with Answer and Decline");
+  await t.click(t.notes[0], "answer");
+  assert.equal(t.opened[0], "/messages/4?answer=7");
+  t = make(null); await t.push(call); await t.click(t.notes[0], "decline");
+  assert.deepEqual(t.fetched[0], { action: "decline", id: 7 });
+  t = make(null); await t.push(call); await t.push({ type: "call-end", id: 7, video: true, missed: true, from: call.from });
+  assert.ok(t.notes[0].closed && t.notes[1].title === "Missed video call");
+  t = make(true); await t.push(call); await t.push({ type: "msg", from: call.from, text: "hi" });
+  assert.equal(t.notes.length, 0, "on screen: the page handles it");
+  t = make(false); await t.push({ type: "msg", from: call.from, text: "hi" });
+  assert.equal(t.notes[0].title, "Tanvi");
+});

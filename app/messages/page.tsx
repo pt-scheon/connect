@@ -2,6 +2,8 @@ import { all } from "@/lib/db";
 import { requireMember } from "@/lib/auth";
 import { ConversationList } from "./list";
 import { NewChat } from "./chat";
+import { pushPublicKey } from "@/lib/push";
+import { PushToggle } from "../push-toggle";
 
 export const metadata = { title: "Messages" };
 
@@ -18,6 +20,7 @@ export default async function Messages({ searchParams }: { searchParams: Promise
         <div className="stack" style={{ maxWidth: 460, width: "100%" }}>
           <h2>{fresh ? "New message" : "Talk to anyone at your college"}</h2>
           <p className="small muted">Messages stay inside your college. You can block anyone from their chat.</p>
+          <PushToggle publicKey={pushPublicKey()} compact />
           <NewChat people={people} />
         </div>
       </section>

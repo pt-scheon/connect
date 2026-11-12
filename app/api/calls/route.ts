@@ -3,6 +3,7 @@ import { get, run, now } from "@/lib/db";
 import { canMessage } from "@/lib/chat";
 import { allow } from "@/lib/notify";
 import { finish, iceServers, liveCall, online, signal, sweep } from "@/lib/calls";
+import { push } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,9 @@ export async function POST(req: Request) {
     const id = Number(run("INSERT INTO voice_calls (caller_id, callee_id, video, caller_device, created_at) VALUES (?,?,?,?,?)",
       me.id, to, b.video ? 1 : 0, device, now()).lastInsertRowid);
     signal(id, to, null, "ring", { id, video: !!b.video, from: { id: me.id, name: me.name, picture: me.picture } });
-    return Response.json({ id, ice: iceServers(), online: online(to) });
+    // Rings their phone or laptop too, even with Connect closed.
+    void push(to, { type: "call", id, video: !!b.video, from: { id: me.id, name: me.name } }, { ttl: 45, urgent: true });
+    return Response.json({ id, ice: await iceServers(), online: online(to) });
   }
 
   const c = get("SELECT * FROM voice_calls WHERE id=? AND (caller_id=? OR callee_id=?)", Number(b.id), me.id, me.id);
@@ -43,7 +46,7 @@ export async function POST(req: Request) {
     signal(c.id, other, c.caller_device, "accepted", { id: c.id });
     // Any other tab of yours that was ringing can stop.
     signal(c.id, me.id, null, "taken", { id: c.id, device });
-    return Response.json({ ok: true, ice: iceServers() });
+    return Response.json({ ok: true, ice: await iceServers() });
   }
   if (b.action === "decline") {
     if (c.callee_id === me.id) finish(c, "declined", me.id);

@@ -1,5 +1,6 @@
 import { all, get, run, now, type Row } from "./db";
 import { notify } from "./notify";
+import { push } from "./push";
 
 /* Voice and video calls. Audio and video go straight between the two browsers (WebRTC); the server only rings
    people and passes the connection details between them. One call at a time per person. */
@@ -7,11 +8,54 @@ import { notify } from "./notify";
 export const RING_SECONDS = 45;
 
 /* Where browsers look for a route to each other. STUN works on most home and college Wi-Fi. Mobile data and
-   strict networks often need a TURN relay: set TURN_URLS, TURN_USERNAME and TURN_CREDENTIAL to use one. */
-export function iceServers(): RTCIceServer[] {
-  const list: RTCIceServer[] = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }];
-  const turn = (process.env.TURN_URLS || "").split(",").map((u) => u.trim()).filter(Boolean);
-  if (turn.length) list.push({ urls: turn, username: process.env.TURN_USERNAME || "", credential: process.env.TURN_CREDENTIAL || "" });
+   strict networks need a TURN relay. Three ways to set one up, best first:
+   - Cloudflare (CLOUDFLARE_TURN_KEY_ID + CLOUDFLARE_TURN_API_TOKEN) or Metered (METERED_DOMAIN + METERED_API_KEY):
+     short-lived credentials are fetched from them, so no permanent password ever reaches a browser.
+   - TURN_URLS + TURN_USERNAME + TURN_CREDENTIAL: a fixed relay of your own. */
+const STUN: RTCIceServer = { urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"] };
+const cache = (globalThis as unknown as { __ice?: { at: number; list: RTCIceServer[] } });
+
+export const turnProvider = () =>
+  process.env.CLOUDFLARE_TURN_KEY_ID && process.env.CLOUDFLARE_TURN_API_TOKEN ? "cloudflare"
+  : process.env.METERED_DOMAIN && process.env.METERED_API_KEY ? "metered"
+  : process.env.TURN_URLS ? "static" : "none";
+
+async function fetchTurn(): Promise<RTCIceServer[]> {
+  const p = turnProvider();
+  if (p === "cloudflare") {
+    const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${process.env.CLOUDFLARE_TURN_KEY_ID}/credentials/generate-ice-servers`, {
+      method: "POST", signal: AbortSignal.timeout(5000),
+      headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_TURN_API_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ttl: 6 * 3600 }),
+    });
+    if (!r.ok) throw new Error(`Cloudflare TURN ${r.status}`);
+    const j = await r.json();
+    const list = Array.isArray(j.iceServers) ? j.iceServers : j.iceServers ? [j.iceServers] : [];
+    // Port 53 is often blocked by browsers and networks; leave those out.
+    return list.map((x: RTCIceServer) => ({ ...x, urls: ([] as string[]).concat(x.urls).filter((u) => !/:53(\?|$)/.test(u)) }));
+  }
+  if (p === "metered") {
+    const host = String(process.env.METERED_DOMAIN).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const r = await fetch(`https://${host}/api/v1/turn/credentials?apiKey=${encodeURIComponent(String(process.env.METERED_API_KEY))}`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) throw new Error(`Metered TURN ${r.status}`);
+    const j = await r.json();
+    return (Array.isArray(j) ? j : []).filter((x: RTCIceServer) => ([] as string[]).concat(x.urls).some((u) => u.startsWith("turn")));
+  }
+  if (p === "static") {
+    const urls = String(process.env.TURN_URLS).split(",").map((u) => u.trim()).filter(Boolean);
+    return [{ urls, username: process.env.TURN_USERNAME || "", credential: process.env.TURN_CREDENTIAL || "" }];
+  }
+  return [];
+}
+
+/* STUN plus a relay if one is set up. Relay credentials are reused for an hour (they last six). If the provider
+   cannot be reached, calls still go ahead on STUN alone. */
+export async function iceServers(): Promise<RTCIceServer[]> {
+  if (cache.__ice && Date.now() - cache.__ice.at < 3600_000) return cache.__ice.list;
+  let turn: RTCIceServer[] = [];
+  try { turn = await fetchTurn(); } catch (e) { console.error("[connect] TURN:", (e as Error).message); }
+  const list = [STUN, ...turn];
+  if (turn.length || turnProvider() === "none") cache.__ice = { at: Date.now(), list };
   return list;
 }
 
@@ -43,6 +87,9 @@ export function finish(c: Row, status: "ended" | "missed" | "declined" | "failed
     notify(c.callee_id, `Missed ${kind} from ${who}`, `/messages/${c.caller_id}`);
   }
   for (const id of [c.caller_id, c.callee_id]) signal(c.id, id, null, "ended", { status, by });
+  // Stops the ringing notification on their devices, and leaves a missed-call one if they never picked up.
+  const caller = get("SELECT id, name FROM users WHERE id=?", c.caller_id);
+  if (caller) void push(c.callee_id, { type: "call-end", id: c.id, video: !!c.video, missed, from: { id: caller.id, name: caller.name } }, { ttl: 3600, urgent: true });
 }
 
 export function signal(callId: number, to: number, device: string | null, type: string, payload: unknown) {

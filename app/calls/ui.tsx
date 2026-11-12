@@ -147,6 +147,7 @@ export function CallProvider() {
     if (ev.type === "ring") {
       if (cur.phase !== "idle" && cur.phase !== "ended") return;
       setS({ phase: "incoming", id: ev.call, video: !!pl.video, peer: pl.from as Peer });
+      if (autoAnswer.current === ev.call) { autoAnswer.current = 0; setTimeout(() => acceptRef.current(), 0); return; }
       stopTone.current = tone("ring");
       navigator.vibrate?.([400, 200, 400, 200, 400]);
       if (!document.title.startsWith("📞")) document.title = "📞 " + document.title;
@@ -179,6 +180,16 @@ export function CallProvider() {
       if (p?.remoteDescription) await p.addIceCandidate(pl as RTCIceCandidateInit).catch(() => {}); else queue.current.push(pl as RTCIceCandidateInit);
     } else if (ev.type === "media") setTheirs({ mic: pl.mic !== false, cam: pl.cam !== false });
   }, [cleanup, connect, sig, router]);
+
+  // Picked "Answer" on a call notification: the page opens with ?answer=<call id>, and the ring for that call
+  // (which a newly opened tab still receives) is picked up straight away.
+  const autoAnswer = useRef(0);
+  useEffect(() => {
+    const u = new URL(location.href), id = Number(u.searchParams.get("answer"));
+    if (id) { autoAnswer.current = id; u.searchParams.delete("answer"); router.replace(u.pathname + u.search + u.hash, { scroll: false }); }
+    // The service worker shows call and message notifications while Connect is closed.
+    if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for calls on every page while signed in.
   useEffect(() => {
@@ -217,7 +228,9 @@ export function CallProvider() {
 
   // Hang up if the tab closes mid-call.
   useEffect(() => {
-    const bye = () => { const id = state.current.id; if (id && state.current.phase !== "idle") navigator.sendBeacon?.("/api/calls", new Blob([JSON.stringify({ action: "end", id, device: device.current })], { type: "application/json" })); };
+    // Only a call you are in. A call that is just ringing here keeps ringing: leaving the page is often how you
+    // answer it (the notification opens the chat in this same tab), and your other devices may pick up.
+    const bye = () => { const id = state.current.id; if (id && ["outgoing", "connecting", "active"].includes(state.current.phase)) navigator.sendBeacon?.("/api/calls", new Blob([JSON.stringify({ action: "end", id, device: device.current })], { type: "application/json" })); };
     window.addEventListener("pagehide", bye);
     return () => window.removeEventListener("pagehide", bye);
   }, []);
@@ -241,6 +254,7 @@ export function CallProvider() {
     if (!pc.current) connect();
     document.title = document.title.replace(/^📞 /, "");
   };
+  const acceptRef = useRef(accept); acceptRef.current = accept;
   const decline = () => { const id = state.current.id; if (id) void api({ action: "decline", id }); cleanup(); };
   const hangup = () => { const id = state.current.id; if (id) void api({ action: "end", id }); cleanup(state.current.phase === "active" ? "Call ended" : undefined); };
 

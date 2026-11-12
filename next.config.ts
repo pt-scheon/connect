@@ -18,7 +18,11 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "*.localhost"],
   async headers() {
     // Chat attachments set their own, stricter headers in app/api/files/[key]/route.ts.
-    return [{ source: "/((?!api/files/).*)", headers: security }];
+    return [
+      { source: "/((?!api/files/).*)", headers: security },
+      // The service worker must always be fetched fresh so fixes reach everyone.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Service-Worker-Allowed", value: "/" }] },
+    ];
   },
 };
 

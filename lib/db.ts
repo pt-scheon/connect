@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS call_signals (
 );
 CREATE INDEX IF NOT EXISTS call_signals_to ON call_signals (to_id, id);
 CREATE TABLE IF NOT EXISTS shares (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, files TEXT NOT NULL, text TEXT, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS push_subs (
+  endpoint TEXT PRIMARY KEY, user_id INTEGER NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
 CREATE TABLE IF NOT EXISTS blocks (user_id INTEGER, blocked_id INTEGER, PRIMARY KEY (user_id, blocked_id));
 CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);

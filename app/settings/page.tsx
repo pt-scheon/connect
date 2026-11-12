@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { mailReady } from "@/lib/mail";
+import { pushPublicKey } from "@/lib/push";
+import { PushToggle } from "../push-toggle";
 import { deleteAccount, saveSettings } from "../actions";
 import { F } from "../ui";
 
@@ -18,6 +20,7 @@ export default async function Settings() {
 
       <F action={saveSettings} back="/settings" className="card stack">
         <span className="label">Alerts and visibility</span>
+        <PushToggle publicKey={pushPublicKey()} />
         <label className="check">
           <input type="checkbox" name="email_notes" id="email_notes" defaultChecked={!!me.email_notes} />
           <span><b>Email me what lands in my inbox</b><br />
