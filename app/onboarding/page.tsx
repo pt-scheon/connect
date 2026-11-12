@@ -6,6 +6,8 @@ import { RULES } from "@/lib/credit";
 import { saveProfile, sendCode, verifyCode } from "../actions";
 import { F } from "../ui";
 
+export const metadata = { title: "Your profile" };
+
 export default async function Onboarding({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
   const me = await currentUser();
   if (!me) redirect("/signin");
@@ -28,6 +30,10 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
         <label className="field"><span>Skills</span><input type="text" name="skills" id="skills" defaultValue={me.skills} placeholder="React, ESP32, Figma" />
           <small>Comma separated. They show as “self-listed” until a shipped project backs them.</small></label>
         <label className="field"><span>One line about you</span><input type="text" name="about" id="about" defaultValue={me.about} placeholder="What you like building" /></label>
+        <label className="field"><span>GitHub</span><input type="url" name="github" id="github" defaultValue={me.github ?? ""} placeholder="https://github.com/you" /></label>
+        <label className="field"><span>LinkedIn</span><input type="url" name="linkedin" id="linkedin" defaultValue={me.linkedin ?? ""} placeholder="https://www.linkedin.com/in/you" /></label>
+        <label className="field"><span>Portfolio or website</span><input type="url" name="website" id="website" defaultValue={me.website ?? ""} placeholder="https://" />
+          <small>Optional. Shown on your profile and resume link.</small></label>
         <button className="btn">Save</button>
       </form>
     </div>

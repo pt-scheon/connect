@@ -4,6 +4,8 @@ import { requireUser, standings } from "@/lib/auth";
 import * as A from "../actions";
 import { F, Meter, inr } from "../ui";
 
+export const metadata = { title: "Funding" };
+
 export default async function Funding() {
   const me = await requireUser();
   const S = standings();

@@ -3,6 +3,8 @@ import { all } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { Av } from "../ui";
 
+export const metadata = { title: "Clubs" };
+
 export default async function Clubs() {
   const me = await requireUser();
   const clubs = all("SELECT * FROM clubs ORDER BY name");

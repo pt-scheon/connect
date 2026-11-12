@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth";
 import { createProject } from "../../actions";
 import { F } from "../../ui";
 
+export const metadata = { title: "Post a project" };
+
 export default async function NewProject() {
   await requireUser();
   return (

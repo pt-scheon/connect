@@ -6,6 +6,11 @@ import { EMPTY } from "@/lib/credit";
 import * as A from "../../actions";
 import { F, Pill, Who } from "../../ui";
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const c = get("SELECT name, about FROM clubs WHERE id=?", Number((await params).id));
+  return c ? { title: c.name, description: c.about } : { title: "Club" };
+}
+
 export default async function Club({ params }: { params: Promise<{ id: string }> }) {
   const me = await requireUser();
   const id = Number((await params).id);
@@ -33,7 +38,7 @@ export default async function Club({ params }: { params: Promise<{ id: string }>
       </div>
       <div className="card">
         <h2>Members</h2>
-        <div className="tw"><table><tbody>
+        <div className="tw"><table className="stack-sm"><tbody>
           <tr><th>Member</th><th>Role</th><th className="n">Shipped</th><th className="n">Credit</th>{boss && <th />}</tr>
           {members.map((u) => {
             const s = S.get(u.id) ?? EMPTY;
@@ -45,8 +50,8 @@ export default async function Club({ params }: { params: Promise<{ id: string }>
                     <input type="text" name="role" id={`role-${u.id}`} defaultValue={u.crole} aria-label={`Role for ${u.name}`} style={{ flex: "0 1 160px" }} />
                     <button className="linkbtn small">Save</button>
                   </F>) : u.crole}</td>
-                <td className="n">{s.shipped}/{s.joined}</td>
-                <td className="n">{s.credit}</td>
+                <td className="n" data-label="Shipped">{s.shipped}/{s.joined}</td>
+                <td className="n" data-label="Credit">{s.credit}</td>
                 {boss && <td className="n">{u.id !== c.lead_id && <F action={A.setClubMember} back={back} hidden={{ club: id, user: u.id, do: "remove" }}><button className="linkbtn small">Remove</button></F>}</td>}
               </tr>
             );

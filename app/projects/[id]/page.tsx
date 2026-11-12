@@ -4,6 +4,8 @@ import { all, get } from "@/lib/db";
 import { requireUser, standings } from "@/lib/auth";
 import { EMPTY, RULES, projectShares } from "@/lib/credit";
 import { timeAgo } from "@/lib/notify";
+import { suggest } from "@/lib/match";
+import { skillsOf } from "../../ui";
 import * as A from "../../actions";
 import { ProofHelp, SplitForm } from "../../client";
 import { F, Meter, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
@@ -32,6 +34,14 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const shipped = p.status === "shipped";
 
   const roles = all("SELECT * FROM roles WHERE project_id=? AND open=1", id);
+  // For the lead: people who might fit each open role, best proof first.
+  const invited = new Set<string>(lead ? all("SELECT user_id, text FROM notifications WHERE href=? AND text LIKE '%invited you%'", `/projects/${id}`)
+    .map((nn) => `${nn.user_id}:${nn.text}`) : []);
+  const asked = new Set<number>(all("SELECT user_id FROM requests WHERE project_id=?", id).map((q) => q.user_id));
+  const pool = lead ? all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND onboarded=1")
+    .filter((u) => !team.some((t) => t.id === u.id) && !asked.has(u.id))
+    .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.credit, shipped: st.shipped, left: st.left } }; }) : [];
+  const fits = new Map(roles.map((r) => [r.id, suggest(r.title, pool.map((x) => x.c)).map((sg) => ({ ...sg, u: pool.find((x) => x.u.id === sg.id)!.u, st: S.get(sg.id) ?? EMPTY }))]));
   const myRequest = get("SELECT * FROM requests WHERE project_id=? AND user_id=?", id, me.id);
   const requests = lead ? all("SELECT q.id rid, r.title, u.* FROM requests q JOIN roles r ON r.id=q.role_id JOIN users u ON u.id=q.user_id WHERE q.project_id=? AND q.status='pending'", id) : [];
   const proofs = all("SELECT * FROM proofs WHERE project_id=?", id);
@@ -59,6 +69,16 @@ export default async function Project({ params }: { params: Promise<{ id: string
         <div className="stack tight">
           <div className="row"><h1>{p.name}</h1><Pill status={p.status} /></div>
           <p>{p.pitch}</p>
+          {lead && open && (
+            <details className="small">
+              <summary className="muted" style={{ cursor: "pointer" }}>Edit name and description</summary>
+              <F action={A.editProject} back={back} hidden={{ id }} className="stack tight" >
+                <input type="text" name="name" id="edit-name" defaultValue={p.name} maxLength={60} required aria-label="Project name" />
+                <input type="text" name="pitch" id="edit-pitch" defaultValue={p.pitch} maxLength={300} required aria-label="What it does" />
+                <div><button className="btn ghost sm">Save</button></div>
+              </F>
+            </details>
+          )}
           <span className="small muted mono">{shipped ? `Shipped ${monthYear(p.shipped_at)}` : `Started ${monthYear(p.created_at)}`}</span>
         </div>
       </div>
@@ -86,7 +106,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
 
           <div className="card">
             <h2>Team</h2>
-            <div className="tw"><table><tbody>
+            <div className="tw"><table className="stack-sm"><tbody>
               <tr><th>Who</th><th>Role</th><th>What they did</th>{shipped && <><th className="n">Share</th><th className="n">Credit</th></>}{open && onTeam && <th />}</tr>
               {team.map((t) => {
                 const gone = t.mstatus === "left";
@@ -94,10 +114,10 @@ export default async function Project({ params }: { params: Promise<{ id: string
                 return (
                   <tr key={t.id}>
                     <td><Who u={t} /></td>
-                    <td>{gone ? <Stamp kind="bad">Left mid-project</Stamp> : t.mrole}</td>
-                    <td className={t.did ? "" : "muted"}>{gone ? (t.stake ? `Stake of ${t.stake} lost` : "") : t.did || "Not written yet"}</td>
-                    {shipped && <><td className="n">{gone ? "0%" : `${Math.round(pct)}%`}</td>
-                      <td className="n">{gone ? (t.stake ? `−${t.stake}` : "0") : `+${Math.round(p.pot * pct / 100 * (solo ? RULES.soloFactor : 1))}`}</td></>}
+                    <td data-label="Role">{gone ? <Stamp kind="bad">Left mid-project</Stamp> : t.mrole}</td>
+                    <td className={`wide ${t.did ? "" : "muted"}`}>{gone ? (t.stake ? `Stake of ${t.stake} lost` : "") : t.did || "Not written yet"}</td>
+                    {shipped && <><td className="n" data-label="Share">{gone ? "0%" : `${Math.round(pct)}%`}</td>
+                      <td className="n" data-label="Credit">{gone ? (t.stake ? `−${t.stake}` : "0") : `+${Math.round(p.pot * pct / 100 * (solo ? RULES.soloFactor : 1))}`}</td></>}
                     {open && onTeam && <td className="n">
                       {!gone && t.id !== me.id && t.id !== p.lead_id && (myVotes.has(t.id) ? <span className="small muted">Marked</span>
                         : <F action={A.voteGone} back={back} hidden={{ id, target: t.id }} confirm={`Mark ${t.name.split(" ")[0]} as gone?`}><button className="linkbtn small">Mark as gone</button></F>)}
@@ -139,6 +159,24 @@ export default async function Project({ params }: { params: Promise<{ id: string
                         ? <F action={A.withdrawRequest} back={back} hidden={{ id }}><button className="btn ghost">Withdraw request</button></F> : null)
                     : myRequest ? <span className="small muted">Your request was declined</span>
                     : me.role === "student" ? <F action={A.requestJoin} back={back} hidden={{ role: r.id }}><button className="btn">Ask to join · stake {RULES.stake}</button></F> : null}
+                  {lead && (fits.get(r.id)?.length ?? 0) > 0 && (
+                    <div className="suggest">
+                      <span className="label">People who might fit</span>
+                      {fits.get(r.id)!.map((sg) => {
+                        const done = [...invited].some((k) => k.startsWith(`${sg.id}:`) && k.includes(r.title));
+                        return (
+                          <div key={sg.id} className="row between">
+                            <span className="stack" style={{ gap: 0 }}>
+                              <Who u={sg.u} />
+                              <span className="small muted">{sg.matched.join(", ")} · {sg.backed ? `${sg.st.shipped} shipped` : "listed, not yet shipped"} · {sg.st.credit} credit</span>
+                            </span>
+                            {done ? <span className="small muted">Invited</span>
+                              : <F action={A.inviteToRole} back={back} hidden={{ role: r.id, to: sg.id }}><button className="btn ghost sm">Invite to apply</button></F>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ))}
               {!lead && roles.length > 0 && <p className="small muted">Joining holds {RULES.stake} of your credit. You get it back when the project ships. If you leave or the team marks you as gone, you lose it.</p>}

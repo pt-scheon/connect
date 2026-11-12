@@ -46,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     {unread > 0 && <b>{unread > 9 ? "9+" : unread}</b>}
                   </Link>
                   <Link href={`/u/${me.id}`} className="who" aria-label="Your profile">
-                    {me.role === "student" && <span className="bal">{standings().get(me.id)?.credit ?? 0} credit</span>}
+                    {me.role === "student" && <span className="bal">{standings().get(me.id)?.credit ?? 0}<span className="hide-sm"> credit</span></span>}
                     <Av u={me} />
                   </Link>
                 </div>

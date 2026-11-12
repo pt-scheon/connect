@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/auth";
 import * as A from "../actions";
 import { F, Who } from "../ui";
 
+export const metadata = { title: "Admin" };
+
 export default async function Admin() {
   const me = await requireUser();
   if (!me.admin) notFound();

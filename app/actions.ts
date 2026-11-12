@@ -64,14 +64,30 @@ export async function saveProfile(fd: FormData) {
   if (!s("branch") || !(year > 1950 && year < 2100)) redirect("/onboarding?err=" + encodeURIComponent("Fill in your branch and graduation year."));
   // The student/alum choice is made once. Changing it later would dodge verification.
   const role = me.onboarded ? me.role : fd.get("role") === "alum" ? "alum" : "student";
-  run("UPDATE users SET branch=?, grad_year=?, skills=?, about=?, role=?, onboarded=1 WHERE id=?",
-    s("branch", 60), year, s("skills"), s("about"), role, me.id);
+  const back = me.onboarded ? "/onboarding?edit=1" : "/onboarding";
+  const links: Record<string, string> = {};
+  for (const [k, host] of [["github", "github.com"], ["linkedin", "linkedin.com"], ["website", ""]] as const) {
+    const v = s(k, 200);
+    if (v && !profileLink(v, host)) redirect(back + (back.includes("?") ? "&" : "?") + "err=" + encodeURIComponent(
+      host ? `That ${k === "github" ? "GitHub" : "LinkedIn"} link does not look right. Paste the full https://${host}/... address.` : "The website link has to start with https://"));
+    links[k] = v;
+  }
+  run("UPDATE users SET branch=?, grad_year=?, skills=?, about=?, role=?, github=?, linkedin=?, website=?, onboarded=1 WHERE id=?",
+    s("branch", 60), year, s("skills"), s("about"), role, links.github, links.linkedin, links.website, me.id);
   // Alumni are always approved by hand, whatever their email says.
   if (!me.onboarded && role === "alum") run("UPDATE users SET verified=0, college_email=NULL WHERE id=?", me.id);
   const auto = !me.onboarded && autoVerify(me.id);
   revalidatePath("/", "layout");
   if (auto) redirect("/?ok=" + encodeURIComponent(`Your college email is verified. You start with ${RULES.starter} credit.`));
   redirect(me.onboarded ? `/u/${me.id}` : "/onboarding");
+}
+/* A link a person adds to their profile: https only, and on the right site when one is expected. */
+function profileLink(v: string, host: string) {
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "https:") return false;
+    return !host || u.hostname === host || u.hostname.endsWith("." + host);
+  } catch { return false; }
 }
 export async function sendCode(fd: FormData) {
   const { me, s, fail } = await ctx(fd, false);
@@ -128,6 +144,28 @@ export async function createProject(fd: FormData) {
     return pid;
   })();
   done(`/projects/${id}`, "Project posted.");
+}
+export async function editProject(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  const p = project(n("id"));
+  if (!p || p.lead_id !== me.id || !open(p)) fail("Only the lead can edit a project before it goes for review.");
+  const name = s("name", 60), pitch = s("pitch");
+  if (!name || !pitch) fail("Give it a name and one line on what it does.");
+  run("UPDATE projects SET name=?, pitch=? WHERE id=?", name, pitch, p!.id);
+  if (name !== p!.name) logUpdate(p!.id, me.id, `Renamed from ${p!.name}`);
+  done(back, "Project updated.");
+}
+export async function inviteToRole(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const r = get("SELECT r.*, p.name, p.lead_id, p.status FROM roles r JOIN projects p ON p.id=r.project_id WHERE r.id=? AND r.open=1", n("role"));
+  if (!r || r.lead_id !== me.id) fail("Only the lead can invite people to an open role.");
+  const to = get("SELECT id, name FROM users WHERE id=? AND role='student' AND verified=1 AND suspended=0", n("to"));
+  if (!to || member(r.project_id, to.id)) fail("That person cannot be invited.");
+  if (get("SELECT 1 FROM notifications WHERE user_id=? AND href=? AND text LIKE ?", to.id, `/projects/${r.project_id}`, `%invited you%${r.title}%`))
+    fail(`${to.name.split(" ")[0]} has already been invited to this role.`);
+  if (!allow(`invite:${me.id}`, 15, 3600)) fail("You have sent a lot of invites. Try again in an hour.");
+  notify(to.id, `${me.name} invited you to apply for ${r.title} on ${r.name}`, `/projects/${r.project_id}`);
+  done(back, `Invited ${to.name.split(" ")[0]}. They can ask to join from the project page.`);
 }
 export async function addRole(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);

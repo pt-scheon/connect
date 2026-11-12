@@ -52,6 +52,16 @@ function Graph({ center, mates }: { center: Row; mates: { u: Row; list: Tie[] }[
   );
 }
 
+function Links({ u }: { u: Row }) {
+  const links = [["GitHub", u.github], ["LinkedIn", u.linkedin], ["Website", u.website]].filter(([, v]) => v) as [string, string][];
+  if (!links.length) return null;
+  return (
+    <span className="row small">
+      {links.map(([label, href]) => <a key={label} href={href} target="_blank" rel="noopener noreferrer nofollow">{label} ↗</a>)}
+    </span>
+  );
+}
+
 export default async function Profile({ params, searchParams }: Props) {
   const me = await currentUser();
   const id = Number((await params).id);
@@ -108,7 +118,7 @@ export default async function Profile({ params, searchParams }: Props) {
     body = (
       <div className="card">
         <div className="row between">
-          <div><h2>{u.name}</h2><span className="muted">{u.branch}, class of {u.grad_year}</span></div>
+          <div className="stack tight"><div><h2>{u.name}</h2><span className="muted">{u.branch}, class of {u.grad_year}</span></div><Links u={u} /></div>
           {self && <div className="row noprint">
             <F action={A.aiResume} back={back}><button className="btn ghost">{u.resume ? "Rewrite with AI" : "Write with AI"}</button></F>
             {u.resume && <F action={A.clearResume} back={back}><button className="linkbtn small">Use plain version</button></F>}
@@ -190,6 +200,7 @@ export default async function Profile({ params, searchParams }: Props) {
             <h1>{u.name}</h1>
             <span className="muted">{u.branch}, class of {u.grad_year}{alum ? " · alum" : ""}</span>
             {u.about && <span>{u.about}</span>}
+            <Links u={u} />
             <div className="row">
               {signedIn.includes("google") && <Stamp>Google sign-in</Stamp>}
               {signedIn.includes("linkedin") && <Stamp>LinkedIn sign-in</Stamp>}
@@ -197,7 +208,7 @@ export default async function Profile({ params, searchParams }: Props) {
             </div>
             {viewer && !self && !alum && <span className="small muted">{pathTo(T, viewer.id, id, names)}</span>}
           </div>
-          <div className="stack tight noprint" style={{ alignItems: "end" }}>
+          <div className="stack tight noprint profile-actions" style={{ alignItems: "end" }}>
             {self && <Link className="btn ghost sm" href="/onboarding?edit=1">Edit profile</Link>}
             {!alum && u.verified ? <CopyLink path={`/u/${id}?tab=resume`} label={self ? "Copy resume link" : "Copy link"} /> : null}
             {viewer && !self && !alum && viewer.role === "student" && (

@@ -103,3 +103,19 @@ test("three shipped projects with the same two people is flagged as a closed cir
   for (let i = 0; i < 3; i++) project("shipped", 60, [a, b, c]);
   assert.equal(compute().get(a)!.circle, true);
 });
+
+test("teammate suggestions rank proven skills above listed ones", async () => {
+  const { suggest, roleSkills } = await import("../lib/match");
+  assert.ok(roleSkills("React frontend").has("react"));
+  assert.ok(roleSkills("RFID hardware").has("esp32"));
+  const people = [
+    { id: 1, skills: ["React", "Figma"], credit: 40, shipped: 0, left: 0 }, // listed only
+    { id: 2, skills: ["React", "Node"], credit: 160, shipped: 4, left: 0 }, // proven
+    { id: 3, skills: ["Python"], credit: 300, shipped: 5, left: 0 },        // no match
+    { id: 4, skills: ["React"], credit: 120, shipped: 2, left: 3 },         // proven but quits
+  ];
+  const s = suggest("React frontend", people);
+  // Proven first; someone who quit three projects drops below someone who only listed the skill.
+  assert.deepEqual(s.map((x) => x.id), [2, 1, 4]);
+  assert.equal(s.find((x) => x.id === 3), undefined);
+});
