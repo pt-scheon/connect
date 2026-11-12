@@ -139,10 +139,10 @@ export function Chat({ other, initial, initialSeen, canSend, reason, projects = 
   // Grow the box with what you type, up to five lines.
   useLayoutEffect(() => {
     const el = box.current;
-    if (!el) return;
+    if (!el || !el.offsetParent) return; // hidden while recording: measure when it is back
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight + 2, 140) + "px";
-  }, [text]);
+  }, [text, files.length, recording, uploading]);
 
   const addFiles = (list: FileList | File[]) => {
     setErr("");
@@ -259,7 +259,7 @@ export function Chat({ other, initial, initialSeen, canSend, reason, projects = 
                     <span className="bubble-time">{time(m.created_at)}</span>
                   </div>
                 ) : m.kind === "call" ? (
-                  <div className="call-log"><span aria-hidden="true">{m.text.includes("Video") ? "🎥" : "📞"}</span>{m.text}<span className="bubble-time">{time(m.created_at)}</span></div>
+                  <div className="call-log"><span aria-hidden="true">{/video/i.test(m.text) ? "🎥" : "📞"}</span>{m.text}<span className="bubble-time">{time(m.created_at)}</span></div>
                 ) : m.file && m.kind === "voice" ? (
                   <div className="file-msg"><VoiceNote src={`/api/files/${m.file.key}`} seconds={m.file.secs} mine={m.mine} /><span className="bubble-time">{time(m.created_at)}</span></div>
                 ) : m.file && m.kind === "video" ? (

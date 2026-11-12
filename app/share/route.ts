@@ -1,16 +1,18 @@
 import crypto from "crypto";
-import { currentUser, baseUrl } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
 import { isMember } from "@/lib/college";
 import { all, run, now } from "@/lib/db";
 import { LIMITS, cleanName, maxFor, remove, save, sniff } from "@/lib/files";
 import { allow } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
-const go = (path: string) => Response.redirect(new URL(path, baseUrl()), 303);
+// Redirects stay on whatever address the request came in on.
+const to = (req: Request) => (path: string) => Response.redirect(new URL(path, req.url), 303);
 
 /* Receives what you shared to Connect from another app (the phone's share sheet). The files are checked and held
    for an hour while you pick who to send them to. Nothing is sent until you choose. */
 export async function POST(req: Request) {
+  const go = to(req);
   const me = await currentUser();
   if (!me) return go("/signin");
   if (!isMember(me)) return go("/onboarding");
@@ -41,6 +43,6 @@ export async function POST(req: Request) {
   return go(`/share/${id}${skipped ? "?skipped=" + skipped : ""}`);
 }
 
-export function GET() {
-  return go("/messages");
+export function GET(req: Request) {
+  return to(req)("/messages");
 }

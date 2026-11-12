@@ -157,3 +157,18 @@ test("chat attachments are accepted by what the bytes are, not by their name", a
   assert.equal(sniff(B([0x50, 0x4b, 0x03, 0x04, 0]), "archive.zip"), null, "other zip files are refused");
   assert.equal(cleanName("../../etc/passwd<script>.pdf", "pdf"), ".._.._etc_passwd_script_.pdf");
 });
+
+test("videos and voice notes are recognised by their bytes too", async () => {
+  const { sniff, maxFor } = await import("../lib/files");
+  const B = (s: string | number[]) => Buffer.from(s as never);
+  const mp4 = Buffer.concat([B([0, 0, 0, 0x18]), B("ftypisom"), B([0, 0, 0, 0])]);
+  const mov = Buffer.concat([B([0, 0, 0, 0x14]), B("ftypqt  "), B([0, 0, 0, 0])]);
+  const webm = B([0x1a, 0x45, 0xdf, 0xa3, 0, 0]);
+  assert.equal(sniff(mp4, "clip.mp4")?.mime, "video/mp4");
+  assert.equal(sniff(mov, "IMG_0001.MOV")?.mime, "video/quicktime");
+  assert.equal(sniff(webm, "x.webm")?.kind, "video");
+  assert.equal(sniff(webm, "voice-note.webm", true)?.mime, "audio/webm", "a recording made in the chat is a voice note");
+  assert.equal(sniff(mp4, "voice-note.m4a", true)?.kind, "voice");
+  assert.equal(sniff(B("OggS\0"), "a.ogg")?.kind, "voice");
+  assert.ok(maxFor("video") > maxFor("file") && maxFor("voice") < maxFor("file"));
+});

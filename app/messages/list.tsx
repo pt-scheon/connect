@@ -20,7 +20,8 @@ export function ConversationList({ me, active }: { me: Row; active?: number }) {
           <span className="convo-body">
             <span className="row between nowrap"><b className="ellipsis">{u.name}</b><span className="small muted nowrap">{timeAgo(last.created_at)}</span></span>
             <span className="small muted ellipsis">
-              {last.from_id === me.id ? "You: " : ""}{last.kind === "invite" ? "Project invite" : last.kind === "image" ? `📷 ${last.text || "Photo"}` : last.kind === "file" ? `📎 ${last.file_name}` : last.text}
+              {last.from_id === me.id ? "You: " : ""}{({ invite: "Project invite", project: "🚀 Shared a project", image: `📷 ${last.text || "Photo"}`, video: `🎬 ${last.text || "Video"}`,
+                voice: "🎙️ Voice note", file: `📎 ${last.file_name}`, call: `${/video/i.test(last.text) ? "🎥" : "📞"} ${last.text}` } as Record<string, string>)[last.kind] ?? last.text}
             </span>
           </span>
           {unread > 0 && <span className="count" aria-label={`${unread} unread`}>{unread}</span>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 /* Voice and video calls, for any page of the app. One CallProvider lives in the layout; it listens for rings,
    runs the WebRTC connection, and draws the call screen. CallButtons anywhere start a call through it. */
@@ -52,7 +53,7 @@ function tone(kind: "ring" | "back") {
     setTimeout(cycle, kind === "ring" ? 2400 : 3000);
   };
   void ctx.resume().then(cycle);
-  return () => { stop = true; void ctx?.close(); };
+  return () => { if (stop) return; stop = true; ctx?.close().catch(() => {}); };
 }
 
 export function CallProvider() {
@@ -72,6 +73,9 @@ export function CallProvider() {
   const startedAt = useRef(0);
   const remoteV = useRef<HTMLVideoElement>(null), localV = useRef<HTMLVideoElement>(null), remoteA = useRef<HTMLAudioElement>(null);
   const remoteStream = useRef<MediaStream | null>(null);
+  // Mic and camera state in a ref as well, so two quick taps never send the other side an out-of-date state.
+  const now = useRef({ mic: true, cam: true });
+  const router = useRouter();
 
   const api = useCallback(async (body: Record<string, unknown>) => {
     const r = await fetch("/api/calls", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, device: device.current }) });
@@ -84,7 +88,7 @@ export function CallProvider() {
     pc.current?.close(); pc.current = null;
     local.current?.getTracks().forEach((t) => t.stop()); local.current = null; camTrack.current = null;
     remoteStream.current = null; queue.current = []; restarted.current = false;
-    setSharing(false); setMic(true); setCam(true); setTheirs({ mic: true, cam: true }); setNet(""); setMini(false);
+    setSharing(false); setMic(true); setCam(true); now.current = { mic: true, cam: true }; setTheirs({ mic: true, cam: true }); setNet(""); setMini(false);
     document.title = document.title.replace(/^📞 /, "");
     if (note) { setS((x) => ({ ...x, phase: "ended", note })); setTimeout(() => setS((x) => (x.phase === "ended" ? { phase: "idle" } : x)), 2200); }
     else setS({ phase: "idle" });
@@ -153,6 +157,8 @@ export function CallProvider() {
     if (ev.type === "ended") {
       const why = pl.status === "declined" ? "Declined" : pl.status === "missed" ? "No answer" : pl.status === "failed" ? "Call failed" : "Call ended";
       cleanup(why);
+      // The call line in the chat and any missed-call badge are new; redraw the page's server parts.
+      router.refresh();
       return;
     }
     if (ev.type === "accepted" && cur.phase === "outgoing") {
@@ -172,7 +178,7 @@ export function CallProvider() {
     } else if (ev.type === "ice") {
       if (p?.remoteDescription) await p.addIceCandidate(pl as RTCIceCandidateInit).catch(() => {}); else queue.current.push(pl as RTCIceCandidateInit);
     } else if (ev.type === "media") setTheirs({ mic: pl.mic !== false, cam: pl.cam !== false });
-  }, [cleanup, connect, sig]);
+  }, [cleanup, connect, sig, router]);
 
   // Listen for calls on every page while signed in.
   useEffect(() => {
@@ -238,8 +244,11 @@ export function CallProvider() {
   const decline = () => { const id = state.current.id; if (id) void api({ action: "decline", id }); cleanup(); };
   const hangup = () => { const id = state.current.id; if (id) void api({ action: "end", id }); cleanup(state.current.phase === "active" ? "Call ended" : undefined); };
 
-  const toggleMic = () => { const on = !mic; local.current?.getAudioTracks().forEach((t) => (t.enabled = on)); setMic(on); sig("media", { mic: on, cam }); };
-  const toggleCam = () => { const on = !cam; if (camTrack.current) camTrack.current.enabled = on; setCam(on); sig("media", { mic, cam: on }); };
+  // Quick taps are sent as one update, so they cannot reach the other side out of order.
+  const mediaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const tellMedia = () => { clearTimeout(mediaTimer.current); mediaTimer.current = setTimeout(() => sig("media", { ...now.current }), 150); };
+  const toggleMic = () => { const on = !now.current.mic; now.current.mic = on; local.current?.getAudioTracks().forEach((t) => (t.enabled = on)); setMic(on); tellMedia(); };
+  const toggleCam = () => { const on = !now.current.cam; now.current.cam = on; if (camTrack.current) camTrack.current.enabled = on; setCam(on); tellMedia(); };
   const flip = async () => {
     const cur = camTrack.current?.getSettings().facingMode;
     try {
