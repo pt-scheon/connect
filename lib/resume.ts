@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { all, get } from "./db";
+import { askGemini } from "./gemini";
 
 export type ResumeFacts = {
   name: string; branch: string; classOf: number | null;
@@ -48,26 +48,5 @@ Leave out a section that has nothing in it. Output the resume text only.`;
 /* Returns the resume text, or an error message to show the person. */
 export async function writeResume(facts: ResumeFacts): Promise<{ text?: string; error?: string }> {
   if (!facts.projects.length) return { error: "You need at least one shipped project before the AI has anything to write from." };
-  try {
-    const client = new Anthropic();
-    const res = await client.beta.messages.create({
-      model: "claude-opus-5-5",
-      max_tokens: 16000,
-      output_config: { effort: "low" },
-      // If the model declines, the API retries on a fallback model inside the same call.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      system: SYSTEM,
-      messages: [{ role: "user", content: JSON.stringify(facts) }],
-    });
-    if (res.stop_reason === "refusal") return { error: "The AI declined to write this. Your template resume is unchanged." };
-    const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("").trim();
-    return text ? { text } : { error: "The AI returned nothing. Try again." };
-  } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError) return { error: "The Claude API key was rejected. Check ANTHROPIC_API_KEY." };
-    if (e instanceof Anthropic.RateLimitError) return { error: "The AI is busy. Try again in a minute." };
-    if (e instanceof Anthropic.APIConnectionError) return { error: "Could not reach the Claude API. Check the connection and ANTHROPIC_API_KEY." };
-    if (e instanceof Anthropic.APIError) return { error: `The AI request failed (status ${e.status}).` };
-    return { error: "AI resume is not set up. Add ANTHROPIC_API_KEY to .env.local." };
-  }
+  return askGemini(SYSTEM, JSON.stringify(facts));
 }

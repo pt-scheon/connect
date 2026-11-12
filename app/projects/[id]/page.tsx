@@ -5,7 +5,7 @@ import { requireUser, standings } from "@/lib/auth";
 import { EMPTY, RULES, projectShares } from "@/lib/credit";
 import { timeAgo } from "@/lib/notify";
 import * as A from "../../actions";
-import { SplitForm } from "../../client";
+import { ProofHelp, SplitForm } from "../../client";
 import { F, Meter, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -72,6 +72,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
             <div className="card">
               <h2>In review</h2>
               <p className="muted">{reviews.length} of {RULES.reviewsNeeded} reviews in. Reviewers are people outside the team with {RULES.reviewerMin}+ credit. They open the proof and decide what this is worth. The stricter verdict wins.</p>
+              {canReview && <ProofHelp id={id} action={A.summariseProof} />}
               {canReview && (
                 <div className="row">
                   {[[RULES.live, "Live and in use", "btn"], [RULES.demo, "Works, demo only", "btn ghost"], [0, "Not ready", "btn danger"]].map(([v, label, cls]) => (

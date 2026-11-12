@@ -32,7 +32,7 @@ Someone who uses both with the same verified email lands on one account.
 - `COLLEGE_EMAIL_DOMAIN`: e.g. `college.ac.in`. A student who signs in with a Google account on this domain is verified at once. Everyone else gets a code by email.
 - `RESEND_API_KEY` and `MAIL_FROM`: so the code is emailed. Without them the code is only printed in the server log.
 - `ADMIN_EMAILS`: your own sign-in email. Admins approve alumni, register clubs, handle reports and can ship a project with a single review.
-- `ANTHROPIC_API_KEY`: turns on "Write with AI" for resumes.
+- `GEMINI_API_KEY`: turns on "Write with AI" for resumes.
 
 ### 3. Hosting
 
@@ -83,7 +83,7 @@ npm run build
 - `lib/auth.ts` sessions and account records
 - `lib/oauth.ts` Google and LinkedIn settings
 - `lib/notify.ts` inbox entries, project timeline, rate limits
-- `lib/resume.ts` what the AI is given and the Claude call
+- `lib/resume.ts` what the AI is given and the Gemini call
 - `app/actions.ts` every write, with its permission checks
 - `app/client.tsx` the interactive pieces (board, people search, split sliders, toasts)
 - `app/landing.tsx` the public home page

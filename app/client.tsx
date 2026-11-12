@@ -290,3 +290,41 @@ export function Simulator() {
     </div>
   );
 }
+
+/* ---------- light / dark switch, remembered in a cookie so the server renders the right one ---------- */
+export function ThemeToggle({ theme }: { theme: "light" | "dark" }) {
+  const [t, setT] = useState(theme);
+  const flip = () => {
+    const next = t === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    document.cookie = `theme=${next}; path=/; max-age=31536000; samesite=lax`;
+    setT(next);
+  };
+  return (
+    <button type="button" className="iconbtn" onClick={flip} aria-label={t === "dark" ? "Switch to light mode" : "Switch to dark mode"} title={t === "dark" ? "Light mode" : "Dark mode"}>
+      {t === "dark" ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.900 4.900l1.400 1.400M17.700 17.700l1.400 1.400M2 12h2M20 12h2M4.900 19.100l1.400-1.400M17.700 6.300l1.400-1.400" /></svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.800A9 9 0 1 1 11.200 3a7 7 0 0 0 9.800 9.800z" /></svg>
+      )}
+    </button>
+  );
+}
+
+/* ---------- reviewer help: Gemini reads the project record and lists what to check ---------- */
+export function ProofHelp({ id, action }: { id: number; action: (id: number) => Promise<{ text?: string; error?: string }> }) {
+  const [out, setOut] = useState<{ text?: string; error?: string } | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="stack tight">
+      <div className="row">
+        <button type="button" className="btn ghost sm" disabled={pending} onClick={() => start(async () => setOut(await action(id)))}>
+          {pending ? "Reading the project…" : out?.text ? "Summarise again" : "What should I check? (Gemini)"}
+        </button>
+        <span className="small muted">Suggests what to verify. It does not open links or give a verdict.</span>
+      </div>
+      {out?.error && <span className="small neg">{out.error}</span>}
+      {out?.text && <div className="note pre" style={{ color: "var(--ink)" }}>{out.text}</div>}
+    </div>
+  );
+}

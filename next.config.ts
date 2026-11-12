@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   // Builds a self-contained server in .next/standalone for the Dockerfile.
   output: "standalone",
   poweredByHeader: false,
+  // Dev only: lets http://127.0.0.1:3000 load scripts as well as localhost.
+  allowedDevOrigins: ["127.0.0.1"],
   async headers() {
     return [{ source: "/:path*", headers: security }];
   },

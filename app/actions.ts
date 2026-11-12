@@ -524,3 +524,16 @@ export async function report(fd: FormData) {
   for (const a of all("SELECT id FROM users WHERE admin=1")) notify(a.id, `New report on a ${kind === "user" ? "person" : "project"}`, "/admin");
   done(back, "Reported. An admin will look at it.");
 }
+
+/* ---------- AI help for reviewers ---------- */
+export async function summariseProof(projectId: number): Promise<{ text?: string; error?: string }> {
+  const me = await currentUser();
+  if (!me?.onboarded || !me.verified) return { error: "Sign in and verify first." };
+  const p = project(projectId);
+  if (!p || p.status !== "review") return { error: "This project is not up for review." };
+  if (member(p.id, me.id)) return { error: "You cannot review a project you were on." };
+  if (!me.admin && (compute().get(me.id)?.credit ?? 0) < RULES.reviewerMin) return { error: `You need ${RULES.reviewerMin} credit to review.` };
+  if (!allow(`ai:${me.id}`, 10, 3600)) return { error: "You have asked for several summaries. Try again in an hour." };
+  const { proofSummary } = await import("@/lib/review-help");
+  return proofSummary(p.id);
+}

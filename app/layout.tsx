@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Bricolage_Grotesque, Hanken_Grotesk, DM_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import { get } from "@/lib/db";
 import { baseUrl, currentUser, standings } from "@/lib/auth";
 import { signOut } from "./actions";
-import { NavLinks, Toast } from "./client";
+import { NavLinks, ThemeToggle, Toast } from "./client";
 import { Av } from "./ui";
 import "./globals.css";
 
@@ -23,17 +24,23 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const me = await currentUser();
-  const signedIn = me?.onboarded;
+  const signedIn = !!me?.onboarded;
+  const theme = (await cookies()).get("theme")?.value === "light" ? "light" : "dark";
   const unread = signedIn ? get("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND seen=0", me.id).n : 0;
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html lang="en" data-theme={theme} className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body>
         <header className="bar">
           <div className="wrap">
             <Link href="/" className="logo"><i />Connect</Link>
             {signedIn ? (
               <>
+                <nav className="tabs" aria-label="Sections">
+                  <NavLinks admin={!!me.admin} />
+                  <form action={signOut}><button>Sign out</button></form>
+                </nav>
                 <div className="right">
+                  <ThemeToggle theme={theme} />
                   <Link href="/inbox" className="bell" aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
                     {unread > 0 && <b>{unread > 9 ? "9+" : unread}</b>}
@@ -43,13 +50,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <Av u={me} />
                   </Link>
                 </div>
-                <nav className="tabs" aria-label="Sections">
-                  <NavLinks admin={!!me.admin} />
-                  <form action={signOut}><button>Sign out</button></form>
-                </nav>
               </>
             ) : (
-              <div className="right" style={{ paddingBottom: 10 }}>{!me && <Link className="btn sm" href="/signin">Sign in</Link>}</div>
+              <div className="right" style={{ marginLeft: "auto" }}><ThemeToggle theme={theme} />{!me && <Link className="btn sm" href="/signin">Sign in</Link>}</div>
             )}
           </div>
         </header>
