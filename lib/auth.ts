@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { get, run, now, type Row } from "./db";
 import { compute } from "./credit";
+import { collegeForEmail, isMember } from "./college";
 
 const prod = process.env.NODE_ENV === "production";
 /* Sample sign-in (pick any seeded person). Never available in production. */
@@ -56,24 +57,29 @@ export function upsertUser(p: { sub: string; name: string; email?: string; email
     get("SELECT user_id FROM identities WHERE sub=?", p.sub)?.user_id ?? get("SELECT id FROM users WHERE sub=?", p.sub)?.id;
   if (!id && email && p.emailVerified) id = get("SELECT id FROM users WHERE email=? AND email_verified=1", email)?.id;
   if (id) {
-    run("UPDATE users SET picture=COALESCE(?, picture), admin=MAX(admin, ?) WHERE id=?", p.picture ?? null, admin, id);
+    run("UPDATE users SET picture=COALESCE(?, picture), admin=MAX(admin, ?), super=MAX(super, ?) WHERE id=?", p.picture ?? null, admin, admin, id);
   } else {
-    id = Number(run("INSERT INTO users (sub, name, email, email_verified, picture, admin, created_at) VALUES (?,?,?,?,?,?,?)",
-      p.sub, p.name, email, p.emailVerified ? 1 : 0, p.picture ?? null, admin, now()).lastInsertRowid);
+    id = Number(run("INSERT INTO users (sub, name, email, email_verified, picture, admin, super, created_at) VALUES (?,?,?,?,?,?,?,?)",
+      p.sub, p.name, email, p.emailVerified ? 1 : 0, p.picture ?? null, admin, admin, now()).lastInsertRowid);
   }
   run("INSERT OR IGNORE INTO identities (sub, user_id) VALUES (?,?)", p.sub, id);
   return id;
 }
 
-/* A student whose sign-in email is already on the college domain needs no code. */
-export function collegeDomain() {
-  return (process.env.COLLEGE_EMAIL_DOMAIN || "").toLowerCase();
-}
+/* A student who signed in with a verified email on a college's domain needs no code: that email is the proof.
+   Only that college can be joined this way, and someone already verified at a college never moves. */
 export function autoVerify(userId: number) {
   const u = get("SELECT * FROM users WHERE id=?", userId);
-  const d = collegeDomain();
-  if (!u || u.verified || u.role !== "student" || !d || !u.email_verified || !u.email?.endsWith("@" + d)) return false;
-  if (get("SELECT 1 FROM users WHERE college_email=? AND id<>?", u.email, userId)) return false;
-  run("UPDATE users SET verified=1, college_email=? WHERE id=?", u.email, userId);
-  return true;
+  if (!u || u.verified || u.role !== "student" || !u.email_verified || !u.email) return false;
+  const c = collegeForEmail(u.email);
+  if (!c || get("SELECT 1 FROM users WHERE college_email=? AND id<>?", u.email, userId)) return false;
+  run("UPDATE users SET verified=1, college_email=?, college_id=? WHERE id=?", u.email.toLowerCase(), c.id, userId);
+  return c.status === "active";
+}
+
+/* Signed in, onboarded, and a verified member of an open college. Everything college-specific needs this. */
+export async function requireMember(): Promise<Row> {
+  const u = await requireUser();
+  if (!isMember(u)) redirect("/onboarding");
+  return u;
 }

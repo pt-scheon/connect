@@ -1,20 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { all, get } from "@/lib/db";
-import { requireUser, standings } from "@/lib/auth";
+import { currentUser, requireMember, standings } from "@/lib/auth";
 import { EMPTY } from "@/lib/credit";
 import * as A from "../../actions";
 import { F, Pill, Who } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const c = get("SELECT name, about FROM clubs WHERE id=?", Number((await params).id));
+  const me = await currentUser();
+  const c = me?.verified ? get("SELECT name, about FROM clubs WHERE id=? AND college_id=?", Number((await params).id), me.college_id) : null;
   return c ? { title: c.name, description: c.about } : { title: "Club" };
 }
 
 export default async function Club({ params }: { params: Promise<{ id: string }> }) {
-  const me = await requireUser();
+  const me = await requireMember();
   const id = Number((await params).id);
-  const c = get("SELECT * FROM clubs WHERE id=?", id);
+  const c = get("SELECT * FROM clubs WHERE id=? AND college_id=?", id, me.college_id);
   if (!c) notFound();
   const back = `/clubs/${id}`;
   const S = standings();

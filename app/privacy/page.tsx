@@ -14,11 +14,12 @@ export default function Privacy() {
       <ul>
         <li><b>From Google or LinkedIn sign-in:</b> your name, email address and profile photo. Nothing else, and we never see your password.</li>
         <li><b>From you:</b> branch, graduation year, skills, a line about you, optional GitHub, LinkedIn and website links, and your college email if you verify with a code.</li>
-        <li><b>From using Connect:</b> projects you post or join, milestones, proof links, reviews, vouches, credit splits, questions, club roles and funding applications.</li>
+        <li><b>From using Connect:</b> projects you post or join, milestones, proof links, reviews, vouches, credit splits, questions, messages you send, club roles and funding applications.</li>
       </ul>
 
       <h2>What is public</h2>
-      <p>Verified students have a profile page anyone with the link can open: name, photo, branch, year, skills, links, projects and credit. Your email addresses are never shown to anyone. Reviews are shown without the reviewer&rsquo;s name.</p>
+      <p>Verified students have a profile page anyone with the link can open: name, photo, branch, year, skills, links, projects and credit. Your email addresses are never shown to anyone, only the college domain you verified with. Reviews are shown without the reviewer&rsquo;s name.</p>
+      <p>Everything else stays inside your college: projects in progress, people lists, clubs, funding and messages are visible only to verified members of the same college. A college&rsquo;s public page shows only its counts and shipped projects.</p>
 
       <h2>How it is used</h2>
       <ul>

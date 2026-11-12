@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { Bricolage_Grotesque, Hanken_Grotesk, DM_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import { get } from "@/lib/db";
+import { collegeById, isMember } from "@/lib/college";
+import { unreadMessages } from "@/lib/chat";
 import { baseUrl, currentUser, standings } from "@/lib/auth";
 import { signOut } from "./actions";
 import { NavLinks, ThemeToggle, Toast } from "./client";
@@ -29,6 +31,9 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const me = await currentUser();
   const signedIn = !!me?.onboarded;
+  const member = signedIn && isMember(me);
+  const college = member ? collegeById(me.college_id) : null;
+  const dms = member ? unreadMessages(me.id) : 0;
   const theme = (await cookies()).get("theme")?.value === "light" ? "light" : "dark";
   const unread = signedIn ? get("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND seen=0", me.id).n : 0;
   return (
@@ -37,14 +42,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="bar">
           <div className="wrap">
             <Link href="/" className="logo"><i />Connect</Link>
+            {college && <Link href={`/c/${college.slug}`} className="college-chip" title={college.name}>{college.name}</Link>}
             {signedIn ? (
               <>
                 <nav className="tabs" aria-label="Sections">
-                  <NavLinks admin={!!me.admin} />
+                  {member ? <NavLinks admin={!!me.admin} /> : <span className="small muted">Finish verifying to see your college</span>}
                   <form action={signOut}><button>Sign out</button></form>
                 </nav>
                 <div className="right">
                   <ThemeToggle theme={theme} />
+                  {member && (
+                    <Link href="/messages" className="bell" aria-label={dms ? `Messages, ${dms} unread` : "Messages"}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                      {dms > 0 && <b>{dms > 9 ? "9+" : dms}</b>}
+                    </Link>
+                  )}
                   <Link href="/inbox" className="bell" aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
                     {unread > 0 && <b>{unread > 9 ? "9+" : unread}</b>}
@@ -60,16 +72,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
         </header>
-        {signedIn && !me.verified && (
+        {signedIn && !member && (
           <div className="strip"><div className="wrap">
-            {me.role === "alum" ? "Your alumni account is waiting for an admin to approve it. You can look around until then."
-              : <>You can look around, but you cannot join or post until you <Link href="/onboarding">verify your college email</Link>.</>}
+            {me.role === "alum" ? "Your alumni account is waiting for an admin of your college to approve it."
+              : <>Your college&rsquo;s projects and people stay hidden until you <Link href="/onboarding">prove your college email</Link>.</>}
           </div></div>
         )}
         <main className="wrap">{children}</main>
         <footer className="foot"><div className="wrap">
           <span>Connect. Credit comes only from what ships.</span>
-          <span className="row"><Link href="/rules">How credit works</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <Link href="/settings">Settings</Link> : <Link href="/signin">Sign in</Link>}</span>
+          <span className="row"><Link href="/rules">How credit works</Link><Link href="/colleges">Colleges</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <Link href="/settings">Settings</Link> : <Link href="/signin">Sign in</Link>}</span>
         </div></footer>
         <Suspense><Toast /></Suspense>
       </body>

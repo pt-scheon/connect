@@ -1,6 +1,6 @@
 # Connect
 
-A network for one college where students build projects together. Credit comes only from projects that ship, and teammates and outside reviewers decide what each person earned.
+A network of colleges where students build projects together. Each college is its own private space. Credit comes only from projects that ship, and teammates and outside reviewers decide what each person earned.
 
 ## Run it locally
 
@@ -14,7 +14,7 @@ Open http://localhost:3000 and pick a sample person on the sign-in page. That li
 
 ## Going live
 
-You need three things: sign-in keys, a server with a disk, and your college's email domain.
+You need two things: sign-in keys and a server with a disk.
 
 ### 1. Sign-in keys
 
@@ -29,7 +29,7 @@ Someone who uses both with the same verified email lands on one account.
 
 - `APP_URL`: the public address, e.g. `https://connect.yourcollege.in`.
 - `SESSION_SECRET`: a long random string (`openssl rand -hex 32`).
-- `COLLEGE_EMAIL_DOMAIN`: e.g. `college.ac.in`. A student who signs in with a Google account on this domain is verified at once. Everyone else gets a code by email.
+- `ADMIN_EMAILS`: your sign-in email. You become site admin: you open new colleges on non-academic domains and pick each college's admins at /admin/colleges.
 - `SMTP_URL` (a Gmail app password works) or `RESEND_API_KEY`, plus `MAIL_FROM`: sends verification codes and inbox alerts by email. Without them, codes are printed in the server log in development, and in production students verify by signing in with a Google account on `COLLEGE_EMAIL_DOMAIN` (or an admin verifies them on /admin).
 - `CONTACT_EMAIL`: optional, shown on the privacy page.
 - `ADMIN_EMAILS`: your own sign-in email. Admins approve alumni, register clubs, handle reports and can ship a project with a single review.
@@ -54,7 +54,10 @@ Do not run `npm run seed` on the live server. It wipes everything.
 
 Google and LinkedIn only share name, photo and email. Neither shares education. So:
 
-- Students are verified by signing in with a college Google account, or by a code sent to their college email. One account per address.
+- Each college is a separate space: board, people, clubs, funding, admin and messages. Nothing crosses between them except public profiles and a college's public page (/c/slug), which shows only counts and shipped projects.
+- A student's college comes only from an email they prove: a Google sign-in with that address, or a code sent to it. Personal mail (Gmail, Yahoo...) is refused, lookalike domains do not match, and a verified account never moves college.
+- A new college on an academic domain (.edu, .ac.in, .edu.in ...) opens the first time someone proves an address on it. Other domains wait for a site admin. Alumni pick their college and are approved by that college's admins.
+- Direct messages between verified people at the same college, with project invites as cards, blocking, and a limit of five messages before the other person replies.
 - Alumni are approved by an admin by hand.
 
 ## The credit rules
@@ -95,6 +98,4 @@ npm run build
 ## Not built yet
 
 - Real payments. Funding records promises and "paid" marks. Money moves outside the app.
-- More than one college per install.
-- A privacy policy and terms page. Write these for your college before inviting people.
 - Rate limits are kept in memory, which is fine for one server.

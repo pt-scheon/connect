@@ -126,3 +126,19 @@ test("the board's Fits you filter matches a role to the skills a person listed",
   assert.deepEqual(fitFor("React frontend", ["React", "Node", "Figma"]), ["React"]);
   assert.deepEqual(fitFor("RFID hardware", ["Flutter", "Firebase"]), []);
 });
+
+test("a college email only counts for the college that owns that domain", async () => {
+  const { matchCollege, onDomain, isPublicMail, isAcademic, baseDomain } = await import("../lib/domains");
+  const colleges = [{ id: 1, domains: "nirmauni.ac.in" }, { id: 2, domains: "iitb.ac.in,iitb.edu" }, { id: 3, domains: "cse.nirmauni.ac.in" }];
+  assert.equal(matchCollege("nirmauni.ac.in", colleges)?.id, 1);
+  assert.equal(matchCollege("students.nirmauni.ac.in", colleges)?.id, 1, "a subdomain belongs to its college");
+  assert.equal(matchCollege("cse.nirmauni.ac.in", colleges)?.id, 3, "the most specific domain wins");
+  assert.equal(matchCollege("fakenirmauni.ac.in", colleges), undefined, "a lookalike domain is not the college");
+  assert.equal(matchCollege("nirmauni.ac.in.evil.com", colleges), undefined, "a domain that only starts the same is not the college");
+  assert.equal(matchCollege("iitb.edu", colleges)?.id, 2);
+  assert.ok(!onDomain("xnirmauni.ac.in", "nirmauni.ac.in"));
+  assert.ok(isPublicMail("gmail.com") && isPublicMail("yahoo.co.in") && !isPublicMail("nirmauni.ac.in"));
+  assert.ok(isAcademic("nirmauni.ac.in") && isAcademic("mit.edu") && isAcademic("unimelb.edu.au") && !isAcademic("somecollege.com"));
+  assert.equal(baseDomain("students.mit.edu"), "mit.edu");
+  assert.equal(baseDomain("mit.edu"), "mit.edu");
+});

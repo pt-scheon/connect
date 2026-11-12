@@ -23,7 +23,7 @@ export function Landing() {
           <h1>Build with people from your college. Earn credit only for <em>what ships</em>.</h1>
           <p className="lead">Connect is where you find a team, ship a project, and leave with a record your teammates signed. A big bio earns nothing here.</p>
           <SignInButtons large />
-          <span className="small muted">Free for students. One account per college email.</span>
+          <span className="small muted">Free for students. One account per college email, and each college is its own private space. <Link href="/colleges">See the colleges</Link>.</span>
         </div>
         <Simulator />
       </section>

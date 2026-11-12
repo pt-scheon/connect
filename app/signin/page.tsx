@@ -11,7 +11,7 @@ export const metadata = { title: "Sign in" };
 
 export default async function SignIn() {
   if (await currentUser()) redirect("/");
-  const people = devLogin ? all("SELECT * FROM users WHERE suspended=0 ORDER BY role DESC, name LIMIT 30") : [];
+  const people = devLogin ? all("SELECT u.*, c.name college FROM users u LEFT JOIN colleges c ON c.id=u.college_id WHERE u.suspended=0 ORDER BY c.name, u.role DESC, u.name LIMIT 40") : [];
   const missing = devLogin && readyProviders().length < 2;
   return (
     <div className="stack narrow">
@@ -30,7 +30,7 @@ export default async function SignIn() {
           {people.map((u) => (
             <form key={u.id} action={devSignIn} className="row between">
               <input type="hidden" name="id" value={u.id} />
-              <span className="row nowrap"><Av u={u} /><span>{u.name} <span className="muted small">{u.role === "alum" ? "alum" : u.branch}{u.admin ? " · admin" : ""}</span></span></span>
+              <span className="row nowrap"><Av u={u} /><span>{u.name} <span className="muted small">{u.college ?? "no college yet"} · {u.role === "alum" ? "alum" : u.branch}{u.admin ? " · admin" : ""}</span></span></span>
               <button className="btn ghost sm">Sign in</button>
             </form>
           ))}

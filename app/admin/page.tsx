@@ -1,26 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { all } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireMember } from "@/lib/auth";
 import * as A from "../actions";
 import { F, Who } from "../ui";
 
 export const metadata = { title: "Admin" };
 
 export default async function Admin() {
-  const me = await requireUser();
+  const me = await requireMember();
   if (!me.admin) notFound();
-  const alumni = all("SELECT * FROM users WHERE role='alum' AND verified=0 AND onboarded=1");
-  const waiting = all("SELECT * FROM users WHERE role='student' AND verified=0 AND onboarded=1 AND suspended=0 ORDER BY created_at DESC LIMIT 50");
-  const students = all("SELECT id, name, branch FROM users WHERE role='student' AND verified=1 ORDER BY name");
-  const review = all("SELECT * FROM projects WHERE status='review'");
-  const reports = all("SELECT r.*, u.name by_name FROM reports r JOIN users u ON u.id=r.by_id WHERE r.open=1 ORDER BY r.id DESC");
+  const cid = me.college_id;
+  const alumni = all("SELECT * FROM users WHERE role='alum' AND verified=0 AND onboarded=1 AND suspended=0 AND college_id=?", cid);
+  const waiting = all("SELECT * FROM users WHERE role='student' AND verified=0 AND onboarded=1 AND suspended=0 AND college_id=? ORDER BY created_at DESC LIMIT 50", cid);
+  const students = all("SELECT id, name, branch FROM users WHERE role='student' AND verified=1 AND suspended=0 AND college_id=? ORDER BY name", cid);
+  const review = all("SELECT * FROM projects WHERE status='review' AND college_id=?", cid);
+  const reports = all("SELECT r.*, u.name by_name FROM reports r JOIN users u ON u.id=r.by_id WHERE r.open=1 AND r.college_id=? ORDER BY r.id DESC", cid);
   const label = (r: { kind: string; target_id: number }) =>
     r.kind === "user" ? all("SELECT name FROM users WHERE id=?", r.target_id)[0]?.name : all("SELECT name FROM projects WHERE id=?", r.target_id)[0]?.name;
-  const suspended = all("SELECT * FROM users WHERE suspended=1 AND deleted=0");
+  const suspended = all("SELECT * FROM users WHERE suspended=1 AND deleted=0 AND college_id=?", cid);
   return (
     <>
-      <div className="head"><div className="stack tight"><h1>Admin</h1><p>Verify students and alumni, register clubs, and clear the review queue. One admin review is enough to ship a project.</p></div></div>
+      <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your college only. Verify students and alumni, register clubs, and clear the review queue.{me.super ? <> Site admin: <Link href="/admin/colleges">manage colleges</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
       <div className="grid">
         <div className="card">
           <h2>Students not verified</h2>

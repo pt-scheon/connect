@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { all, get, run, db, now, type Row } from "@/lib/db";
 import { compute, RULES } from "@/lib/credit";
 import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify } from "@/lib/auth";
+import { addCollege, collegeById, collegeForEmail, isMember } from "@/lib/college";
+import { domainOf, isEmail, isPublicMail } from "@/lib/domains";
 import { notify, logUpdate, allow } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { mailReady, sendMail } from "@/lib/mail";
@@ -31,8 +33,8 @@ async function ctx(fd: FormData, needVerified = true) {
   const me = await requireUser();
   const back = safeBack(fd.get("back"));
   if (!allow(`act:${me.id}`, 40, 60)) bounce(back, "err", "Slow down a little. Try again in a minute.");
-  if (needVerified && !me.verified)
-    bounce(back, "err", me.role === "alum" ? "An admin has to approve your alumni account first." : "Verify your college email first.");
+  if (needVerified && !isMember(me))
+    bounce(back, "err", me.role === "alum" ? "An admin of your college has to approve your alumni account first." : "Verify your college email first.");
   return {
     me, back,
     s: (k: string, max = 300) => String(fd.get(k) ?? "").trim().slice(0, max),
@@ -41,7 +43,11 @@ async function ctx(fd: FormData, needVerified = true) {
   };
 }
 const lines = (t: string) => t.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 12);
-const project = (id: number): Row | undefined => get("SELECT * FROM projects WHERE id=?", id);
+/* A project, only if it belongs to the person's own college. Every project action goes through this. */
+const project = (id: number, me: Row): Row | undefined => get("SELECT * FROM projects WHERE id=? AND college_id=?", id, me.college_id);
+/* Someone at the same college. */
+const colleague = (id: number, me: Row, extra = ""): Row | undefined =>
+  get(`SELECT * FROM users WHERE id=? AND college_id=? AND deleted=0 ${extra}`, id, me.college_id);
 const member = (pid: number, uid: number): Row | undefined => get("SELECT * FROM members WHERE project_id=? AND user_id=?", pid, uid);
 const isActive = (pid: number, uid: number) => member(pid, uid)?.status === "active";
 const open = (p: Row) => p.status === "recruiting" || p.status === "building";
@@ -73,10 +79,16 @@ export async function saveProfile(fd: FormData) {
       host ? `That ${k === "github" ? "GitHub" : "LinkedIn"} link does not look right. Paste the full https://${host}/... address.` : "The website link has to start with https://"));
     links[k] = v;
   }
+  // Alumni say which college they are from; an admin of that college approves them by hand.
+  const alumCollege = !me.onboarded && role === "alum" ? get("SELECT * FROM colleges WHERE id=? AND status='active'", Number(fd.get("college"))) : null;
+  if (!me.onboarded && role === "alum" && !alumCollege) redirect(back + "?err=" + encodeURIComponent("Pick the college you graduated from."));
   run("UPDATE users SET branch=?, grad_year=?, skills=?, about=?, role=?, github=?, linkedin=?, website=?, onboarded=1 WHERE id=?",
     s("branch", 60), year, s("skills"), s("about"), role, links.github, links.linkedin, links.website, me.id);
-  // Alumni are always approved by hand, whatever their email says.
-  if (!me.onboarded && role === "alum") run("UPDATE users SET verified=0, college_email=NULL WHERE id=?", me.id);
+  if (alumCollege) {
+    run("UPDATE users SET verified=0, college_email=NULL, college_id=? WHERE id=?", alumCollege.id, me.id);
+    for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", alumCollege.id))
+      notify(a.id, `${me.name} says they are an alum of ${alumCollege.name}. Approve them if that is true.`, "/admin");
+  }
   const auto = !me.onboarded && autoVerify(me.id);
   revalidatePath("/", "layout");
   if (auto) redirect("/?ok=" + encodeURIComponent(`Your college email is verified. You start with ${RULES.starter} credit.`));
@@ -92,25 +104,27 @@ function profileLink(v: string, host: string) {
 }
 export async function sendCode(fd: FormData) {
   const { me, s, fail } = await ctx(fd, false);
-  const email = s("email").toLowerCase();
-  const domain = (process.env.COLLEGE_EMAIL_DOMAIN || "").toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail("That does not look like an email address.");
-  if (domain && !email.endsWith("@" + domain)) fail(`Use your @${domain} address.`);
+  if (me.role !== "student") fail("Alumni are approved by an admin of their college, not by email code.");
+  if (me.verified && me.college_id) fail(`You are already verified at ${collegeById(me.college_id)?.name ?? "your college"}. A verified account stays with its college.`);
+  const email = s("email").toLowerCase(), domain = domainOf(email);
+  if (!isEmail(email)) fail("That does not look like an email address.");
+  if (isPublicMail(domain)) fail("Use the email your college gave you, not a personal one like Gmail. That is what proves where you study.");
   if (get("SELECT 1 FROM users WHERE college_email=? AND id<>?", email, me.id)) fail("That college email is already linked to another account.");
+  const known = collegeForEmail(email), name = s("college_name", 80);
+  if (!known && name.length < 3) fail(`@${domain} is not on Connect yet. Add your college's full name and we will set it up.`);
   if (!allow(`code:${me.id}`, 3, 600)) fail("Too many codes requested. Wait ten minutes.");
   const code = String(crypto.randomInt(100000, 1000000));
-  run("INSERT OR REPLACE INTO codes (user_id, email, code, expires, tries) VALUES (?,?,?,?,0)", me.id, email, code, now() + 900);
+  run("INSERT OR REPLACE INTO codes (user_id, email, code, expires, tries, college_name) VALUES (?,?,?,?,0,?)", me.id, email, code, now() + 900, known ? "" : name);
   if (mailReady()) {
     if (!(await sendMail(email, "Your Connect code", `Your Connect verification code is ${code}. It expires in 15 minutes.\n\nIf you did not ask for this, ignore this email.`)))
       fail("Could not send the email. Try again in a minute.");
   } else if (process.env.NODE_ENV === "production") {
     run("DELETE FROM codes WHERE user_id=?", me.id);
-    fail(domain ? `Email codes are not switched on yet. Sign out and sign in with your @${domain} Google account instead; that verifies you straight away.`
-      : "Email codes are not switched on yet. Ask an admin to verify you.");
+    fail("Email codes are not switched on yet. Sign out and sign in with your college Google account instead; that verifies you straight away. Or ask your college's admin below.");
   } else {
     console.log(`[connect] verification code for ${email}: ${code}`);
   }
-  done("/onboarding", "Code sent. It expires in 15 minutes.");
+  done("/onboarding", `Code sent to ${email}. It expires in 15 minutes.`);
 }
 export async function verifyCode(fd: FormData) {
   const { me, s, fail } = await ctx(fd, false);
@@ -121,9 +135,30 @@ export async function verifyCode(fd: FormData) {
     run("UPDATE codes SET tries=tries+1 WHERE user_id=?", me.id);
     fail("Wrong code.");
   }
-  run("UPDATE users SET verified=1, college_email=? WHERE id=?", c.email, me.id);
-  run("DELETE FROM codes WHERE user_id=?", me.id);
-  done("/", `Verified. You start with ${RULES.starter} credit.`);
+  if (me.verified && me.college_id) fail("You are already verified.");
+  if (get("SELECT 1 FROM users WHERE college_email=? AND id<>?", c.email, me.id)) fail("That college email is already linked to another account.");
+  const college = db.transaction(() => {
+    const col = collegeForEmail(c.email) ?? addCollege(c.college_name || domainOf(c.email), c.email, me.id);
+    run("UPDATE users SET verified=1, college_email=?, college_id=? WHERE id=?", c.email, col.id, me.id);
+    run("DELETE FROM codes WHERE user_id=?", me.id);
+    return col;
+  })();
+  if (college.status !== "active") {
+    for (const a of all("SELECT id FROM users WHERE super=1")) notify(a.id, `New college waiting for approval: ${college.name} (@${college.domains})`, "/admin/colleges");
+    done("/onboarding", `Email confirmed. ${college.name} is new on Connect, so the team checks it first. You will get in as soon as it is approved.`);
+  }
+  done("/", `Verified at ${college.name}. You start with ${RULES.starter} credit.`);
+}
+/* No email code available: the student names their college and waits for one of its admins to vouch for them. */
+export async function askCollegeAdmin(fd: FormData) {
+  const { me, n, fail } = await ctx(fd, false);
+  if (me.role !== "student" || (me.verified && me.college_id)) fail("This is only for students who have not verified yet.");
+  const c = get("SELECT * FROM colleges WHERE id=? AND status='active'", n("college"));
+  if (!c) fail("Pick your college.");
+  run("UPDATE users SET college_id=? WHERE id=? AND verified=0", c.id, me.id);
+  for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", c.id))
+    notify(a.id, `${me.name} asked to be verified as a student of ${c.name}`, "/admin");
+  done("/onboarding", `Asked the admins of ${c.name}. You will get a note in your inbox once they verify you.`);
 }
 
 /* ---------- projects ---------- */
@@ -133,8 +168,8 @@ export async function createProject(fd: FormData) {
   const name = s("name", 60), pitch = s("pitch"), ms = lines(s("milestones", 1000)), roles = lines(s("roles", 1000));
   if (!name || !pitch || !ms.length) fail("Give it a name, one line on what it does, and at least one milestone.");
   const id = db.transaction(() => {
-    const pid = Number(run("INSERT INTO projects (name, pitch, status, lead_id, created_at) VALUES (?,?,?,?,?)",
-      name, pitch, roles.length ? "recruiting" : "building", me.id, now()).lastInsertRowid);
+    const pid = Number(run("INSERT INTO projects (name, pitch, status, lead_id, college_id, created_at) VALUES (?,?,?,?,?,?)",
+      name, pitch, roles.length ? "recruiting" : "building", me.id, me.college_id, now()).lastInsertRowid);
     run("INSERT INTO members (project_id, user_id, role) VALUES (?,?,?)", pid, me.id, s("myrole", 60) || "Lead");
     for (const m of ms) run("INSERT INTO milestones (project_id, title) VALUES (?,?)", pid, m.slice(0, 120));
     for (const r of roles) {
@@ -148,7 +183,7 @@ export async function createProject(fd: FormData) {
 }
 export async function editProject(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.lead_id !== me.id || !open(p)) fail("Only the lead can edit a project before it goes for review.");
   const name = s("name", 60), pitch = s("pitch");
   if (!name || !pitch) fail("Give it a name and one line on what it does.");
@@ -160,17 +195,20 @@ export async function inviteToRole(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
   const r = get("SELECT r.*, p.name, p.lead_id, p.status FROM roles r JOIN projects p ON p.id=r.project_id WHERE r.id=? AND r.open=1", n("role"));
   if (!r || r.lead_id !== me.id) fail("Only the lead can invite people to an open role.");
-  const to = get("SELECT id, name FROM users WHERE id=? AND role='student' AND verified=1 AND suspended=0", n("to"));
+  const to = colleague(n("to"), me, "AND role='student' AND verified=1 AND suspended=0");
   if (!to || member(r.project_id, to.id)) fail("That person cannot be invited.");
   if (get("SELECT 1 FROM notifications WHERE user_id=? AND href=? AND text LIKE ?", to.id, `/projects/${r.project_id}`, `%invited you%${r.title}%`))
     fail(`${to.name.split(" ")[0]} has already been invited to this role.`);
   if (!allow(`invite:${me.id}`, 15, 3600)) fail("You have sent a lot of invites. Try again in an hour.");
   notify(to.id, `${me.name} invited you to apply for ${r.title} on ${r.name}`, `/projects/${r.project_id}`);
+  if (!get("SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)", to.id, me.id, me.id, to.id))
+    run("INSERT INTO messages (from_id, to_id, text, kind, project_id, created_at) VALUES (?,?,?,?,?,?)",
+      me.id, to.id, `Invited you to join ${r.name} as ${r.title}.`, "invite", r.project_id, now());
   done(back, `Invited ${to.name.split(" ")[0]}. They can ask to join from the project page.`);
 }
 export async function addRole(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.lead_id !== me.id || !open(p)) fail("Only the lead can add roles to an open project.");
   if (!s("title")) fail("Name the role.");
   run("INSERT INTO roles (project_id, title, note) VALUES (?,?,?)", p!.id, s("title", 60), s("note", 160));
@@ -189,7 +227,7 @@ export async function closeRole(fd: FormData) {
 export async function requestJoin(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
   const r = get("SELECT * FROM roles WHERE id=? AND open=1", n("role"));
-  const p = r && project(r.project_id);
+  const p = r && project(r.project_id, me);
   if (!p || !open(p)) fail("That role is no longer open.");
   if (me.role !== "student") fail("Only students can join projects.");
   if (member(p.id, me.id)) fail("You have already been on this project.");
@@ -208,7 +246,7 @@ export async function withdrawRequest(fd: FormData) {
 export async function answerRequest(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
   const q = get("SELECT q.*, r.title FROM requests q JOIN roles r ON r.id=q.role_id WHERE q.id=? AND q.status='pending'", n("request"));
-  const p = q && project(q.project_id);
+  const p = q && project(q.project_id, me);
   if (!p || p.lead_id !== me.id) fail("Only the lead can answer join requests.");
   if (s("answer") !== "accept") {
     run("UPDATE requests SET status='declined' WHERE id=?", q.id);
@@ -229,7 +267,7 @@ export async function answerRequest(fd: FormData) {
 }
 export async function addProof(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || !isActive(p.id, me.id) || !open(p)) fail("Only the team can add proof while the project is open.");
   const url = s("url", 400);
   if (!/^https?:\/\/\S+\.\S+/.test(url) || !s("label")) fail("Add a label and a full link starting with https://");
@@ -239,14 +277,14 @@ export async function addProof(fd: FormData) {
 export async function removeProof(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
   const pr = get("SELECT * FROM proofs WHERE id=?", n("proof"));
-  const p = pr && project(pr.project_id);
+  const p = pr && project(pr.project_id, me);
   if (!p || !isActive(p.id, me.id) || !open(p)) fail("Proof can only be changed by the team before review.");
   run("DELETE FROM proofs WHERE id=?", pr.id);
   done(back);
 }
 export async function addMilestone(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.lead_id !== me.id || !open(p) || !s("title")) fail("Only the lead can add milestones to an open project.");
   run("INSERT INTO milestones (project_id, title) VALUES (?,?)", p!.id, s("title", 120));
   done(back);
@@ -254,7 +292,7 @@ export async function addMilestone(fd: FormData) {
 export async function toggleMilestone(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
   const m = get("SELECT * FROM milestones WHERE id=?", n("milestone"));
-  const p = m && project(m.project_id);
+  const p = m && project(m.project_id, me);
   if (!p || !isActive(p.id, me.id) || !open(p)) fail("Only the team can tick milestones while the project is open.");
   run("UPDATE milestones SET done=1-done WHERE id=?", m.id);
   if (!m.done) logUpdate(p.id, me.id, `Milestone done: ${m.title}`);
@@ -262,14 +300,14 @@ export async function toggleMilestone(fd: FormData) {
 }
 export async function saveContribution(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || !isActive(p.id, me.id) || p.status === "shipped" || p.status === "dropped") fail("You can only edit this while the project is open.");
   run("UPDATE members SET role=?, did=? WHERE project_id=? AND user_id=?", s("role", 60) || "Member", s("did", 200), p!.id, me.id);
   done(back, "Saved.");
 }
 export async function submitForReview(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.lead_id !== me.id || !open(p)) fail("Only the lead can send an open project for review.");
   if (!get("SELECT 1 FROM proofs WHERE project_id=?", p!.id)) fail("Add at least one proof link first.");
   if (get("SELECT 1 FROM milestones WHERE project_id=? AND done=0", p!.id)) fail("Tick off every milestone first.");
@@ -281,7 +319,7 @@ export async function submitForReview(fd: FormData) {
     // Tell the people who can review it.
     const S = compute();
     const onIt = new Set(all("SELECT user_id FROM members WHERE project_id=?", p!.id).map((r) => r.user_id));
-    for (const u of all("SELECT id, admin FROM users WHERE verified=1 AND suspended=0"))
+    for (const u of all("SELECT id, admin FROM users WHERE verified=1 AND suspended=0 AND college_id=?", me.college_id))
       if (!onIt.has(u.id) && (u.admin || (S.get(u.id)?.credit ?? 0) >= RULES.reviewerMin))
         notify(u.id, `${p!.name} is ready for review`, `/projects/${p!.id}`);
   })();
@@ -289,7 +327,7 @@ export async function submitForReview(fd: FormData) {
 }
 export async function reviewProject(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   const verdict = n("verdict");
   const note = s("note", 400);
   if (verdict === 0 && note.length < 15) fail("Say what is missing, so the team knows what to fix. A sentence is enough.");
@@ -327,7 +365,7 @@ export async function reviewProject(fd: FormData) {
 }
 export async function allocate(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.status !== "shipped" || !isActive(p.id, me.id)) fail("Only the team of a shipped project can split it.");
   const others = all("SELECT user_id FROM members WHERE project_id=? AND status='active' AND user_id<>?", p!.id, me.id).map((r) => r.user_id as number);
   if (!others.length) fail("There is no one else on this project.");
@@ -341,7 +379,7 @@ export async function allocate(fd: FormData) {
 }
 export async function voteGone(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  const p = project(n("id")), target = n("target");
+  const p = project(n("id"), me), target = n("target");
   if (!p || !open(p) || !isActive(p.id, me.id) || !isActive(p.id, target) || target === me.id) fail("You can only mark an active teammate on an open project.");
   if (target === p!.lead_id) fail("The lead cannot be voted out. If the lead is gone, leave the project.");
   let msg = "Marked. They are removed once two thirds of the team agree.";
@@ -360,7 +398,7 @@ export async function voteGone(fd: FormData) {
 }
 export async function leaveProject(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.status === "shipped" || p.status === "dropped" || !isActive(p.id, me.id)) fail("You are not on an open project here.");
   if (p!.lead_id === me.id) fail("You are the lead. Drop the project instead.");
   run("UPDATE members SET status='left' WHERE project_id=? AND user_id=?", p!.id, me.id);
@@ -368,7 +406,7 @@ export async function leaveProject(fd: FormData) {
 }
 export async function dropProject(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.lead_id !== me.id || p.status === "shipped" || p.status === "dropped") fail("Only the lead can drop a project that has not shipped.");
   db.transaction(() => {
     run("UPDATE projects SET status='dropped' WHERE id=?", p!.id);
@@ -423,25 +461,25 @@ export async function clearResume(fd: FormData) {
 export async function createClub(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);
   if (!me.admin) fail("Only an admin can register a club.");
-  const lead = get("SELECT id FROM users WHERE id=? AND verified=1 AND role='student'", n("lead"));
+  const lead = colleague(n("lead"), me, "AND verified=1 AND role='student'");
   if (!s("name") || !lead) fail("Give the club a name and pick a verified student as lead.");
   db.transaction(() => {
-    const id = run("INSERT INTO clubs (name, about, lead_id) VALUES (?,?,?)", s("name", 60), s("about"), lead.id).lastInsertRowid;
+    const id = run("INSERT INTO clubs (name, about, lead_id, college_id) VALUES (?,?,?,?)", s("name", 60), s("about"), lead.id, me.college_id).lastInsertRowid;
     run("INSERT INTO club_members (club_id, user_id, role, confirmed) VALUES (?,?,'Lead',1)", id, lead.id);
   })();
   done(back, "Club registered.");
 }
 export async function joinClub(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  if (!get("SELECT 1 FROM clubs WHERE id=?", n("club"))) fail("No such club.");
-  const c = get("SELECT * FROM clubs WHERE id=?", n("club"));
+  const c = get("SELECT * FROM clubs WHERE id=? AND college_id=?", n("club"), me.college_id);
+  if (!c) fail("No such club.");
   const r = run("INSERT OR IGNORE INTO club_members (club_id, user_id) VALUES (?,?)", c.id, me.id);
   if (r.changes) notify(c.lead_id, `${me.name} asked to join ${c.name}`, `/clubs/${c.id}`);
   done(back, "Asked to join. The club lead confirms members.");
 }
 export async function setClubMember(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const c = get("SELECT * FROM clubs WHERE id=?", n("club")), user = n("user");
+  const c = get("SELECT * FROM clubs WHERE id=? AND college_id=?", n("club"), me.college_id), user = n("user");
   if (!c) fail("No such club.");
   const boss = c.lead_id === me.id || me.admin;
   if (s("do") === "remove") {
@@ -462,7 +500,7 @@ export async function createCall(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);
   if (me.role !== "alum") fail("Only approved alumni can open a funding call.");
   if (!s("title") || n("amount") <= 0 || n("min_credit") < 0) fail("Add a title and an amount.");
-  run("INSERT INTO calls (alum_id, title, about, amount, min_credit) VALUES (?,?,?,?,?)", me.id, s("title", 80), s("about"), n("amount"), n("min_credit"));
+  run("INSERT INTO calls (alum_id, title, about, amount, min_credit, college_id) VALUES (?,?,?,?,?,?)", me.id, s("title", 80), s("about"), n("amount"), n("min_credit"), me.college_id);
   done(back, "Call opened.");
 }
 export async function closeCall(fd: FormData) {
@@ -472,7 +510,7 @@ export async function closeCall(fd: FormData) {
 }
 export async function applyToCall(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  const c = get("SELECT * FROM calls WHERE id=? AND open=1", n("call")), p = project(n("id"));
+  const c = get("SELECT * FROM calls WHERE id=? AND open=1 AND college_id=?", n("call"), me.college_id), p = project(n("id"), me);
   if (!c || !p || p.lead_id !== me.id || p.status === "dropped") fail("Only the lead of a live project can apply to an open call.");
   const S = compute();
   const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
@@ -522,7 +560,7 @@ export async function markPaid(fd: FormData) {
 export async function approveAlum(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
-  run("UPDATE users SET verified=1 WHERE id=? AND role='alum'", n("user"));
+  if (!run("UPDATE users SET verified=1 WHERE id=? AND role='alum' AND college_id=?", n("user"), me.college_id).changes) fail("They are not waiting at your college.");
   notify(n("user"), "Your alumni account is approved. You can open funding calls now.", "/funding");
   done(back, "Approved.");
 }
@@ -530,7 +568,7 @@ export async function approveAlum(fd: FormData) {
 export async function verifyStudent(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
-  run("UPDATE users SET verified=1 WHERE id=? AND role='student' AND deleted=0", n("user"));
+  if (!run("UPDATE users SET verified=1 WHERE id=? AND role='student' AND deleted=0 AND college_id=?", n("user"), me.college_id).changes) fail("They are not waiting at your college.");
   notify(n("user"), `An admin verified you as a student. You start with ${RULES.starter} credit and can join projects now.`, "/");
   done(back, "Verified.");
 }
@@ -538,26 +576,26 @@ export async function setSuspended(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
   if (n("user") === me.id) fail("You cannot suspend yourself.");
-  run("UPDATE users SET suspended=? WHERE id=? AND admin=0", n("on") ? 1 : 0, n("user"));
+  if (!run("UPDATE users SET suspended=? WHERE id=? AND admin=0 AND (college_id=? OR ?)", n("on") ? 1 : 0, n("user"), me.college_id, me.super ? 1 : 0).changes) fail("You can only act on people at your college.");
   done(back, n("on") ? "Suspended. They are signed out and cannot sign in." : "Restored.");
 }
 export async function setHidden(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
-  run("UPDATE projects SET hidden=? WHERE id=?", n("on") ? 1 : 0, n("id"));
+  if (!run("UPDATE projects SET hidden=? WHERE id=? AND college_id=?", n("on") ? 1 : 0, n("id"), me.college_id).changes) fail("That project is not at your college.");
   done(back, n("on") ? "Hidden from everyone except its team and admins." : "Visible again.");
 }
 export async function closeReport(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
-  run("UPDATE reports SET open=0 WHERE id=?", n("report"));
+  run("UPDATE reports SET open=0 WHERE id=? AND college_id=?", n("report"), me.college_id);
   done(back);
 }
 
 /* ---------- updates, inbox, reports ---------- */
 export async function postUpdate(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || !isActive(p.id, me.id) || p.status === "dropped") fail("Only the team can post updates.");
   if (!s("text")) fail("Write the update first.");
   logUpdate(p!.id, me.id, s("text", 280), "post");
@@ -573,15 +611,17 @@ export async function report(fd: FormData) {
   const kind = s("kind") === "project" ? "project" : "user";
   if (!s("reason")) fail("Say what is wrong.");
   if (!allow(`report:${me.id}`, 5, 3600)) fail("You have sent several reports. Give the admins time to look.");
-  run("INSERT INTO reports (by_id, kind, target_id, reason, created_at) VALUES (?,?,?,?,?)", me.id, kind, n("target"), s("reason", 300), now());
-  for (const a of all("SELECT id FROM users WHERE admin=1")) notify(a.id, `New report on a ${kind === "user" ? "person" : "project"}`, "/admin");
+  const where = get(`SELECT college_id FROM ${kind === "user" ? "users" : "projects"} WHERE id=?`, n("target"))?.college_id;
+  if (!where) fail("Nothing to report there.");
+  run("INSERT INTO reports (by_id, kind, target_id, reason, created_at, college_id) VALUES (?,?,?,?,?,?)", me.id, kind, n("target"), s("reason", 300), now(), where);
+  for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", where)) notify(a.id, `New report on a ${kind === "user" ? "person" : "project"}`, "/admin");
   done(back, "Reported. An admin will look at it.");
 }
 
 /* ---------- questions on a project ---------- */
 export async function postComment(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const p = project(n("id"));
+  const p = project(n("id"), me);
   if (!p || p.status === "dropped" || p.hidden) fail("You can't comment on this project.");
   const text = s("text", 500);
   if (text.length < 2) fail("Write something first.");
@@ -600,8 +640,8 @@ export async function postComment(fd: FormData) {
 }
 export async function deleteComment(fd: FormData) {
   const { me, back, n } = await ctx(fd, false);
-  const c = get("SELECT * FROM comments WHERE id=?", n("comment"));
-  if (c && (c.user_id === me.id || me.admin)) run("DELETE FROM comments WHERE id=?", c.id);
+  const c = get("SELECT c.*, p.college_id FROM comments c JOIN projects p ON p.id=c.project_id WHERE c.id=?", n("comment"));
+  if (c && (c.user_id === me.id || (me.admin && c.college_id === me.college_id))) run("DELETE FROM comments WHERE id=?", c.id);
   done(back + "#questions");
 }
 
@@ -609,7 +649,7 @@ export async function deleteComment(fd: FormData) {
 export async function summariseProof(projectId: number): Promise<{ text?: string; error?: string }> {
   const me = await currentUser();
   if (!me?.onboarded || !me.verified) return { error: "Sign in and verify first." };
-  const p = project(projectId);
+  const p = project(projectId, me);
   if (!p || p.status !== "review") return { error: "This project is not up for review." };
   if (member(p.id, me.id)) return { error: "You cannot review a project you were on." };
   if (!me.admin && (compute().get(me.id)?.credit ?? 0) < RULES.reviewerMin) return { error: `You need ${RULES.reviewerMin} credit to review.` };
@@ -634,10 +674,10 @@ export async function toggleOpen(fd: FormData) {
 export async function deleteAccount(fd: FormData) {
   const { me, s, fail } = await ctx(fd, false);
   if (s("confirm").toLowerCase() !== "delete") fail('Type "delete" to confirm.');
-  if (me.admin && get("SELECT COUNT(*) n FROM users WHERE admin=1 AND deleted=0").n <= 1) fail("You are the only admin. Make someone else an admin first.");
+  if (me.super && get("SELECT COUNT(*) n FROM users WHERE super=1 AND deleted=0").n <= 1) fail("You are the only site admin. Add another one first.");
   db.transaction(() => {
     run(`UPDATE users SET name='Deleted user', email=NULL, college_email=NULL, picture=NULL, about='', skills='', resume=NULL,
-         github='', linkedin='', website='', sub=?, admin=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
+         github='', linkedin='', website='', sub=?, admin=0, super=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
       "DELETE FROM claims WHERE user_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
       "DELETE FROM requests WHERE user_id=? AND status='pending'"]) run(q, me.id);
@@ -645,4 +685,39 @@ export async function deleteAccount(fd: FormData) {
   await clearSession();
   revalidatePath("/", "layout");
   redirect("/?ok=" + encodeURIComponent("Your account is deleted."));
+}
+
+/* ---------- site admins (ADMIN_EMAILS): colleges and who runs each one ---------- */
+async function superCtx(fd: FormData) {
+  const c = await ctx(fd, false);
+  if (!c.me.super) c.fail("Site admins only.");
+  return c;
+}
+export async function saveCollege(fd: FormData) {
+  const { back, s, n, fail } = await superCtx(fd);
+  const c = collegeById(n("id"));
+  if (!c) fail("No such college.");
+  const name = s("name", 80);
+  const domains = s("domains", 300).toLowerCase().split(/[\s,]+/).filter(Boolean);
+  if (name.length < 3 || !domains.length || domains.some((d) => !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) || isPublicMail(d)))
+    fail("Give a name and at least one college email domain, like nirmauni.ac.in. Personal mail domains are not allowed.");
+  for (const d of domains) {
+    const other = get("SELECT name FROM colleges WHERE id<>? AND (',' || domains || ',') LIKE ?", c.id, `%,${d},%`);
+    if (other) fail(`${d} already belongs to ${other.name}.`);
+  }
+  const status = ["active", "pending", "closed"].includes(s("status")) ? s("status") : c.status;
+  run("UPDATE colleges SET name=?, domains=?, status=? WHERE id=?", name, domains.join(","), status, c.id);
+  if (status === "active" && c.status !== "active")
+    for (const u of all("SELECT id FROM users WHERE college_id=? AND verified=1", c.id))
+      notify(u.id, `${name} is open on Connect. Welcome in.`, "/");
+  done(back, "College saved.");
+}
+export async function setCollegeAdmin(fd: FormData) {
+  const { back, n, s, fail } = await superCtx(fd);
+  const u = get("SELECT * FROM users WHERE id=? AND college_id=? AND verified=1 AND deleted=0", n("user"), n("college"));
+  if (!u) fail("Pick a verified person at that college.");
+  const on = s("on") === "1";
+  run("UPDATE users SET admin=? WHERE id=?", on ? 1 : 0, u.id);
+  if (on) notify(u.id, "You are now an admin of your college on Connect.", "/admin");
+  done(back, on ? `${u.name} is now an admin.` : `${u.name} is no longer an admin.`);
 }

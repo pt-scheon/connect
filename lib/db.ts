@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { baseDomain, domainOf, guessName, matchCollege, slugify } from "./domains";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -37,6 +38,17 @@ CREATE TABLE IF NOT EXISTS identities (sub TEXT PRIMARY KEY, user_id INTEGER NOT
 CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, text TEXT, href TEXT, seen INTEGER DEFAULT 0, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER, kind TEXT DEFAULT 'post', text TEXT, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY, by_id INTEGER, kind TEXT, target_id INTEGER, reason TEXT, open INTEGER DEFAULT 1, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS colleges (
+  id INTEGER PRIMARY KEY, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, domains TEXT NOT NULL,
+  status TEXT DEFAULT 'active', requested_by INTEGER, created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, text TEXT NOT NULL,
+  kind TEXT DEFAULT 'text', project_id INTEGER, seen INTEGER DEFAULT 0, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS messages_pair ON messages (from_id, to_id, id);
+CREATE INDEX IF NOT EXISTS messages_inbox ON messages (to_id, seen);
+CREATE TABLE IF NOT EXISTS blocks (user_id INTEGER, blocked_id INTEGER, PRIMARY KEY (user_id, blocked_id));
 CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
@@ -56,6 +68,14 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["users", "open_to_join", "INTEGER DEFAULT 0"],
   ["users", "deleted", "INTEGER DEFAULT 0"],
   ["requests", "note", "TEXT DEFAULT ''"],
+  // One college per person, project, club and funding call. Everything is scoped by it.
+  ["users", "college_id", "INTEGER"],
+  ["users", "super", "INTEGER DEFAULT 0"],
+  ["projects", "college_id", "INTEGER"],
+  ["clubs", "college_id", "INTEGER"],
+  ["calls", "college_id", "INTEGER"],
+  ["reports", "college_id", "INTEGER"],
+  ["codes", "college_name", "TEXT DEFAULT ''"],
 ];
 
 const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");
@@ -69,7 +89,50 @@ function open() {
     const have = (d.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).some((x) => x.name === c);
     if (!have) d.exec(`ALTER TABLE ${t} ADD COLUMN ${c} ${type}`);
   }
+  for (const ix of ["users_college ON users (college_id)", "projects_college ON projects (college_id)", "clubs_college ON clubs (college_id)"])
+    d.exec(`CREATE INDEX IF NOT EXISTS ${ix}`);
+  assignColleges(d);
   return d;
+}
+
+/* Upgrades a database from before colleges existed. Each verified college email becomes a college (named from
+   its domain; an admin can rename it), people join the college of their email, and projects, clubs and calls
+   follow the person who started them. Anyone left over joins the first college. Runs once: only rows with no
+   college are touched. */
+function assignColleges(d: Database.Database) {
+  const q = <T = Record<string, unknown>>(sql: string, ...a: unknown[]) => d.prepare(sql).all(...a) as T[];
+  if (!q("SELECT 1 FROM users WHERE college_id IS NULL AND onboarded=1 AND (verified=1 OR role='alum') LIMIT 1").length
+    && !q("SELECT 1 FROM projects WHERE college_id IS NULL LIMIT 1").length) return;
+  d.transaction(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const make = (domain: string, name: string) => {
+      const base = slugify(name);
+      let slug = base;
+      for (let i = 2; q("SELECT 1 FROM colleges WHERE slug=?", slug).length; i++) slug = `${base}-${i}`;
+      return Number(d.prepare("INSERT INTO colleges (slug, name, domains, status, created_at) VALUES (?,?,?,?,?)")
+        .run(slug, name, domain, "active", now).lastInsertRowid);
+    };
+    const colleges = () => q<{ id: number; domains: string }>("SELECT id, domains FROM colleges");
+    const envDomain = (process.env.COLLEGE_EMAIL_DOMAIN || "").toLowerCase();
+    if (envDomain && !matchCollege(envDomain, colleges())) make(envDomain, process.env.COLLEGE_NAME || guessName(envDomain));
+    for (const u of q<{ id: number; college_email: string }>("SELECT id, college_email FROM users WHERE college_id IS NULL AND college_email IS NOT NULL")) {
+      const dom = domainOf(u.college_email);
+      if (!dom) continue;
+      const c = matchCollege(dom, colleges())?.id ?? make(baseDomain(dom), dom.endsWith(".example") ? "Demo College" : guessName(dom));
+      d.prepare("UPDATE users SET college_id=? WHERE id=?").run(c, u.id);
+    }
+    const first = colleges()[0]?.id ?? (q("SELECT 1 FROM users LIMIT 1").length ? make(envDomain || "college.example", envDomain ? guessName(envDomain) : "Demo College") : null);
+    if (first) {
+      // Alumni and anyone else onboarded join the first college; unverified students wait until they prove an email.
+      d.prepare("UPDATE users SET college_id=? WHERE college_id IS NULL AND onboarded=1 AND (role='alum' OR verified=1)").run(first);
+      for (const t of ["projects", "clubs"]) d.exec(`UPDATE ${t} SET college_id=(SELECT college_id FROM users WHERE id=${t}.lead_id) WHERE college_id IS NULL`);
+      d.exec("UPDATE calls SET college_id=(SELECT college_id FROM users WHERE id=calls.alum_id) WHERE college_id IS NULL");
+      for (const t of ["projects", "clubs", "calls"]) d.prepare(`UPDATE ${t} SET college_id=? WHERE college_id IS NULL`).run(first);
+    }
+    // People listed in ADMIN_EMAILS run the whole site.
+    for (const e of (process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean))
+      d.prepare("UPDATE users SET super=1, admin=1 WHERE lower(email)=? AND email_verified=1").run(e);
+  })();
 }
 
 const g = globalThis as unknown as { __connectDb?: Database.Database };

@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { all } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireMember } from "@/lib/auth";
 import { Av } from "../ui";
 
 export const metadata = { title: "Clubs" };
 
 export default async function Clubs() {
-  const me = await requireUser();
-  const clubs = all("SELECT * FROM clubs ORDER BY name");
+  const me = await requireMember();
+  const clubs = all("SELECT * FROM clubs WHERE college_id=? ORDER BY name", me.college_id);
   const members = all("SELECT cm.club_id, u.* FROM club_members cm JOIN users u ON u.id=cm.user_id WHERE cm.confirmed=1");
   return (
     <>

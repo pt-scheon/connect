@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { all, get, now } from "@/lib/db";
-import { requireUser, standings } from "@/lib/auth";
+import { currentUser, requireMember, standings } from "@/lib/auth";
 import { EMPTY, RULES, projectShares } from "@/lib/credit";
 import { timeAgo } from "@/lib/notify";
 import { suggest } from "@/lib/match";
@@ -11,14 +11,16 @@ import { JoinAsk, ProofHelp, SplitForm } from "../../client";
 import { F, Meter, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const p = get("SELECT name, pitch FROM projects WHERE id=? AND hidden=0", Number((await params).id));
+  const me = await currentUser();
+  const p = me?.verified ? get("SELECT name, pitch FROM projects WHERE id=? AND hidden=0 AND college_id=?", Number((await params).id), me.college_id) : null;
   return p ? { title: p.name, description: p.pitch } : { title: "Project" };
 }
 
 export default async function Project({ params }: { params: Promise<{ id: string }> }) {
-  const me = await requireUser();
+  const me = await requireMember();
   const id = Number((await params).id);
-  const p = get("SELECT * FROM projects WHERE id=?", id);
+  // Projects are only visible inside their own college.
+  const p = get("SELECT * FROM projects WHERE id=? AND college_id=?", id, me.college_id);
   if (!p) notFound();
   const back = `/projects/${id}`;
   const S = standings();
@@ -39,7 +41,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const invited = new Set<string>(lead ? all("SELECT user_id, text FROM notifications WHERE href=? AND text LIKE '%invited you%'", `/projects/${id}`)
     .map((nn) => `${nn.user_id}:${nn.text}`) : []);
   const asked = new Set<number>(all("SELECT user_id FROM requests WHERE project_id=?", id).map((q) => q.user_id));
-  const pool = lead ? all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND onboarded=1")
+  const pool = lead ? all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND onboarded=1 AND college_id=?", me.college_id)
     .filter((u) => !team.some((t) => t.id === u.id) && !asked.has(u.id))
     .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.credit, shipped: st.shipped, left: st.left, open: !!u.open_to_join } }; }) : [];
   const fits = new Map(roles.map((r) => [r.id, suggest(r.title, pool.map((x) => x.c)).map((sg) => ({ ...sg, u: pool.find((x) => x.u.id === sg.id)!.u, st: S.get(sg.id) ?? EMPTY }))]));

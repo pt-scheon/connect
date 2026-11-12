@@ -6,6 +6,8 @@ import { currentUser, standings } from "@/lib/auth";
 import { EMPTY } from "@/lib/credit";
 import { ties, pathTo, type Tie } from "@/lib/graph";
 import { resumeFacts } from "@/lib/resume";
+import { collegeById, isMember } from "@/lib/college";
+import { inviteToProject } from "../../chat-actions";
 import * as A from "../../actions";
 import { CopyLink, Count } from "../../client";
 import { Av, F, Pill, Stamp, Who, initials, inr, skillsOf, statusLabel } from "../../ui";
@@ -14,8 +16,10 @@ type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: st
 const find = (id: number) => get("SELECT * FROM users WHERE id=? AND onboarded=1 AND suspended=0", id);
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const u = find(Number((await params).id));
-  if (!u) return { title: "Profile" };
+  const id = Number((await params).id), u = find(id), me = await currentUser();
+  // Same visibility rule as the page: outside their college, only verified students.
+  const ok = u && ((u.verified && u.role === "student") || me?.id === id || (me?.verified && me.college_id && me.college_id === u.college_id));
+  if (!ok) return { title: "Profile" };
   const s = standings().get(u.id) ?? EMPTY;
   const description = u.role === "alum" ? `${u.name}, class of ${u.grad_year}.` : `${s.credit} credit. ${s.shipped} shipped of ${s.joined} joined. Every line signed by teammates.`;
   return { title: u.name, description, openGraph: { title: `${u.name} on Connect`, description } };
@@ -67,7 +71,16 @@ export default async function Profile({ params, searchParams }: Props) {
   const id = Number((await params).id);
   const u = find(id);
   // Signed-out visitors can see verified students only. This is the link a student sends to a recruiter.
-  if (!u || (!me && !(u.verified && u.role === "student"))) notFound();
+  // Anyone outside their college sees the same: verified students only.
+  const sameCollege = !!me && (me.id === id || (!!me.verified && !!me.college_id && me.college_id === u?.college_id));
+  if (!u || (!sameCollege && !(u.verified && u.role === "student"))) notFound();
+  const college = collegeById(u.college_id);
+  // Message and invite: verified people at the same college, not yourself.
+  const canTalk = !!me && me.id !== id && isMember(me) && me.college_id === u.college_id && !!u.verified && !u.deleted;
+  const myRoles = canTalk ? all(
+    `SELECT r.id, r.title, p.name pname FROM roles r JOIN projects p ON p.id=r.project_id
+     WHERE r.open=1 AND p.lead_id=? AND p.college_id=? AND p.status IN ('recruiting','building')
+       AND p.id NOT IN (SELECT project_id FROM members WHERE user_id=?) ORDER BY p.name, r.title`, me!.id, me!.college_id, id) : [];
   const viewer = me?.onboarded ? me : null;
   const tab = (await searchParams).tab ?? (viewer ? "work" : "resume");
   const back = `/u/${id}?tab=${tab}`;
@@ -199,17 +212,45 @@ export default async function Profile({ params, searchParams }: Props) {
           <div className="stack tight" style={{ flex: "1 1 240px" }}>
             <h1>{u.name}</h1>
             {!alum && u.open_to_join ? <span><span className="pill ok">Open to projects</span></span> : null}
-            <span className="muted">{u.branch}, class of {u.grad_year}{alum ? " · alum" : ""}</span>
+            <span className="muted">{u.branch}, class of {u.grad_year}{alum ? " · alum" : ""}{college ? <> · <Link href={`/c/${college.slug}`}>{college.name}</Link></> : null}</span>
             {u.about && <span>{u.about}</span>}
             <Links u={u} />
             <div className="row">
               {signedIn.includes("google") && <Stamp>Google sign-in</Stamp>}
               {signedIn.includes("linkedin") && <Stamp>LinkedIn sign-in</Stamp>}
-              {u.verified ? <Stamp>{alum ? "Alum approved" : "College email"}</Stamp> : <Stamp kind="no">Not verified</Stamp>}
+              {u.verified ? <Stamp>{alum ? "Alum approved by college admin" : `Verified @${String(u.college_email ?? "").split("@")[1] ?? "college"} email`}</Stamp> : <Stamp kind="no">Not verified</Stamp>}
             </div>
             {viewer && !self && !alum && <span className="small muted">{pathTo(T, viewer.id, id, names)}</span>}
           </div>
           <div className="stack tight noprint profile-actions" style={{ alignItems: "end" }}>
+            {canTalk && (
+              <span className="row nowrap profile-cta">
+                <Link className="btn" href={`/messages/${id}`}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                  Message
+                </Link>
+              </span>
+            )}
+            {canTalk && !alum && myRoles.length > 0 && (
+              <details className="invite-pop">
+                <summary className="btn ghost">Invite to project</summary>
+                <form action={inviteToProject} className="stack invite-form">
+                  <input type="hidden" name="to" value={id} />
+                  <input type="hidden" name="back" value={back} />
+                  <label className="field"><span>Role</span>
+                    <select name="role" id="invite-role" required defaultValue="">
+                      <option value="" disabled>Pick an open role</option>
+                      {[...new Set(myRoles.map((r) => r.pname))].map((pn) => (
+                        <optgroup key={pn} label={pn}>{myRoles.filter((r) => r.pname === pn).map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}</optgroup>
+                      ))}
+                    </select></label>
+                  <label className="field"><span>Note <span className="muted">(optional)</span></span>
+                    <textarea name="note" id="invite-note" rows={2} maxLength={300} placeholder={`Why ${u.name.split(" ")[0]} would be great for it`} /></label>
+                  <button className="btn">Send invite</button>
+                  <span className="small muted">It arrives as a card in your chat with them.</span>
+                </form>
+              </details>
+            )}
             {self && <Link className="btn ghost sm" href="/onboarding?edit=1">Edit profile</Link>}
             {self && !alum && (
               <F action={A.toggleOpen} back={back}><button className="btn ghost sm">{u.open_to_join ? "Stop showing as open" : "Mark me open to projects"}</button></F>

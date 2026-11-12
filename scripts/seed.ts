@@ -140,6 +140,11 @@ db.transaction(() => {
   note("tanvi", "Priya Nair is waiting for alumni approval", "/admin");
   run("INSERT INTO calls (alum_id, title, about, amount, min_credit) VALUES (?,?,?,?,?)", ids.meera, "Campus utility grant", "For anything students on campus would use every week.", 30000, 150);
   run("INSERT INTO calls (alum_id, title, about, amount, min_credit) VALUES (?,?,?,?,?)", ids.rohan, "Hardware build grant", "Parts and fabrication for a physical build. Paid per milestone.", 50000, 250);
+
+  // Everything above lives in one sample college, on the reserved .example domain so it can never match a real one.
+  const demo = run("INSERT INTO colleges (slug, name, domains, status, created_at) VALUES ('demo-college','Demo College','college.example','active',?)", ago(30)).lastInsertRowid;
+  run("UPDATE users SET college_id=?", demo);
+  for (const t of ["projects", "clubs", "calls", "reports"]) run(`UPDATE ${t} SET college_id=?`, demo);
 })();
 
 console.log("Seeded sample data. Start the app with `npm run dev` and pick a person on the sign-in page.");

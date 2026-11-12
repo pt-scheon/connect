@@ -7,9 +7,10 @@ export const alt = "A Connect project";
 
 const STATUS: Record<string, string> = { recruiting: "Needs people", building: "Building", review: "In review", shipped: "Shipped", dropped: "Dropped" };
 
-/* Preview card for a project link: what it is, how far along, and who it still needs. */
+/* Preview card for a shipped project's link. Work in progress stays inside its college. */
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
-  const p = get("SELECT * FROM projects WHERE id=? AND hidden=0", Number((await params).id));
+  // Link previews are public, so they only show what a college already shows publicly: shipped projects.
+  const p = get("SELECT * FROM projects WHERE id=? AND hidden=0 AND status='shipped'", Number((await params).id));
   if (!p) return ogCard({ eyebrow: "Project", title: "Build with people from your college", subtitle: "Credit comes only from what ships." });
   const team = get("SELECT COUNT(*) n FROM members WHERE project_id=? AND status='active'", p.id).n;
   const ms = get("SELECT COUNT(*) total, COALESCE(SUM(done),0) done FROM milestones WHERE project_id=?", p.id);

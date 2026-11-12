@@ -1,25 +1,25 @@
 import Link from "next/link";
 import { all } from "@/lib/db";
-import { requireUser, standings } from "@/lib/auth";
+import { requireMember, standings } from "@/lib/auth";
 import * as A from "../actions";
 import { F, Meter, inr } from "../ui";
 
 export const metadata = { title: "Funding" };
 
 export default async function Funding() {
-  const me = await requireUser();
+  const me = await requireMember();
   const S = standings();
   const back = "/funding";
-  const users = new Map(all("SELECT id, name, grad_year FROM users").map((u) => [u.id, u]));
-  const calls = all("SELECT * FROM calls WHERE open=1 ORDER BY id DESC");
-  const apps = all("SELECT a.*, p.name FROM applications a JOIN projects p ON p.id=a.project_id");
-  const grants = all("SELECT g.*, p.name FROM grants g JOIN projects p ON p.id=g.project_id ORDER BY g.id DESC");
-  const parts = all("SELECT * FROM grant_parts");
+  const users = new Map(all("SELECT id, name, grad_year FROM users WHERE college_id=?", me.college_id).map((u) => [u.id, u]));
+  const calls = all("SELECT * FROM calls WHERE open=1 AND college_id=? ORDER BY id DESC", me.college_id);
+  const apps = all("SELECT a.*, p.name FROM applications a JOIN projects p ON p.id=a.project_id WHERE p.college_id=?", me.college_id);
+  const grants = all("SELECT g.*, p.name FROM grants g JOIN projects p ON p.id=g.project_id WHERE p.college_id=? ORDER BY g.id DESC", me.college_id);
+  const parts = all("SELECT gp.* FROM grant_parts gp JOIN grants g ON g.id=gp.grant_id JOIN projects p ON p.id=g.project_id WHERE p.college_id=?", me.college_id);
   const total = grants.reduce((a, g) => a + g.amount, 0);
   const paid = parts.filter((x) => x.paid).reduce((a, x) => a + x.amount, 0);
   const members = all("SELECT project_id, user_id FROM members WHERE status='active'");
   const teamCredit = (pid: number) => members.filter((m) => m.project_id === pid).reduce((a, m) => a + (S.get(m.user_id)?.credit ?? 0), 0);
-  const myProjects = all("SELECT * FROM projects WHERE lead_id=? AND status<>'dropped'", me.id);
+  const myProjects = all("SELECT * FROM projects WHERE lead_id=? AND status<>'dropped' AND college_id=?", me.id, me.college_id);
   const isAlum = me.role === "alum" && me.verified;
 
   return (

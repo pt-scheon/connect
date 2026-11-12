@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { all, now } from "@/lib/db";
 import { currentUser, standings } from "@/lib/auth";
+import { collegeById, isMember } from "@/lib/college";
 import { EMPTY, RULES } from "@/lib/credit";
 import { ties, pathTo } from "@/lib/graph";
 import { timeAgo } from "@/lib/notify";
@@ -13,17 +14,18 @@ import { Av, skillsOf } from "./ui";
 export default async function Home({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   const me = await currentUser();
   if (!me) return <Landing />;
-  if (!me.onboarded) redirect("/onboarding");
+  if (!me.onboarded || !isMember(me)) redirect("/onboarding");
+  const cid = me.college_id, college = collegeById(cid)!;
   const S = standings(), mine = S.get(me.id) ?? EMPTY;
   const canReview = !!me.verified && (!!me.admin || mine.credit >= RULES.reviewerMin);
 
-  const members = all("SELECT m.project_id, u.id, u.name, u.picture FROM members m JOIN users u ON u.id=m.user_id WHERE m.status='active'");
-  const roles = all("SELECT project_id, title FROM roles WHERE open=1");
+  const members = all("SELECT m.project_id, u.id, u.name, u.picture FROM members m JOIN users u ON u.id=m.user_id JOIN projects p ON p.id=m.project_id WHERE m.status='active' AND p.college_id=?", cid);
+  const roles = all("SELECT r.project_id, r.title FROM roles r JOIN projects p ON p.id=r.project_id WHERE r.open=1 AND p.college_id=?", cid);
   const ms = new Map(all("SELECT project_id, COUNT(*) total, SUM(done) done FROM milestones GROUP BY project_id").map((m) => [m.project_id, m]));
   const funded = new Set(all("SELECT project_id FROM grants").map((g) => g.project_id));
   const last = new Map(all("SELECT project_id, MAX(created_at) t FROM updates GROUP BY project_id").map((x) => [x.project_id, x.t]));
   const mySkills = me.role === "student" ? skillsOf(me) : [];
-  const items: BoardItem[] = all("SELECT * FROM projects ORDER BY created_at DESC")
+  const items: BoardItem[] = all("SELECT * FROM projects WHERE college_id=? ORDER BY created_at DESC", cid)
     .map((p) => {
       const team = members.filter((m) => m.project_id === p.id).map(({ id, name, picture }) => ({ id, name, picture }));
       const open = roles.filter((r) => r.project_id === p.id).map((r) => r.title);
@@ -41,22 +43,23 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
 
   // People two steps away: shipped with someone you shipped with.
   const T = ties();
-  const names = new Map(all("SELECT id, name FROM users").map((u) => [u.id, u.name]));
-  const near = all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND id<>?", me.id)
+  const names = new Map(all("SELECT id, name FROM users WHERE college_id=?", cid).map((u) => [u.id, u.name]));
+  const near = all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND college_id=? AND id<>?", cid, me.id)
     .filter((u) => !T.get(me.id)?.has(u.id))
     .map((u) => ({ u, path: pathTo(T, me.id, u.id, names) }))
     .filter((x) => !x.path.startsWith("No one"))
     .slice(0, 3);
   const feed = all(
     `SELECT up.*, p.name FROM updates up JOIN projects p ON p.id=up.project_id
-     WHERE p.hidden=0 AND p.status<>'dropped' ORDER BY up.created_at DESC, up.id DESC LIMIT 8`);
+     WHERE p.hidden=0 AND p.status<>'dropped' AND p.college_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 8`, cid);
 
   return (
     <>
       <div className="head">
         <div className="stack tight">
+          <span className="label college-tag">{college.name}</span>
           <h1>Projects on campus</h1>
-          <p>One board for the whole college. Every project shows who is on it, what is built so far and what it still needs.</p>
+          <p>One board for everyone at {college.name}, and only them. Every project shows who is on it, what is built so far and what it still needs.</p>
         </div>
         {me.role === "student" && <Link className="btn" href="/projects/new">Post a project</Link>}
       </div>
