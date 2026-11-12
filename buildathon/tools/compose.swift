@@ -8,7 +8,7 @@ import AppKit
 let args = CommandLine.arguments
 let template = PDFDocument(url: URL(fileURLWithPath: args[1]))!
 let outURL = URL(fileURLWithPath: args[2])
-let teamSize = ProcessInfo.processInfo.environment["TEAM_SIZE"] ?? "2"
+let teamSize = ProcessInfo.processInfo.environment["TEAM_SIZE"] ?? "3"
 let here = URL(fileURLWithPath: args[1]).deletingLastPathComponent().path
 
 let W: CGFloat = 720, H: CGFloat = 405
