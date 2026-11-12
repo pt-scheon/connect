@@ -286,19 +286,24 @@ export async function submitForReview(fd: FormData) {
   done(back, "Sent for review.");
 }
 export async function reviewProject(fd: FormData) {
-  const { me, back, n, fail } = await ctx(fd);
+  const { me, back, n, s, fail } = await ctx(fd);
   const p = project(n("id"));
   const verdict = n("verdict");
+  const note = s("note", 400);
+  if (verdict === 0 && note.length < 15) fail("Say what is missing, so the team knows what to fix. A sentence is enough.");
   if (!p || p.status !== "review" || ![0, RULES.demo, RULES.live].includes(verdict)) fail("This project is not up for review.");
   if (member(p!.id, me.id)) fail("You cannot review a project you were on.");
   if (!me.admin && (compute().get(me.id)?.credit ?? 0) < RULES.reviewerMin) fail(`You need ${RULES.reviewerMin} credit to review.`);
   let msg = "Review recorded. One more is needed.";
   db.transaction(() => {
-    run("INSERT OR REPLACE INTO reviews (project_id, reviewer_id, verdict) VALUES (?,?,?)", p!.id, me.id, verdict);
+    run("INSERT OR REPLACE INTO reviews (project_id, reviewer_id, verdict, note) VALUES (?,?,?,?)", p!.id, me.id, verdict, note);
     const rs = all("SELECT r.verdict, u.admin FROM reviews r JOIN users u ON u.id=r.reviewer_id WHERE r.project_id=?", p!.id);
     if (rs.length < RULES.reviewsNeeded && !rs.some((r) => r.admin)) return;
     const pot = Math.min(...rs.map((r) => r.verdict)); // the stricter reviewer wins
     const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
+    // Reviewer notes go on the timeline without names, so reviewers can be candid.
+    for (const r of all("SELECT note, verdict FROM reviews WHERE project_id=? AND note<>''", p!.id))
+      logUpdate(p!.id, null, `Reviewer note (${r.verdict === 0 ? "not ready" : r.verdict === RULES.demo ? "demo only" : "live"}): ${r.note}`);
     if (pot === 0) {
       run("DELETE FROM reviews WHERE project_id=?", p!.id);
       run("UPDATE projects SET status='building' WHERE id=?", p!.id);
@@ -561,6 +566,33 @@ export async function report(fd: FormData) {
   run("INSERT INTO reports (by_id, kind, target_id, reason, created_at) VALUES (?,?,?,?,?)", me.id, kind, n("target"), s("reason", 300), now());
   for (const a of all("SELECT id FROM users WHERE admin=1")) notify(a.id, `New report on a ${kind === "user" ? "person" : "project"}`, "/admin");
   done(back, "Reported. An admin will look at it.");
+}
+
+/* ---------- questions on a project ---------- */
+export async function postComment(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const p = project(n("id"));
+  if (!p || p.status === "dropped" || p.hidden) fail("You can't comment on this project.");
+  const text = s("text", 500);
+  if (text.length < 2) fail("Write something first.");
+  if (!allow(`comment:${me.id}`, 10, 600)) fail("You are posting a lot. Wait a few minutes.");
+  run("INSERT INTO comments (project_id, user_id, text, created_at) VALUES (?,?,?,?)", p!.id, me.id, text, now());
+  const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
+  const short = text.length > 60 ? text.slice(0, 57) + "..." : text;
+  if (team.includes(me.id)) {
+    // The team answered: tell the outsiders who asked.
+    for (const r of all("SELECT DISTINCT user_id FROM comments WHERE project_id=? AND user_id<>?", p!.id, me.id))
+      if (!team.includes(r.user_id)) notify(r.user_id, `${p!.name} replied: ${short}`, `/projects/${p!.id}#questions`);
+  } else {
+    for (const id of team) notify(id, `${me.name} asked about ${p!.name}: ${short}`, `/projects/${p!.id}#questions`);
+  }
+  done(back + "#questions");
+}
+export async function deleteComment(fd: FormData) {
+  const { me, back, n } = await ctx(fd, false);
+  const c = get("SELECT * FROM comments WHERE id=?", n("comment"));
+  if (c && (c.user_id === me.id || me.admin)) run("DELETE FROM comments WHERE id=?", c.id);
+  done(back + "#questions");
 }
 
 /* ---------- AI help for reviewers ---------- */

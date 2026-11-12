@@ -320,3 +320,14 @@ td{padding-block:11px}
 }
 @media (max-width:900px){.tabs{-webkit-mask-image:linear-gradient(90deg,#000 82%,transparent);mask-image:linear-gradient(90deg,#000 82%,transparent);padding-right:24px}}
 .suggest{width:100%;display:flex;flex-direction:column;gap:8px;margin-top:6px;padding:12px;border-radius:12px;background:var(--sunk);border:1px dashed var(--line2)}
+.comment{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:var(--sunk);border:1px solid var(--line)}
+.comment.team{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.comment p{font-size:.92rem}
+.step{display:flex;gap:10px;align-items:center;color:var(--ink);font-weight:500;font-size:.92rem;padding:6px 8px;margin:0 -8px;border-radius:8px}
+.step:hover{background:var(--surface2);text-decoration:none}
+.step span{width:18px;color:var(--accent);font-weight:700}
+.step.ok{color:var(--muted);text-decoration:line-through}
+.step.ok span{color:var(--ok)}
+.start{gap:10px}
+.steps-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 16px}
+.start .meter{flex:none;height:8px;width:100%}

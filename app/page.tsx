@@ -53,6 +53,29 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
         </div>
         {me.role === "student" && <Link className="btn" href="/projects/new">Post a project</Link>}
       </div>
+      {me.role === "student" && (() => {
+            const steps: [boolean, string, string][] = [
+              [!!me.verified, "Verify your college email", "/onboarding"],
+              [!!(me.skills && (me.github || me.linkedin)), "Add your skills and a GitHub or LinkedIn link", "/onboarding?edit=1"],
+              [mine.joined > 0, "Join a project or post your own", items.some((p) => p.open.length) ? "/?f=open" : "/projects/new"],
+              [mine.shipped > 0, "Ship it and get it reviewed", "/credit"],
+            ];
+            const left = steps.filter((x) => !x[0]).length;
+            if (!left) return null;
+            return (
+              <div className="card start">
+                <span className="label">Getting started · {steps.length - left} of {steps.length}</span>
+                <span className="meter"><b style={{ width: `${(100 * (steps.length - left)) / steps.length}%` }} /></span>
+                <div className="steps-row">
+                {steps.map(([ok, label, href]) => (
+                  <Link key={label} href={href} className={`step ${ok ? "ok" : ""}`}>
+                    <span aria-hidden="true">{ok ? "✓" : "○"}</span>{label}
+                  </Link>
+                ))}
+                </div>
+              </div>
+            );
+          })()}
       <div className="cols">
         <Board items={items} canReview={canReview} initial={(await searchParams).f ?? "all"} />
         <aside className="stack">

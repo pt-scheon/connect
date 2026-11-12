@@ -27,6 +27,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const active = team.filter((t) => t.mstatus === "active");
   const mine = team.find((t) => t.id === me.id);
   if (p.hidden && !mine && !me.admin) notFound();
+  const comments = all("SELECT c.*, u.name, u.picture, u.id uid FROM comments c JOIN users u ON u.id=c.user_id WHERE c.project_id=? ORDER BY c.created_at, c.id", id);
   const updates = all("SELECT up.*, u.name uname FROM updates up LEFT JOIN users u ON u.id=up.user_id WHERE up.project_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 30", id);
   const onTeam = mine?.mstatus === "active";
   const lead = p.lead_id === me.id;
@@ -94,11 +95,14 @@ export default async function Project({ params }: { params: Promise<{ id: string
               <p className="muted">{reviews.length} of {RULES.reviewsNeeded} reviews in. Reviewers are people outside the team with {RULES.reviewerMin}+ credit. They open the proof and decide what this is worth. The stricter verdict wins.</p>
               {canReview && <ProofHelp id={id} action={A.summariseProof} />}
               {canReview && (
-                <div className="row">
-                  {[[RULES.live, "Live and in use", "btn"], [RULES.demo, "Works, demo only", "btn ghost"], [0, "Not ready", "btn danger"]].map(([v, label, cls]) => (
-                    <F key={v} action={A.reviewProject} back={back} hidden={{ id, verdict: v }}><button className={String(cls)}>{label}</button></F>
-                  ))}
-                </div>
+                <F action={A.reviewProject} back={back} hidden={{ id }} className="stack tight">
+                  <textarea name="note" id="review-note" maxLength={400} placeholder="A note for the team: what you checked, and what is missing if it is not ready. Shown without your name." style={{ minHeight: 70 }} />
+                  <div className="row">
+                    <button className="btn" name="verdict" value={RULES.live}>Live and in use</button>
+                    <button className="btn ghost" name="verdict" value={RULES.demo}>Works, demo only</button>
+                    <button className="btn danger" name="verdict" value={0}>Not ready</button>
+                  </div>
+                </F>
               )}
               {iReviewed && <span className="small muted">You have reviewed this. Picking again replaces your verdict.</span>}
             </div>
@@ -225,6 +229,33 @@ export default async function Project({ params }: { params: Promise<{ id: string
           {onTeam && !lead && open && (
             <F action={A.leaveProject} back={back} hidden={{ id }} confirm="Leave this project?"><button className="btn danger sm">Leave project{mine.stake ? ` · lose your ${mine.stake} stake` : ""}</button></F>
           )}
+
+          <div className="card" id="questions">
+            <h2>Questions</h2>
+            <p className="small muted">Ask the team anything before you join. The team&apos;s answers are marked.</p>
+            {comments.length === 0 && <span className="small muted">No questions yet.</span>}
+            <div className="stack tight">
+              {comments.map((c) => {
+                const fromTeam = active.some((t) => t.id === c.uid);
+                return (
+                  <div key={c.id} className={`comment ${fromTeam ? "team" : ""}`}>
+                    <div className="row between">
+                      <span className="row nowrap"><Who u={{ id: c.uid, name: c.name, picture: c.picture }} />{fromTeam && <span className="pill info">Team</span>}</span>
+                      <span className="row small muted">{timeAgo(c.created_at)}
+                        {(c.uid === me.id || me.admin) ? <F action={A.deleteComment} back={back} hidden={{ comment: c.id }} confirm="Delete this?"><button className="linkbtn small">Delete</button></F> : null}</span>
+                    </div>
+                    <p className="pre">{c.text}</p>
+                  </div>
+                );
+              })}
+            </div>
+            {me.verified && p.status !== "dropped" ? (
+              <F action={A.postComment} back={back} hidden={{ id }} className="row">
+                <input type="text" name="text" id="comment-text" maxLength={500} placeholder={onTeam ? "Answer a question or add a note" : "Ask the team a question"} required />
+                <button className="btn ghost">Post</button>
+              </F>
+            ) : null}
+          </div>
 
           <div className="card">
             <h2>Updates</h2>

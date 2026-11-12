@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS identities (sub TEXT PRIMARY KEY, user_id INTEGER NOT
 CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, text TEXT, href TEXT, seen INTEGER DEFAULT 0, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER, kind TEXT DEFAULT 'post', text TEXT, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY, by_id INTEGER, kind TEXT, target_id INTEGER, reason TEXT, open INTEGER DEFAULT 1, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER);
+CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
 CREATE INDEX IF NOT EXISTS updates_project ON updates (project_id);
 `;
@@ -49,6 +51,7 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["users", "github", "TEXT DEFAULT ''"],
   ["users", "linkedin", "TEXT DEFAULT ''"],
   ["users", "website", "TEXT DEFAULT ''"],
+  ["reviews", "note", "TEXT DEFAULT ''"],
 ];
 
 const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");
