@@ -14,8 +14,8 @@ export default async function Credit() {
   return (
     <>
       <div className="head"><div className="stack tight">
-        <h1>How credit works</h1>
-        <p>Credit answers one question: did this person finish real things with other people? Nothing you type about yourself can raise it.</p>
+        <h1>How Connect rates people</h1>
+        <p>Credit, skills and credibility, and exactly how each one is worked out. Nothing you type about yourself can raise any of them.</p>
       </div></div>
       {me.role === "student" && (
         <div className="card" style={{ maxWidth: 620 }}>

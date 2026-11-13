@@ -733,3 +733,15 @@ test("gifts move free credit only, inside their limits", async () => {
   assert.equal(giftBlock([{ ...g(1, 2, 20), created_at: t - (G.windowDays + 1) * 86400 }], p(1), p(2), 15, t), null);
   void fresh;
 });
+
+test("the rules page states every rule from the same numbers the code uses", async () => {
+  const { SECTIONS } = await import("../app/rule-list");
+  const { RULES } = await import("../lib/rules");
+  const text = SECTIONS.flatMap((s) => [s.intro, ...s.rules.flat()]).join(" ");
+  for (const n of [RULES.starter, RULES.stake, RULES.live, RULES.demo, RULES.reviewerMin, RULES.vouchesCounted, RULES.comm.pairMaxCount, RULES.comm.pairMaxCredit,
+    RULES.comm.minClientCredit, RULES.comm.reviewerAbove, RULES.gift.pairMax, RULES.skill.prior, RULES.skill.halfLifeMonths, RULES.cred.reportPenalty])
+    assert.ok(new RegExp(`\\b${n}\\b`).test(text), `${n} is explained`);
+  assert.ok(!/undefined|NaN/.test(text));
+  assert.match(text, /coursework/);
+  assert.match(text, /CGPA, grades and exam results are not part of any score/);
+});
