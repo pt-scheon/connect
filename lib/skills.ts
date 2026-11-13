@@ -31,6 +31,9 @@ export const label = (k: string) => LABELS[k] ?? k.charAt(0).toUpperCase() + k.s
 export const parseSkills = (text: string, max = 8): string[] =>
   [...new Set(String(text || "").split(/[,\n]/).map(canon).filter((k) => k.length > 1))].slice(0, max);
 
+/* A code sent to a work address proves the person has a mailbox at that company, not what they did there. */
+export const WORK_EMAIL_TRUST = 0.7;
+
 /* ---------- the formula ---------- */
 export type Evidence = {
   skill: string; q: number; w: number; tier: "A" | "B";
@@ -125,6 +128,14 @@ export function competency(S: Map<number, Standing>): Map<number, Map<string, Sk
         });
       }
     }
+  }
+  // Outside evidence (tier B): checked by an admin, a teammate on Connect, or a code sent to a work email.
+  // It can lift a skill, at half the weight of work Connect saw happen.
+  for (const e of all("SELECT * FROM evidence WHERE status='verified' AND kind IN ('hackathon','internship')")) {
+    const q = e.kind === "hackathon" ? (e.value === "won" ? K.qHackWin : e.value === "finalist" ? K.qHackFinal : K.qHackTookPart) : K.qInternship;
+    const by = e.method === "work_email" ? WORK_EMAIL_TRUST : e.method === "admin" ? 1 : credWeight(S.get(e.decided_by)?.cred.score);
+    for (const skill of parseSkills(e.skills))
+      add(e.user_id, { skill, tier: "B", kind: e.kind === "hackathon" ? "hackathon" : "internship", label: e.title, at: e.created_at, q, w: K.tier.B * recency(e.created_at, t) * by });
   }
   return new Map([...items].map(([id, list]) => [id, summarise(list)]));
 }

@@ -59,7 +59,10 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const solo = active.length === 1;
   const myAllocs = new Map(all("SELECT to_id, pct FROM allocations WHERE project_id=? AND from_id=?", id, me.id).map((a) => [a.to_id, a.pct]));
   const myVotes = new Set(all("SELECT target_id FROM gone_votes WHERE project_id=? AND voter_id=?", id, me.id).map((v) => v.target_id));
-  const canReview = p.status === "review" && !mine && me.verified && (me.admin || (S.get(me.id)?.earned ?? 0) >= RULES.reviewerMin);
+  const invites = all("SELECT reviewer_id FROM review_invites WHERE project_id=?", id).map((r) => r.reviewer_id as number);
+  const canReview = p.status === "review" && !mine && me.verified
+    && (me.admin || (p.invited_at ? invites.includes(me.id) : (S.get(me.id)?.earned ?? 0) >= RULES.reviewerMin));
+  const live = p.live_url ? get("SELECT * FROM live_checks WHERE project_id=? AND url=? ORDER BY id DESC LIMIT 1", id, p.live_url) : null;
   const iReviewed = reviews.some((r) => r.reviewer_id === me.id);
   const lastMove = get("SELECT MAX(created_at) t FROM updates WHERE project_id=?", id)?.t ?? p.created_at;
   const quietDays = Math.floor((now() - lastMove) / 86400);
@@ -115,7 +118,18 @@ export default async function Project({ params }: { params: Promise<{ id: string
           {p.status === "review" && (
             <div className="card">
               <h2>In review</h2>
-              <p className="muted">{reviews.length} of {RULES.reviewsNeeded} reviews in. Reviewers are people outside the team with {RULES.reviewerMin}+ credit. They open the proof and decide what this is worth. The stricter verdict wins.</p>
+              <p className="muted">{reviews.length} of {RULES.reviewsNeeded} reviews in. {p.invited_at
+                ? (invites.length >= RULES.reviewsNeeded
+                  ? `Connect picked ${invites.length} reviewers with ${RULES.reviewerMin}+ credit who have never been on a team with anyone here.`
+                  : "Too few people outside this team's circle can review it, so an admin of the college decides.")
+                : `Reviewers are people outside the team with ${RULES.reviewerMin}+ credit.`} Two matching verdicts settle it. If they disagree, a third decides and the middle verdict wins.</p>
+              {p.live_url && (
+                <div className="row between small">
+                  <span>Live link: <a href={p.live_url} target="_blank" rel="noopener noreferrer nofollow">{p.live_url} ↗</a> {live ? <Stamp kind={live.ok ? undefined : "bad"}>{live.ok ? "Up" : live.note} · checked {timeAgo(live.created_at)}</Stamp> : <Stamp kind="no">Not checked yet</Stamp>}</span>
+                  {canReview && <F action={A.checkLiveNow} back={back} hidden={{ id }}><button className="linkbtn small">Check again</button></F>}
+                </div>
+              )}
+              {p.status === "review" && !canReview && !mine && <span className="small muted">You were not picked to review this one. Reviewers are chosen by Connect, not by the team.</span>}
               {canReview && <ProofHelp id={id} action={A.summariseProof} />}
               {canReview && (
                 <F action={A.reviewProject} back={back} hidden={{ id }} className="stack tight">
@@ -268,7 +282,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
             <div className="card">
               <h2>Ship it</h2>
               {missing.length ? <p className="muted">Before review you still need: {missing.join(", ")}.</p>
-                : <p className="muted">Everything is in place. Two people outside the team will open your proof and decide what it is worth.</p>}
+                : <p className="muted">Everything is in place. Connect picks reviewers who have never worked with anyone on the team. They open your proof and decide what it is worth.</p>}
               <div className="row">
                 <F action={A.submitForReview} back={back} hidden={{ id }}><button className="btn" disabled={missing.length > 0}>Send for review</button></F>
                 <F action={A.dropProject} back={back} hidden={{ id }} confirm="Drop this project for good?"><button className="btn danger">Drop project · lose {RULES.stake}</button></F>
@@ -337,6 +351,19 @@ export default async function Project({ params }: { params: Promise<{ id: string
               </div>
             ))}
             {shipped && <span><Stamp>Reviewed · pot {p.pot}</Stamp></span>}
+            {p.live_url && p.status !== "review" && (
+              <div className="row between small">
+                <a href={p.live_url} target="_blank" rel="noopener noreferrer nofollow">Live link ↗</a>
+                {live ? <Stamp kind={live.ok ? undefined : "bad"}>{live.ok ? "Up" : "Down"} · {timeAgo(live.created_at)}</Stamp> : <span className="muted">Checked at review</span>}
+              </div>
+            )}
+            {onTeam && open && (
+              <F action={A.setLiveUrl} back={back} hidden={{ id }} className="stack tight">
+                <input type="url" name="url" id="live-url" defaultValue={p.live_url ?? ""} placeholder="Live link Connect should open (https://)" aria-label="Live link" />
+                <button className="btn ghost sm">Save live link</button>
+                <span className="small muted">Optional. Connect opens it when you send the project for review and tells reviewers whether it answered.</span>
+              </F>
+            )}
             {onTeam && open && (
               <F action={A.addProof} back={back} hidden={{ id }} className="stack tight">
                 <input type="text" name="label" id="proof-label" placeholder="Live site, repo, demo video…" required />

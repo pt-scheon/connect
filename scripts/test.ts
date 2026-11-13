@@ -512,3 +512,94 @@ test("a solo project's skills count only when a reviewer or admin ticks them, an
   assert.ok(skill(solo, "rust")!.score < skill(mate, "rust")!.score);
   assert.equal(skill(solo, "rust")!.why, "based on 1 solo project");
 });
+
+/* ---------- rating redesign: evidence tiers, reviewers, live links, split flags ---------- */
+
+test("outside evidence counts only once verified, and for less than work Connect saw happen", async () => {
+  const { run, now, user, shipWith, skill, compute } = await skillKit();
+  const [a, b, c, admin] = [user(1, 12), user(1, 12), user(1, 12), user(1, 12)];
+  run("UPDATE users SET admin=1 WHERE id=?", admin);
+  const ev = (who: number, status: string, kind = "hackathon", value = "won", skills = "python") =>
+    Number(run("INSERT INTO evidence (user_id, kind, title, skills, value, status, method, decided_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)", who, kind, "Hack", skills, value, status, "admin", admin, now()).lastInsertRowid);
+  const cred = (id: number) => compute().get(id)!.cred.score, base = cred(a);
+  ev(a, "pending");
+  assert.equal(skill(a, "python"), undefined, "waiting items count for nothing");
+  assert.equal(cred(a), base);
+  ev(a, "verified");
+  const tierB = skill(a, "python")!;
+  assert.equal(tierB.why, "based on 1 hackathon");
+  assert.ok(cred(a) > base, "evidence that checked out builds credibility");
+  // The same skill from a live shipped project, signed by teammates, moves the score more.
+  shipWith([b, c], "python");
+  assert.ok(skill(b, "python")!.score > tierB.score && skill(b, "python")!.conf > tierB.conf);
+  ev(c, "rejected", "internship", "", "rust");
+  assert.equal(skill(c, "rust"), undefined);
+  assert.ok(cred(c) < cred(b), "a rejected item costs credibility");
+  // Marks are not evidence of any kind.
+  ev(a, "verified", "cgpa", "9.8", "data structures");
+  assert.equal(skill(a, "data structures"), undefined, "a CGPA row is ignored even if one were stored");
+});
+
+test("reviewers come from outside the team's network, and trusted people are picked more often", async () => {
+  const { all } = await import("../lib/db");
+  const { user, project, compute } = await setup();
+  const { eligibleReviewers, teamTies, pickWeighted } = await import("../lib/reviewers");
+  const [lead, mate, friend, poor, far1, far2, helper] = [user(), user(), user(), user(), user(), user(), user()];
+  project("shipped", 100, [lead, friend]);   // friend has shipped with the lead
+  project("shipped", 100, [far1, far2]);     // far1 and far2 have credit and no tie to the team
+  project("shipped", 100, [friend, helper]); // so friend has enough credit, and so does helper
+  const pid = project("review", 0, [lead, mate]);
+  const S = compute();
+  const team = all("SELECT user_id FROM members WHERE project_id=?", pid).map((r) => r.user_id);
+  const ok = eligibleReviewers(all("SELECT * FROM users"), team, teamTies(all("SELECT project_id, user_id FROM members")), S).sort();
+  assert.deepEqual(ok, [far1, far2, helper].sort(), "not the team, not their past teammates, not people without credit");
+  assert.ok(!ok.includes(friend) && !ok.includes(poor));
+  // With a fixed "random" number the heavier person is taken first; nobody is picked twice.
+  assert.deepEqual(pickWeighted([1, 2, 3], (id) => (id === 3 ? 10 : 0.1), 2, () => 0.5)[0], 3);
+  assert.equal(new Set(pickWeighted([1, 2, 3, 4, 5], () => 1, 4)).size, 4);
+  assert.equal(pickWeighted([1, 2], () => 1, 4).length, 2);
+});
+
+test("two matching reviews decide; a disagreement waits for a third and the middle verdict wins; an admin settles it", async () => {
+  await setup();
+  const { verdictOf } = await import("../lib/reviewers");
+  assert.equal(verdictOf([{ verdict: 100 }]), null);
+  assert.equal(verdictOf([{ verdict: 100 }, { verdict: 100 }]), 100);
+  assert.equal(verdictOf([{ verdict: 100 }, { verdict: 60 }]), null);
+  assert.equal(verdictOf([{ verdict: 100 }, { verdict: 60 }, { verdict: 60 }]), 60);
+  assert.equal(verdictOf([{ verdict: 100 }, { verdict: 0 }, { verdict: 60 }]), 60, "one harsh and one soft reviewer are both outvoted");
+  assert.equal(verdictOf([{ verdict: 100 }, { verdict: 100 }, { verdict: 0, admin: 1 }]), 0);
+  assert.equal(verdictOf([{ verdict: 60, admin: 1 }]), 60);
+});
+
+test("the live check only ever opens public https links", async () => {
+  const { isPublicAddress, liveUrl, checkLive } = await import("../lib/live");
+  for (const ip of ["127.0.0.1", "10.1.2.3", "192.168.1.1", "172.16.0.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fe80::1", "fd00::1", "::ffff:127.0.0.1", "not-an-ip"])
+    assert.equal(isPublicAddress(ip), false, ip);
+  for (const ip of ["8.8.8.8", "1.1.1.1", "172.32.0.1", "2606:4700:4700::1111"]) assert.equal(isPublicAddress(ip), true, ip);
+  for (const u of ["http://example.com", "https://localhost/x", "https://127.0.0.1/", "https://[::1]/", "https://user:pw@example.com", "https://example.com:8443/", "https://intranet", "ftp://example.com", "https://db.internal/"])
+    assert.equal(liveUrl(u), null, u);
+  assert.ok(liveUrl("https://busping.example.com/map"));
+  assert.equal((await checkLive("https://127.0.0.1/admin")).ok, false);
+});
+
+test("a big share with nothing on the record is flagged for an admin, and changes no numbers", async () => {
+  const { run, now, user, project, give, compute } = await setup();
+  const { splitFlags } = await import("../lib/reviewers");
+  const [a, b, c, d] = [user(), user(), user(), user()];
+  const pid = project("shipped", 100, [a, b, c, d]);
+  run("UPDATE projects SET college_id=1 WHERE id=?", pid);
+  run("UPDATE members SET did='Did things' WHERE project_id=? AND user_id<>?", pid, d);
+  for (const u of [a, b, c]) run("INSERT INTO updates (project_id, user_id, kind, text, created_at) VALUES (?,?,'event','Milestone done: x',?)", pid, u, now());
+  // a, b and c all hand most of their split to d, who did nothing anyone can see.
+  for (const from of [a, b, c]) for (const to of [a, b, c, d]) if (to !== from) give(pid, from, to, to === d ? 80 : 10);
+  give(pid, d, a, 34); give(pid, d, b, 33); give(pid, d, c, 33);
+  const before = compute().get(d)!.credit;
+  const flags = splitFlags(1);
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].user_id, d);
+  assert.equal(compute().get(d)!.credit, before);
+  run("UPDATE members SET did='Built the backend' WHERE project_id=? AND user_id=?", pid, d);
+  run("INSERT INTO updates (project_id, user_id, kind, text, created_at) VALUES (?,?,'post','Shipped the API',?)", pid, d, now());
+  assert.equal(splitFlags(1).length, 0, "the flag clears once the record shows their work");
+});

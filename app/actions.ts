@@ -12,7 +12,9 @@ import { notify, logUpdate, allow } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
 import { mailReady, sendMail } from "@/lib/mail";
-import { remove as removeFile } from "@/lib/files";
+import { remove as removeFile, save as saveFile, sniff, cleanName } from "@/lib/files";
+import { checkLive, liveUrl } from "@/lib/live";
+import { eligibleReviewers, pickReviewers, teamTies, verdictOf } from "@/lib/reviewers";
 
 /* ---------- plumbing ---------- */
 function safeBack(v: FormDataEntryValue | null) {
@@ -378,18 +380,56 @@ export async function submitForReview(fd: FormData) {
   if (get("SELECT 1 FROM milestones WHERE project_id=? AND done=0", p!.id)) fail("Tick off every milestone first.");
   if (get("SELECT 1 FROM members WHERE project_id=? AND status='active' AND did=''", p!.id)) fail("Every teammate has to write what they did first.");
   if (!get("SELECT 1 FROM project_skills WHERE project_id=?", p!.id)) fail("List the skills this project used first.");
+  // Pick the reviewers: people with no tie to anyone on the team, more likely the more their word can be trusted.
+  const S = compute();
+  const everOn = all("SELECT user_id FROM members WHERE project_id=?", p!.id).map((r) => r.user_id as number);
+  const pool = all("SELECT * FROM users WHERE college_id=?", me.college_id);
+  const picked = pickReviewers(eligibleReviewers(pool, everOn, teamTies(all("SELECT project_id, user_id FROM members")), S), S);
   db.transaction(() => {
     run("DELETE FROM reviews WHERE project_id=?", p!.id);
-    run("UPDATE projects SET status='review' WHERE id=?", p!.id);
+    run("DELETE FROM review_invites WHERE project_id=?", p!.id);
+    run("UPDATE projects SET status='review', invited_at=? WHERE id=?", now(), p!.id);
     logUpdate(p!.id, me.id, "Sent for review");
-    // Tell the people who can review it.
-    const S = compute();
-    const onIt = new Set(all("SELECT user_id FROM members WHERE project_id=?", p!.id).map((r) => r.user_id));
-    for (const u of all("SELECT id, admin FROM users WHERE verified=1 AND suspended=0 AND college_id=?", me.college_id))
-      if (!onIt.has(u.id) && (u.admin || (S.get(u.id)?.earned ?? 0) >= RULES.reviewerMin))
-        notify(u.id, `${p!.name} is ready for review`, `/projects/${p!.id}`);
+    for (const id of picked) {
+      run("INSERT INTO review_invites (project_id, reviewer_id, created_at) VALUES (?,?,?)", p!.id, id, now());
+      notify(id, `You were picked to review ${p!.name}`, `/projects/${p!.id}`);
+    }
+    // Admins can always review. With too few outside reviewers, they are the ones who decide.
+    for (const u of pool) if (u.admin && !everOn.includes(u.id) && !picked.includes(u.id))
+      notify(u.id, picked.length < RULES.reviewsNeeded ? `${p!.name} needs an admin review: too few people outside the team can review it` : `${p!.name} is in review`, `/projects/${p!.id}`);
   })();
-  done(back, "Sent for review.");
+  if (p!.live_url) await recordLive(p!.id, p!.live_url);
+  done(back, picked.length ? `Sent for review to ${picked.length} ${picked.length === 1 ? "person" : "people"} outside your team.` : "Sent for review. An admin of your college will review it.");
+}
+async function recordLive(pid: number, url: string) {
+  const r = await checkLive(url);
+  run("INSERT INTO live_checks (project_id, url, ok, status, note, created_at) VALUES (?,?,?,?,?,?)", pid, url, r.ok ? 1 : 0, r.status, r.note, now());
+  return r;
+}
+/* The one link Connect itself opens to see whether the project is really up. */
+export async function setLiveUrl(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  const p = project(n("id"), me);
+  if (!p || !isActive(p.id, me.id) || !open(p)) fail("Only the team can set the live link, before review.");
+  const url = s("url", 300);
+  if (url && !liveUrl(url)) fail("Use a public link that starts with https://");
+  run("UPDATE projects SET live_url=? WHERE id=?", url, p!.id);
+  done(back, url ? "Saved. Connect opens this link when the project goes for review." : "Live link removed.");
+}
+export async function checkLiveNow(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const p = project(n("id"), me);
+  if (!p || !p.live_url || p.status === "dropped") fail("This project has no live link.");
+  if (!allow(`live:${p!.id}`, 4, 3600)) fail("This link was checked a few times already. Try again in an hour.");
+  const r = await recordLive(p!.id, p!.live_url);
+  done(back, r.ok ? "The link answered." : `The link did not check out: ${r.note}.`);
+}
+/* Who may review: an admin, someone Connect picked, or (for projects sent before reviewers were picked) anyone with enough credit. */
+function mayReview(p: Row, me: Row): string | null {
+  if (member(p.id, me.id)) return "You cannot review a project you were on.";
+  if (me.admin) return null;
+  if (p.invited_at) return get("SELECT 1 FROM review_invites WHERE project_id=? AND reviewer_id=?", p.id, me.id) ? null : "Reviewers are picked by Connect from people with no tie to the team. You were not picked for this one.";
+  return (compute().get(me.id)?.earned ?? 0) < RULES.reviewerMin ? `You need ${RULES.reviewerMin} credit to review.` : null;
 }
 export async function reviewProject(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
@@ -398,8 +438,8 @@ export async function reviewProject(fd: FormData) {
   const note = s("note", 400);
   if (verdict === 0 && note.length < 15) fail("Say what is missing, so the team knows what to fix. A sentence is enough.");
   if (!p || p.status !== "review" || ![0, RULES.demo, RULES.live].includes(verdict)) fail("This project is not up for review.");
-  if (member(p!.id, me.id)) fail("You cannot review a project you were on.");
-  if (!me.admin && (compute().get(me.id)?.earned ?? 0) < RULES.reviewerMin) fail(`You need ${RULES.reviewerMin} credit to review.`);
+  const why = mayReview(p!, me);
+  if (why) fail(why);
   let msg = "Review recorded. One more is needed.";
   db.transaction(() => {
     run("INSERT OR REPLACE INTO reviews (project_id, reviewer_id, verdict, note) VALUES (?,?,?,?)", p!.id, me.id, verdict, note);
@@ -411,9 +451,16 @@ export async function reviewProject(fd: FormData) {
       if (verdict > 0) for (const k of fd.getAll("skills").map(String)) if (menu.has(k))
         run("INSERT OR IGNORE INTO member_skills (project_id, user_id, skill, by_id) VALUES (?,?,?,?)", p!.id, soloist[0].user_id, k, me.id);
     }
-    const rs = all("SELECT r.verdict, u.admin FROM reviews r JOIN users u ON u.id=r.reviewer_id WHERE r.project_id=?", p!.id);
-    if (rs.length < RULES.reviewsNeeded && !rs.some((r) => r.admin)) return;
-    const pot = Math.min(...rs.map((r) => r.verdict)); // the stricter reviewer wins
+    const rs = all("SELECT r.verdict, u.admin FROM reviews r JOIN users u ON u.id=r.reviewer_id WHERE r.project_id=? ORDER BY r.rowid", p!.id);
+    const outcome = verdictOf(rs);
+    if (outcome === null) {
+      if (rs.length >= RULES.reviewsNeeded) {
+        msg = "Review recorded. The two reviews disagree, so a third reviewer or an admin decides.";
+        for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", me.college_id)) notify(a.id, `Reviewers disagree on ${p!.name}. It needs one more review.`, `/projects/${p!.id}`);
+      }
+      return;
+    }
+    const pot = outcome;
     // Keep each reviewer's verdict next to the outcome: this is how review accuracy is measured later.
     for (const r of all("SELECT reviewer_id, verdict FROM reviews WHERE project_id=?", p!.id))
       run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at) VALUES (?,?,?,?,?)", p!.id, r.reviewer_id, r.verdict, pot, now());
@@ -520,6 +567,94 @@ export async function removeClaim(fd: FormData) {
   const { me, back, n } = await ctx(fd, false);
   run("DELETE FROM claims WHERE id=? AND user_id=?", n("claim"), me.id);
   done(back);
+}
+/* ---------- outside evidence: hackathons and internships, checked by someone else ---------- */
+const EVIDENCE_KINDS = ["hackathon", "internship"]; // marks and CGPA are deliberately not here
+export async function submitEvidence(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  if (me.role !== "student") fail("Only students add evidence.");
+  const kind = s("kind"), title = s("title", 120), url = s("url", 400), skills = parseSkills(s("skills", 200), 5);
+  if (!EVIDENCE_KINDS.includes(kind)) fail("Pick a hackathon or an internship.");
+  if (title.length < 4) fail("Say what it was, for example “Smart India Hackathon 2026”.");
+  if (url && !/^https:\/\/\S+\.\S+/.test(url)) fail("The link has to start with https://");
+  if (!skills.length) fail("List the skills it shows, separated by commas.");
+  const value = kind === "hackathon" ? (["won", "finalist", "took_part"].includes(s("value")) ? s("value") : "took_part") : "";
+  if (get("SELECT COUNT(*) n FROM evidence WHERE user_id=? AND status='pending'", me.id).n >= 3) fail("You have three items waiting already. Wait for those to be checked.");
+  if (!allow(`evidence:${me.id}`, 5, 86400)) fail("You have added several items today. Try again tomorrow.");
+  // The proof: a link, a file, or both. A file is judged by its bytes, like chat attachments.
+  const f = fd.get("file");
+  let file: { key: string; name: string; type: string } | null = null;
+  if (f instanceof File && f.size > 0) {
+    if (f.size > 5 * 1024 * 1024) fail("The file can be up to 5 MB.");
+    const bytes = Buffer.from(await f.arrayBuffer()), t = sniff(bytes, f.name);
+    if (!t || !(t.kind === "image" || t.mime === "application/pdf")) fail("Upload a photo or a PDF.");
+    file = { key: saveFile(bytes), name: cleanName(f.name, t!.ext), type: t!.mime };
+  }
+  if (!url && !file) fail("Add a link or upload a file that proves it. Without proof it stays a “No proof” line.");
+  // Optional ways to get it checked without an admin: a teammate on Connect (hackathons) or a code sent to a work email (internships).
+  const mate = kind === "hackathon" && n("teammate") ? colleague(n("teammate"), me, "AND role='student' AND verified=1 AND suspended=0") : undefined;
+  if (mate?.id === me.id) fail("Pick a teammate, not yourself.");
+  const work = kind === "internship" ? s("work_email", 120).toLowerCase() : "";
+  if (work) {
+    const d = domainOf(work);
+    if (!isEmail(work) || isPublicMail(d) || collegeForEmail(work)) fail("Use the address the company gave you, not a personal or college one.");
+  }
+  const code = work ? String(crypto.randomInt(100000, 1000000)) : null;
+  const id = Number(run(
+    `INSERT INTO evidence (user_id, college_id, kind, title, url, file_key, file_name, file_type, skills, value, teammate_id, work_email, code, code_expires, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    me.id, me.college_id, kind, title, url, file?.key ?? null, file?.name ?? null, file?.type ?? null, skills.join(", "), value, mate?.id ?? null, work || null, code, code ? now() + 900 : null, now()).lastInsertRowid);
+  if (code) {
+    if (mailReady()) await sendMail(work, "Confirm your internship on Connect", `${me.name} listed an internship on Connect: "${title}".\n\nIf that is you, your code is ${code}. It expires in 15 minutes.\nIf it is not, ignore this email.`);
+    else if (process.env.NODE_ENV !== "production") console.log(`[connect] work email code for evidence ${id}: ${code}`);
+  }
+  if (mate) notify(mate.id, `${me.name} says you were on their team at ${title}. Confirm it if that is true.`, `/u/${me.id}?tab=work#evidence`);
+  for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", me.college_id)) notify(a.id, `${me.name} added evidence to check: ${title}`, "/admin#evidence");
+  done(back + "#evidence", code ? `Added. A code was sent to ${work}; enter it to confirm.` : "Added. It counts once it is checked.");
+}
+function settle(e: Row, status: "verified" | "rejected", method: string, by: number, note = "") {
+  run("UPDATE evidence SET status=?, method=?, decided_by=?, note=?, decided_at=?, code=NULL WHERE id=? AND status='pending'", status, method, by, note, now(), e.id);
+  notify(e.user_id, status === "verified" ? `Your evidence was verified: ${e.title}` : `Your evidence was not accepted: ${e.title}${note ? ` (${note})` : ""}`, `/u/${e.user_id}?tab=work#evidence`);
+}
+/* The teammate named on a hackathon item says "yes, we were on that team". Their own credibility is what it weighs. */
+export async function confirmEvidence(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const e = get("SELECT * FROM evidence WHERE id=? AND status='pending' AND college_id=?", n("evidence"), me.college_id);
+  if (!e || e.teammate_id !== me.id || e.user_id === me.id) fail("Only the teammate named on it can confirm it.");
+  if (!allow(`confirm:${me.id}`, 5, 86400 * 7)) fail("You have confirmed several items this week. An admin will check this one.");
+  settle(e, "verified", "teammate", me.id);
+  done(back, "Confirmed. Your name is on it as the person who checked.");
+}
+export async function confirmWorkEmail(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const e = get("SELECT * FROM evidence WHERE id=? AND user_id=? AND status='pending'", n("evidence"), me.id);
+  if (!e || !e.code || (e.code_expires ?? 0) < now()) fail("That code has expired. An admin can still check this item.");
+  if (e.tries >= 5) fail("Too many wrong tries. An admin can still check this item.");
+  if (e.code !== s("code")) {
+    run("UPDATE evidence SET tries=tries+1 WHERE id=?", e.id);
+    fail("Wrong code.");
+  }
+  settle(e, "verified", "work_email", me.id);
+  done(back, `Confirmed with your ${domainOf(e.work_email)} address.`);
+}
+export async function decideEvidence(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd, false);
+  if (!me.admin) fail("Admins only.");
+  const e = get("SELECT * FROM evidence WHERE id=? AND status='pending' AND college_id=?", n("evidence"), me.college_id);
+  if (!e || e.user_id === me.id) fail("That item is not waiting at your college.");
+  const ok = s("answer") === "verify", note = s("note", 200);
+  if (!ok && note.length < 5) fail("Say why, so they know what was wrong.");
+  settle(e, ok ? "verified" : "rejected", "admin", me.id, note);
+  done(back, ok ? "Verified." : "Rejected. It lowers their credibility a little.");
+}
+/* Only an item nobody has judged yet can be taken back. A rejected one stays on the record. */
+export async function removeEvidence(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd, false);
+  const e = get("SELECT * FROM evidence WHERE id=? AND user_id=? AND status='pending'", n("evidence"), me.id);
+  if (!e) fail("Only an item that is still waiting can be removed.");
+  removeFile(e.file_key);
+  run("DELETE FROM evidence WHERE id=?", e.id);
+  done(back, "Removed.");
 }
 export async function aiResume(fd: FormData) {
   const { me, back, fail } = await ctx(fd);
@@ -732,8 +867,8 @@ export async function summariseProof(projectId: number): Promise<{ text?: string
   if (!me?.onboarded || !me.verified) return { error: "Sign in and verify first." };
   const p = project(projectId, me);
   if (!p || p.status !== "review") return { error: "This project is not up for review." };
-  if (member(p.id, me.id)) return { error: "You cannot review a project you were on." };
-  if (!me.admin && (compute().get(me.id)?.earned ?? 0) < RULES.reviewerMin) return { error: `You need ${RULES.reviewerMin} credit to review.` };
+  const why = mayReview(p, me);
+  if (why) return { error: why };
   if (!allow(`ai:${me.id}`, 10, 3600)) return { error: "You have asked for several summaries. Try again in an hour." };
   const { proofSummary } = await import("@/lib/review-help");
   return proofSummary(p.id);
@@ -759,8 +894,9 @@ export async function deleteAccount(fd: FormData) {
   db.transaction(() => {
     run(`UPDATE users SET name='Deleted user', email=NULL, college_email=NULL, picture=NULL, about='', skills='', resume=NULL,
          github='', linkedin='', website='', sub=?, admin=0, super=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
+    for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
-      "DELETE FROM claims WHERE user_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
+      "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
       "DELETE FROM requests WHERE user_id=? AND status='pending'", "DELETE FROM blocks WHERE user_id=? OR blocked_id=?", "DELETE FROM push_subs WHERE user_id=?"]) run(q, ...(q.includes("OR") ? [me.id, me.id] : [me.id]));
     // Their conversations go too, attachments included.
     for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);

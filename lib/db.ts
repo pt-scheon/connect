@@ -69,6 +69,15 @@ CREATE TABLE IF NOT EXISTS review_log (id INTEGER PRIMARY KEY, project_id INTEGE
 CREATE TABLE IF NOT EXISTS project_skills (project_id INTEGER, skill TEXT, PRIMARY KEY (project_id, skill));
 CREATE TABLE IF NOT EXISTS member_skills (project_id INTEGER, user_id INTEGER, skill TEXT, by_id INTEGER, PRIMARY KEY (project_id, user_id, skill, by_id));
 CREATE TABLE IF NOT EXISTS role_skills (role_id INTEGER, skill TEXT, importance INTEGER DEFAULT 2, PRIMARY KEY (role_id, skill));
+CREATE TABLE IF NOT EXISTS review_invites (project_id INTEGER, reviewer_id INTEGER, created_at INTEGER, PRIMARY KEY (project_id, reviewer_id));
+CREATE TABLE IF NOT EXISTS live_checks (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, url TEXT, ok INTEGER, status INTEGER, note TEXT, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS evidence (
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, college_id INTEGER, kind TEXT NOT NULL, title TEXT NOT NULL, url TEXT DEFAULT '',
+  file_key TEXT, file_name TEXT, file_type TEXT, skills TEXT DEFAULT '', value TEXT DEFAULT '', status TEXT DEFAULT 'pending',
+  method TEXT DEFAULT '', teammate_id INTEGER, work_email TEXT, code TEXT, code_expires INTEGER, tries INTEGER DEFAULT 0,
+  decided_by INTEGER, note TEXT DEFAULT '', created_at INTEGER NOT NULL, decided_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS evidence_user ON evidence (user_id);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
 CREATE INDEX IF NOT EXISTS updates_project ON updates (project_id);
@@ -106,6 +115,8 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // Rating redesign: how a report ended ('', 'upheld', 'dismissed') and what kind it was.
   ["reports", "result", "TEXT DEFAULT ''"],
   ["reports", "reason_kind", "TEXT DEFAULT ''"],
+  ["projects", "live_url", "TEXT DEFAULT ''"],
+  ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
 ];
 
 const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");
@@ -114,6 +125,12 @@ function open() {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const d = new Database(file);
   d.pragma("journal_mode = WAL");
+  migrate(d);
+  return d;
+}
+
+/* Creates any missing tables and columns. Only ever adds; safe to run on every start. */
+function migrate(d: Database.Database) {
   d.exec(SCHEMA);
   for (const [t, c, type] of COLUMNS) {
     const have = (d.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).some((x) => x.name === c);
@@ -123,7 +140,6 @@ function open() {
     d.exec(`CREATE INDEX IF NOT EXISTS ${ix}`);
   assignColleges(d);
   ensureHomeCollege(d);
-  return d;
 }
 
 /* The college named in COLLEGE_EMAIL_DOMAIN (and COLLEGE_NAME) always exists, so a brand-new server has one to join. */
@@ -178,8 +194,14 @@ function assignColleges(d: Database.Database) {
   })();
 }
 
-const g = globalThis as unknown as { __connectDb?: Database.Database };
+const g = globalThis as unknown as { __connectDb?: Database.Database; __connectSchema?: string };
+const shape = SCHEMA + JSON.stringify(COLUMNS);
 export const db = g.__connectDb ?? (g.__connectDb = open());
+// In development the connection outlives code reloads. If the tables or columns above changed since it was opened, add them now.
+if (g.__connectSchema !== shape) {
+  if (g.__connectSchema !== undefined || process.env.NODE_ENV !== "production") migrate(db);
+  g.__connectSchema = shape;
+}
 
 /* Rows come back loosely typed; the schema above is the source of truth. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

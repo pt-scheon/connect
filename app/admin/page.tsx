@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { all } from "@/lib/db";
 import { requireMember } from "@/lib/auth";
+import { splitFlags } from "@/lib/reviewers";
 import * as A from "../actions";
 import { F, Who } from "../ui";
 
@@ -18,6 +19,9 @@ export default async function Admin() {
   const reports = all("SELECT r.*, u.name by_name FROM reports r JOIN users u ON u.id=r.by_id WHERE r.open=1 AND r.college_id=? ORDER BY r.id DESC", cid);
   const label = (r: { kind: string; target_id: number }) =>
     r.kind === "user" ? all("SELECT name FROM users WHERE id=?", r.target_id)[0]?.name : all("SELECT name FROM projects WHERE id=?", r.target_id)[0]?.name;
+  const evidence = all("SELECT e.*, u.name FROM evidence e JOIN users u ON u.id=e.user_id WHERE e.status='pending' AND e.college_id=? AND e.user_id<>? ORDER BY e.created_at", cid, me.id);
+  const flags = splitFlags(cid);
+  const nameOf = (id: number) => all("SELECT name FROM users WHERE id=?", id)[0]?.name ?? "Someone";
   const suspended = all("SELECT * FROM users WHERE suspended=1 AND deleted=0 AND college_id=?", cid);
   return (
     <>
@@ -48,6 +52,36 @@ export default async function Admin() {
           <h2>Projects in review</h2>
           {review.length === 0 && <span className="muted">The queue is empty.</span>}
           {review.map((p) => <Link key={p.id} href={`/projects/${p.id}`}>{p.name}</Link>)}
+        </div>
+        <div className="card" id="evidence">
+          <h2>Evidence to check</h2>
+          <span className="small muted">Hackathons and internships students did outside Connect. Open the proof. Verify it only if it shows this person, this event and this result. A rejection lowers their credibility.</span>
+          {evidence.length === 0 && <span className="muted">Nothing is waiting.</span>}
+          {evidence.map((e) => (
+            <div key={e.id} className="stack tight">
+              <span><Link href={`/u/${e.user_id}?tab=work`}>{e.name}</Link>: <b>{e.title}</b> <span className="small muted">{e.kind}{e.value ? `, ${e.value.replace("_", " ")}` : ""} · {e.skills}</span></span>
+              <span className="row small">
+                {e.url && <a href={e.url} target="_blank" rel="noopener noreferrer nofollow">Proof link ↗</a>}
+                {e.file_key && <a href={`/api/files/${e.file_key}`} target="_blank" rel="noopener noreferrer">{e.file_name}</a>}
+              </span>
+              <F action={A.decideEvidence} back="/admin" hidden={{ evidence: e.id }} className="row">
+                <input type="text" name="note" id={`ev-note-${e.id}`} placeholder="Reason, if you reject it" maxLength={200} aria-label="Reason" />
+                <button className="btn sm" name="answer" value="verify">Verify</button>
+                <button className="btn danger sm" name="answer" value="reject">Reject</button>
+              </F>
+            </div>
+          ))}
+        </div>
+        <div className="card">
+          <h2>Credit splits to check</h2>
+          <span className="small muted">Someone got at least twice an equal share, but the project&apos;s record shows nothing from them. Nothing changes automatically. Look, and act on the people if it was a favour.</span>
+          {flags.length === 0 && <span className="muted">No split looks off.</span>}
+          {flags.map((f) => (
+            <div key={`${f.project_id}:${f.user_id}`} className="stack" style={{ gap: 0 }}>
+              <span><Link href={`/projects/${f.project_id}`}>{f.name}</Link>: <Link href={`/u/${f.user_id}`}>{nameOf(f.user_id)}</Link> got {Math.round(f.share)}% <span className="small muted">(an equal share is {Math.round(f.equal)}%)</span></span>
+              <span className="small muted">{f.why}</span>
+            </div>
+          ))}
         </div>
         <div className="card">
           <h2>Reports</h2>

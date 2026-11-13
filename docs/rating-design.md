@@ -214,7 +214,7 @@ wᵢ = tier × recency × share × verifier
 | tier | A = 1, B = 0.5, C = 0 |
 | recency | 0.5 ^ (months since the evidence / 18) |
 | share | team project: min(1, your share / an equal share); solo project: `soloFactor`; everything else: 1 |
-| verifier | average credibility multiplier of the people who confirmed it (reviewers and the teammates who ticked the skill; the client for a commission; 1 for an admin) |
+| verifier | average credibility multiplier of the people who ticked the skill (teammates, or the reviewers of a solo project); the client for a commission; 1 for an admin; 0.7 for a code sent to a work email, which proves a mailbox at the company and nothing more |
 
 Quality `qᵢ`:
 
@@ -357,9 +357,10 @@ project_skills     (project_id, skill, PRIMARY KEY (project_id, skill))         
 member_skills      (project_id, user_id, skill, by_id, PRIMARY KEY (project_id, user_id, skill, by_id))
 review_invites     (project_id, reviewer_id, created_at, PRIMARY KEY (project_id, reviewer_id))
 live_checks        (id, project_id, url, ok, status, created_at)
-evidence           (id, user_id, college_id, kind, title, url, file_key, skills, value, status, method,
+evidence           (id, user_id, college_id, kind, title, url, file_key, file_name, file_type, skills, value,
+                    status, method, teammate_id, work_email, code, code_expires, tries,
                     decided_by, note, created_at, decided_at)
-evidence_confirms  (evidence_id, user_id, PRIMARY KEY (evidence_id, user_id))
+review_log         (id, project_id, reviewer_id, verdict, outcome, created_at)   -- each verdict next to the outcome
 commissions        (id, college_id, client_id, club_id, title, brief, deadline, reward, money, money_note,
                     money_paid, status, doer_id, proof_url, rating, rating_note, reviewer_id, review_ok,
                     dispute_by, dispute_reason, resolution, paid_credit,

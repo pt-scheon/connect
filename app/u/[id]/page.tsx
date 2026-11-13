@@ -99,6 +99,11 @@ export default async function Profile({ params, searchParams }: Props) {
   const shippedWithMe = viewer && T.get(viewer.id)?.get(id)?.some((t) => t.shipped);
   const vouched = viewer && !!get("SELECT 1 FROM vouches WHERE from_id=? AND to_id=?", viewer.id, id);
   const skills = skillsOf(u);
+  // Outside evidence. Everyone sees what was verified; only the owner sees what is waiting or was rejected.
+  const evidence = alum ? [] : all("SELECT e.*, d.name by_name FROM evidence e LEFT JOIN users d ON d.id=e.decided_by WHERE e.user_id=? ORDER BY e.created_at DESC", id)
+    .filter((e) => e.status === "verified" || self || (viewer && e.status === "pending" && e.teammate_id === viewer.id));
+  const collegeMates = self ? all("SELECT id, name FROM users WHERE college_id=? AND role='student' AND verified=1 AND suspended=0 AND id<>? ORDER BY name", u.college_id, id) : [];
+  const checkedBy = (e: Row) => e.method === "admin" ? "Checked by a college admin" : e.method === "teammate" ? `Confirmed by ${e.by_name ?? "a teammate"}` : `Confirmed from a ${String(e.work_email ?? "").split("@")[1] ?? "work"} email`;
   const proven = [...(skillScores().get(id)?.values() ?? [])].sort((a, b) => b.score * (0.5 + b.conf) - a.score * (0.5 + a.conf));
   const listedOnly = skills.filter((k) => !proven.some((x) => x.skill === canon(k)));
   const signedIn = (all("SELECT sub FROM identities WHERE user_id=?", id)).map((r) => String(r.sub).split(":")[0]);
@@ -202,6 +207,60 @@ export default async function Profile({ params, searchParams }: Props) {
             ))}
           </tbody></table></div>
         </div>
+        {(evidence.length > 0 || self) && (
+          <div className="card" id="evidence">
+            <h2>Hackathons and internships</h2>
+            <span className="small muted">Things done outside Connect. They count only after someone else checks them, and for half of what a shipped project counts.</span>
+            {evidence.length === 0 && <span className="muted">Nothing added yet.</span>}
+            {evidence.map((e) => (
+              <div key={e.id} className="stack tight">
+                <div className="row between">
+                  <span><b>{e.title}</b> <span className="small muted">{e.kind === "hackathon" ? (e.value === "won" ? "Hackathon, won" : e.value === "finalist" ? "Hackathon, finalist" : "Hackathon, took part") : "Internship"} · {e.skills}</span></span>
+                  {e.status === "verified" ? <Stamp>{checkedBy(e)}</Stamp> : e.status === "rejected" ? <Stamp kind="bad">Not accepted</Stamp> : <Stamp kind="no">Waiting to be checked</Stamp>}
+                </div>
+                <span className="row small">
+                  {e.url && <a href={e.url} target="_blank" rel="noopener noreferrer nofollow">Proof link ↗</a>}
+                  {e.file_key && (self || viewer?.admin || e.teammate_id === viewer?.id) ? <a href={`/api/files/${e.file_key}`} target="_blank" rel="noopener noreferrer">{e.file_name}</a> : null}
+                  {e.status === "rejected" && e.note && <span className="muted">Reason: {e.note}</span>}
+                </span>
+                {self && e.status === "pending" && e.code && (
+                  <F action={A.confirmWorkEmail} back={back} hidden={{ evidence: e.id }} className="row">
+                    <input type="text" name="code" id={`code-${e.id}`} inputMode="numeric" maxLength={6} placeholder={`Code sent to ${e.work_email}`} aria-label="Code from your work email" required style={{ flex: "0 1 220px" }} />
+                    <button className="btn ghost sm">Confirm</button>
+                  </F>
+                )}
+                {!self && viewer && e.status === "pending" && e.teammate_id === viewer.id && (
+                  <F action={A.confirmEvidence} back={back} hidden={{ evidence: e.id }} confirm="Confirm you were on this team with them? Your name goes on it.">
+                    <button className="btn sm">Yes, I was on that team</button>
+                  </F>
+                )}
+                {self && e.status === "pending" && <F action={A.removeEvidence} back={back} hidden={{ evidence: e.id }}><button className="linkbtn small">Remove</button></F>}
+              </div>
+            ))}
+            {self && (
+              <details className="small">
+                <summary className="btn ghost sm" style={{ display: "inline-block" }}>Add a hackathon or internship</summary>
+                <F action={A.submitEvidence} back={back} className="stack" >
+                  <label className="field"><span>What was it?</span>
+                    <select name="kind" id="ev-kind" defaultValue="hackathon"><option value="hackathon">Hackathon</option><option value="internship">Internship</option></select></label>
+                  <label className="field"><span>Name</span><input type="text" name="title" id="ev-title" maxLength={120} placeholder="Smart India Hackathon 2026, or Firmware intern at Acme" required /></label>
+                  <label className="field"><span>Skills it shows</span><input type="text" name="skills" id="ev-skills" maxLength={200} placeholder="Python, ML" required /></label>
+                  <label className="field"><span>Proof link</span><input type="url" name="url" id="ev-url" placeholder="Results page or certificate link (https://)" /></label>
+                  <label className="field"><span>Or a photo or PDF</span><input type="file" name="file" id="ev-file" accept="image/*,application/pdf" />
+                    <small>Up to 5 MB. Only you, the admins and a teammate you name can open it.</small></label>
+                  <label className="field"><span>Hackathon: how did it go?</span>
+                    <select name="value" id="ev-value" defaultValue="took_part"><option value="took_part">Took part</option><option value="finalist">Finalist</option><option value="won">Won</option></select></label>
+                  <label className="field"><span>Hackathon: a teammate on Connect who can confirm it <span className="muted">(optional)</span></span>
+                    <select name="teammate" id="ev-mate" defaultValue=""><option value="">No one, ask an admin</option>{collegeMates.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+                  <label className="field"><span>Internship: your work email <span className="muted">(optional)</span></span><input type="email" name="work_email" id="ev-work" placeholder="you@company.com" />
+                    <small>We send a code there to confirm it. Otherwise an admin checks your letter.</small></label>
+                  <div><button className="btn">Send for checking</button></div>
+                  <span className="muted">An item that turns out to be false is rejected and lowers your credibility. Marks and CGPA are not used on Connect.</span>
+                </F>
+              </details>
+            )}
+          </div>
+        )}
         {projects.map((p) => (
           <Link key={p.id} className="card lift" href={`/projects/${p.id}`}>
             <span className="row between"><b>{p.name}</b>

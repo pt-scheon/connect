@@ -133,6 +133,13 @@ export function compute(): Map<number, Standing> {
   const upheld = new Map<number, number[]>();
   for (const r of all("SELECT target_id, created_at FROM reports WHERE kind='user' AND result='upheld'"))
     upheld.set(r.target_id, [...(upheld.get(r.target_id) ?? []), r.created_at ?? t]);
+  // Outside evidence a person sent for checking: verified items build trust, rejected ones cost it.
+  const sent = new Map<number, { ok: number; bad: number }>();
+  for (const e of all("SELECT user_id, status FROM evidence WHERE status IN ('verified','rejected')")) {
+    const x = sent.get(e.user_id) ?? { ok: 0, bad: 0 };
+    if (e.status === "verified") x.ok++; else x.bad++;
+    sent.set(e.user_id, x);
+  }
   for (const u of users) {
     const s = S.get(u.id)!;
     s.circle = s.shipped >= 3 && s.mates.size <= 2;
@@ -140,7 +147,7 @@ export function compute(): Map<number, Standing> {
     const j = judged.get(u.id);
     s.cred = credibility({
       shipped: s.shipped, left: s.left, mates: s.mates.size, circle: s.circle, ring: s.ring,
-      reviewsMatched: j?.matched ?? 0, reviewsTotal: j?.total ?? 0, evidenceOk: 0, evidenceBad: 0,
+      reviewsMatched: j?.matched ?? 0, reviewsTotal: j?.total ?? 0, evidenceOk: sent.get(u.id)?.ok ?? 0, evidenceBad: sent.get(u.id)?.bad ?? 0,
       createdAt: u.created_at, upheld: upheld.get(u.id) ?? [],
     }, t);
   }

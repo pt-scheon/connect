@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Dev only: lets http://127.0.0.1:3000 load scripts as well as localhost.
   allowedDevOrigins: ["127.0.0.1", "*.localhost"],
+  // Forms can carry one proof file (a certificate or letter, up to 5 MB).
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   async headers() {
     // Chat attachments set their own, stricter headers in app/api/files/[key]/route.ts.
     return [

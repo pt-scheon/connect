@@ -8,10 +8,12 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ key: string }> }) {
   const me = await currentUser();
   const key = (await params).key;
-  const m = me ? get("SELECT * FROM messages WHERE file_key=? AND (from_id=? OR to_id=?)", key, me.id, me.id) : null;
+  // Proof files on evidence: the owner, the teammate asked to confirm it, and admins of that college.
+  const ev = me ? get("SELECT file_name, file_type, 'file' kind FROM evidence WHERE file_key=? AND (user_id=? OR teammate_id=? OR (college_id=? AND ?=1))", key, me.id, me.id, me.college_id, me.admin ? 1 : 0) : null;
+  const m = ev ?? (me ? get("SELECT * FROM messages WHERE file_key=? AND (from_id=? OR to_id=?)", key, me.id, me.id) : null);
   const bytes = m ? read(key) : null;
   if (!m || !bytes) return new Response("Not found", { status: 404 });
-  const inline = ["image", "video", "voice"].includes(m.kind) || m.file_type === "application/pdf";
+  const inline = ["image", "video", "voice"].includes(m.kind) || m.file_type === "application/pdf" || String(m.file_type).startsWith("image/");
   const download = new URL(req.url).searchParams.has("download");
   const name = encodeURIComponent(m.file_name);
   // Videos and voice notes are played in pieces (and Safari insists on it), so answer byte ranges.
