@@ -345,7 +345,7 @@ export async function submitForReview(fd: FormData) {
     const S = compute();
     const onIt = new Set(all("SELECT user_id FROM members WHERE project_id=?", p!.id).map((r) => r.user_id));
     for (const u of all("SELECT id, admin FROM users WHERE verified=1 AND suspended=0 AND college_id=?", me.college_id))
-      if (!onIt.has(u.id) && (u.admin || (S.get(u.id)?.credit ?? 0) >= RULES.reviewerMin))
+      if (!onIt.has(u.id) && (u.admin || (S.get(u.id)?.earned ?? 0) >= RULES.reviewerMin))
         notify(u.id, `${p!.name} is ready for review`, `/projects/${p!.id}`);
   })();
   done(back, "Sent for review.");
@@ -358,13 +358,16 @@ export async function reviewProject(fd: FormData) {
   if (verdict === 0 && note.length < 15) fail("Say what is missing, so the team knows what to fix. A sentence is enough.");
   if (!p || p.status !== "review" || ![0, RULES.demo, RULES.live].includes(verdict)) fail("This project is not up for review.");
   if (member(p!.id, me.id)) fail("You cannot review a project you were on.");
-  if (!me.admin && (compute().get(me.id)?.credit ?? 0) < RULES.reviewerMin) fail(`You need ${RULES.reviewerMin} credit to review.`);
+  if (!me.admin && (compute().get(me.id)?.earned ?? 0) < RULES.reviewerMin) fail(`You need ${RULES.reviewerMin} credit to review.`);
   let msg = "Review recorded. One more is needed.";
   db.transaction(() => {
     run("INSERT OR REPLACE INTO reviews (project_id, reviewer_id, verdict, note) VALUES (?,?,?,?)", p!.id, me.id, verdict, note);
     const rs = all("SELECT r.verdict, u.admin FROM reviews r JOIN users u ON u.id=r.reviewer_id WHERE r.project_id=?", p!.id);
     if (rs.length < RULES.reviewsNeeded && !rs.some((r) => r.admin)) return;
     const pot = Math.min(...rs.map((r) => r.verdict)); // the stricter reviewer wins
+    // Keep each reviewer's verdict next to the outcome: this is how review accuracy is measured later.
+    for (const r of all("SELECT reviewer_id, verdict FROM reviews WHERE project_id=?", p!.id))
+      run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at) VALUES (?,?,?,?,?)", p!.id, r.reviewer_id, r.verdict, pot, now());
     const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
     // Reviewer notes go on the timeline without names, so reviewers can be candid.
     for (const r of all("SELECT note, verdict FROM reviews WHERE project_id=? AND note<>''", p!.id))
@@ -539,7 +542,7 @@ export async function applyToCall(fd: FormData) {
   if (!c || !p || p.lead_id !== me.id || p.status === "dropped") fail("Only the lead of a live project can apply to an open call.");
   const S = compute();
   const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
-  const credit = team.reduce((a, id) => a + (S.get(id)?.credit ?? 0), 0);
+  const credit = team.reduce((a, id) => a + (S.get(id)?.earned ?? 0), 0);
   if (credit < c.min_credit) fail(`Your team has ${credit} credit. This call needs ${c.min_credit}.`);
   if (!team.some((id) => (S.get(id)?.shipped ?? 0) > 0)) fail("Someone on the team has to have shipped a project before.");
   const r = run("INSERT OR IGNORE INTO applications (call_id, project_id) VALUES (?,?)", c.id, p!.id);
@@ -611,10 +614,14 @@ export async function setHidden(fd: FormData) {
   done(back, n("on") ? "Hidden from everyone except its team and admins." : "Visible again.");
 }
 export async function closeReport(fd: FormData) {
-  const { me, back, n, fail } = await ctx(fd, false);
+  const c = await ctx(fd, false);
+  const { me, back, n, fail } = c;
   if (!me.admin) fail("Admins only.");
-  run("UPDATE reports SET open=0 WHERE id=? AND college_id=?", n("report"), me.college_id);
-  done(back);
+  const { s } = c;
+  // Upheld means the report was right. It lowers the reported person's credibility for a while.
+  const result = s("result") === "upheld" ? "upheld" : "dismissed";
+  run("UPDATE reports SET open=0, result=? WHERE id=? AND college_id=? AND open=1", result, n("report"), me.college_id);
+  done(back, result === "upheld" ? "Report upheld." : "Report dismissed.");
 }
 
 /* ---------- updates, inbox, reports ---------- */
@@ -677,7 +684,7 @@ export async function summariseProof(projectId: number): Promise<{ text?: string
   const p = project(projectId, me);
   if (!p || p.status !== "review") return { error: "This project is not up for review." };
   if (member(p.id, me.id)) return { error: "You cannot review a project you were on." };
-  if (!me.admin && (compute().get(me.id)?.credit ?? 0) < RULES.reviewerMin) return { error: `You need ${RULES.reviewerMin} credit to review.` };
+  if (!me.admin && (compute().get(me.id)?.earned ?? 0) < RULES.reviewerMin) return { error: `You need ${RULES.reviewerMin} credit to review.` };
   if (!allow(`ai:${me.id}`, 10, 3600)) return { error: "You have asked for several summaries. Try again in an hour." };
   const { proofSummary } = await import("@/lib/review-help");
   return proofSummary(p.id);

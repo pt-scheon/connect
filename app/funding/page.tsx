@@ -18,7 +18,7 @@ export default async function Funding() {
   const total = grants.reduce((a, g) => a + g.amount, 0);
   const paid = parts.filter((x) => x.paid).reduce((a, x) => a + x.amount, 0);
   const members = all("SELECT project_id, user_id FROM members WHERE status='active'");
-  const teamCredit = (pid: number) => members.filter((m) => m.project_id === pid).reduce((a, m) => a + (S.get(m.user_id)?.credit ?? 0), 0);
+  const teamCredit = (pid: number) => members.filter((m) => m.project_id === pid).reduce((a, m) => a + (S.get(m.user_id)?.earned ?? 0), 0);
   const myProjects = all("SELECT * FROM projects WHERE lead_id=? AND status<>'dropped' AND college_id=?", me.id, me.college_id);
   const isAlum = me.role === "alum" && me.verified;
 

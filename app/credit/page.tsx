@@ -21,7 +21,8 @@ export default async function Credit() {
             {s.ledger.map((l, i) => (
               <tr key={i}><td><b>{l.what}</b><br /><span className="small muted">{l.why}</span></td><td className={`n ${l.n < 0 ? "neg" : ""}`}>{l.n > 0 ? "+" : "−"}{Math.abs(l.n)}</td></tr>
             ))}
-            <tr><td><b>Total</b></td><td className="n"><b>{s.credit}</b></td></tr>
+            <tr><td><b>Free to use now</b><br /><span className="small muted">What you can stake or spend</span></td><td className="n"><b>{s.credit}</b></td></tr>
+            <tr><td><b>Earned</b><br /><span className="small muted">Shown on your profile. Stakes held and credit spent do not lower it.</span></td><td className="n"><b>{s.earned}</b></td></tr>
           </tbody></table></div>
         </div>
       )}

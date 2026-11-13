@@ -17,7 +17,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
   if (!me.onboarded || !isMember(me)) redirect("/onboarding");
   const cid = me.college_id, college = collegeById(cid)!;
   const S = standings(), mine = S.get(me.id) ?? EMPTY;
-  const canReview = !!me.verified && (!!me.admin || mine.credit >= RULES.reviewerMin);
+  const canReview = !!me.verified && (!!me.admin || mine.earned >= RULES.reviewerMin);
 
   const members = all("SELECT m.project_id, u.id, u.name, u.picture FROM members m JOIN users u ON u.id=m.user_id JOIN projects p ON p.id=m.project_id WHERE m.status='active' AND p.college_id=?", cid);
   const roles = all("SELECT r.project_id, r.title FROM roles r JOIN projects p ON p.id=r.project_id WHERE r.open=1 AND p.college_id=?", cid);

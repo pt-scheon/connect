@@ -13,8 +13,9 @@ async function setup() {
   const { compute, shares, RULES } = await import("../lib/credit");
   for (const t of TABLES) run(`DELETE FROM ${t}`);
   let n = 0;
-  const user = (verified = 1) =>
-    Number(run("INSERT INTO users (sub, name, verified, onboarded, created_at) VALUES (?,?,?,1,?)", `t:${++n}`, `User ${n}`, verified, now()).lastInsertRowid);
+  const user = (verified = 1, monthsOld = 0) =>
+    Number(run("INSERT INTO users (sub, name, verified, onboarded, created_at) VALUES (?,?,?,1,?)", `t:${++n}`, `User ${n}`, verified, now() - monthsOld * 30 * 86400).lastInsertRowid);
+  const vouch = (from: number, to: number, at = now()) => run("INSERT INTO vouches (from_id, to_id, created_at) VALUES (?,?,?)", from, to, at);
   const project = (status: string, pot: number, team: number[], opts: { left?: number[]; shippedAt?: number } = {}) => {
     const pid = Number(run("INSERT INTO projects (name, pitch, status, lead_id, pot, created_at, shipped_at) VALUES ('P','p',?,?,?,?,?)",
       status, team[0], pot, now(), status === "shipped" ? opts.shippedAt ?? now() : null).lastInsertRowid);
@@ -24,7 +25,7 @@ async function setup() {
   };
   const give = (pid: number, from: number, to: number, pct: number) =>
     run("INSERT INTO allocations (project_id, from_id, to_id, pct) VALUES (?,?,?,?)", pid, from, to, pct);
-  return { run, now, compute, shares, RULES, user, project, give };
+  return { run, now, compute, shares, RULES, user, project, give, vouch };
 }
 
 test("a verified student starts with starter credit, an unverified one with none", async () => {
@@ -251,4 +252,151 @@ test("the service worker rings for calls when Connect is closed and stays quiet 
   assert.equal(t.notes.length, 0, "on screen: the page handles it");
   t = make(false); await t.push({ type: "msg", from: call.from, text: "hi" });
   assert.equal(t.notes[0].title, "Tanvi");
+});
+
+/* ---------- rating redesign: credibility, vouch limits, rings ---------- */
+
+/* The credit rules exactly as they were before the redesign. Used to prove that nobody's credit moved. */
+async function creditBefore(): Promise<Map<number, number>> {
+  const { all, now } = await import("../lib/db");
+  const { shares, RULES } = await import("../lib/credit");
+  const sum = new Map<number, number[]>(), stats = new Map<number, number>();
+  for (const u of all("SELECT id, verified, role FROM users")) sum.set(u.id, u.verified && u.role === "student" ? [RULES.starter] : []);
+  const members = all("SELECT * FROM members"), allocs = all("SELECT * FROM allocations");
+  const shippedWith = new Map<number, Set<number>>();
+  for (const p of all("SELECT * FROM projects")) {
+    const team = members.filter((m) => m.project_id === p.id);
+    const active = team.filter((m) => m.status === "active").map((m) => m.user_id as number);
+    for (const m of team) {
+      const l = sum.get(m.user_id)!;
+      if (m.status === "left") { if (m.stake) l.push(-m.stake); }
+      else if (p.status === "dropped") { if (m.user_id === p.lead_id) l.push(-RULES.stake); }
+      else if (p.status !== "shipped" && m.stake) l.push(-m.stake);
+    }
+    if (p.status !== "shipped") continue;
+    const sh = shares(active, allocs.filter((a) => a.project_id === p.id));
+    const faded = (p.shipped_at ?? 0) < now() - RULES.fadeMonths * 30 * 86400;
+    for (const id of active) {
+      sum.get(id)!.push(Math.round(p.pot * (sh.get(id)! / 100) * (active.length === 1 ? RULES.soloFactor : 1) * (faded ? 0.5 : 1)));
+      if (!shippedWith.has(id)) shippedWith.set(id, new Set());
+      for (const o of active) if (o !== id) shippedWith.get(id)!.add(o);
+    }
+  }
+  for (const r of all("SELECT user_id FROM requests WHERE status='pending'")) sum.get(r.user_id)?.push(-RULES.stake);
+  for (const [id, l] of sum) stats.set(id, Math.max(0, l.reduce((a, b) => a + b, 0)));
+  const vouches = all("SELECT * FROM vouches"), pair = new Set(vouches.map((v) => `${v.from_id}>${v.to_id}`));
+  for (const v of vouches) {
+    if (!sum.has(v.to_id) || !sum.has(v.from_id) || !shippedWith.get(v.to_id)?.has(v.from_id)) continue;
+    let n = RULES.vouch * Math.min(1, stats.get(v.from_id)! / RULES.fullWeightAt);
+    if (pair.has(`${v.to_id}>${v.from_id}`)) n /= 2;
+    sum.get(v.to_id)!.push(Math.max(1, Math.round(n)));
+  }
+  return new Map([...sum].map(([id, l]) => [id, Math.max(0, l.reduce((a, b) => a + b, 0))]));
+}
+
+test("carry-over: the sample college has exactly the credit it had before the redesign", async () => {
+  await setup();
+  await import("../scripts/seed");
+  const { compute } = await import("../lib/credit");
+  const before = await creditBefore(), after = compute();
+  assert.ok(before.size >= 10);
+  for (const [id, n] of before) assert.equal(after.get(id)!.credit, n, `user ${id}`);
+  assert.ok([...before.values()].some((n) => n > 100), "the sample data has real credit in it");
+});
+
+test("a lone 95% split is pulled to the middle of what the others gave", async () => {
+  const { shares } = await setup();
+  const ids = [1, 2, 3, 4];
+  const even = (from: number) => ids.filter((x) => x !== from).map((to) => ({ from_id: from, to_id: to, pct: to === ids.filter((x) => x !== from)[0] ? 34 : 33 }));
+  // 2 is 1's friend and gives 1 almost everything; 3 and 4 split evenly.
+  const allocs = [...even(1), { from_id: 2, to_id: 1, pct: 95 }, { from_id: 2, to_id: 3, pct: 3 }, { from_id: 2, to_id: 4, pct: 2 }, ...even(3), ...even(4)];
+  const sh = shares(ids, allocs);
+  assert.ok(sh.get(1)! < 30, `one generous friend cannot lift a share: got ${sh.get(1)}`);
+});
+
+test("credibility starts in the middle and moves with what a person does, never with what they type", async () => {
+  const { run, compute, user, project } = await setup();
+  const [a, b, c, quitter] = [user(), user(), user(), user()];
+  const fresh = compute().get(a)!.cred.score;
+  assert.equal(fresh, 53, "a new verified student starts in the middle");
+  project("shipped", 100, [a, b, c], { left: [quitter] });
+  const S = compute();
+  assert.ok(S.get(a)!.cred.score > fresh, "finishing raises it");
+  assert.ok(S.get(quitter)!.cred.score < fresh, "leaving lowers it");
+  // Everything a person can type about themselves.
+  const snap = () => { const s = compute().get(quitter)!; return [s.credit, s.earned, s.cred.score].join(); };
+  const was = snap();
+  run("UPDATE users SET skills='React, Rust, ML, PCB design', about='10x founder', github='https://github.com/torvalds', linkedin='https://linkedin.com/in/x', branch='CSE' WHERE id=?", quitter);
+  for (let i = 0; i < 10; i++) run("INSERT INTO claims (user_id, text) VALUES (?,?)", quitter, "Won everything");
+  run("UPDATE members SET did='Built all of it', role='Chief architect' WHERE user_id=?", quitter);
+  assert.equal(snap(), was);
+});
+
+test("account age and an upheld report move credibility; a dismissed report does not", async () => {
+  const { run, now, compute, user } = await setup();
+  const [young, old, reported, cleared] = [user(), user(1, 12), user(1, 12), user(1, 12)];
+  run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, created_at) VALUES (?,?,?,?,0,'upheld',?)", old, "user", reported, "x", now());
+  run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, created_at) VALUES (?,?,?,?,0,'dismissed',?)", old, "user", cleared, "x", now());
+  const S = compute(), RULES = (await import("../lib/rules")).RULES;
+  assert.equal(S.get(old)!.cred.score - S.get(young)!.cred.score, 10);
+  assert.equal(S.get(old)!.cred.score - S.get(reported)!.cred.score, RULES.cred.reportPenalty);
+  assert.equal(S.get(cleared)!.cred.score, S.get(old)!.cred.score);
+});
+
+test("a vouch weighs as much as the voucher can be trusted, and only the five strongest count", async () => {
+  const { run, now, compute, user, project, vouch, RULES } = await setup();
+  const star = user(), mates = [1, 2, 3, 4, 5, 6, 7].map(() => user(1, 12));
+  for (const m of mates) project("shipped", 60, [star, m]);
+  const before = compute().get(star)!.credit;
+  const flaky = mates[0];
+  for (let i = 0; i < 4; i++) project("building", 0, [star], { left: [flaky] }); // flaky keeps leaving projects
+  for (let i = 0; i < 2; i++) run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, created_at) VALUES (?,?,?,?,0,'upheld',?)", star, "user", flaky, "x", now());
+  const S = compute();
+  assert.ok(S.get(flaky)!.cred.score < S.get(mates[1])!.cred.score);
+  vouch(flaky, star);
+  const fromFlaky = compute().get(star)!.credit - before;
+  for (const m of mates.slice(1)) vouch(m, star);
+  const all = compute().get(star)!.ledger.filter((l) => l.what.startsWith("Vouch")).map((l) => l.n);
+  assert.equal(all.length, RULES.vouchesCounted, "seven people vouched, five count");
+  assert.ok(Math.min(...all) > fromFlaky, "the weakest vouch is the one left out");
+  assert.ok(all.every((n) => n <= RULES.vouch));
+});
+
+test("a closed vouch ring is flagged and its vouches count a quarter", async () => {
+  const { compute, user, project, vouch } = await setup();
+  const ring = [user(1, 12), user(1, 12), user(1, 12)], open = [user(1, 12), user(1, 12), user(1, 12)], outsider = user(1, 12);
+  project("shipped", 100, ring);
+  project("shipped", 100, open);
+  project("shipped", 60, [open[0], outsider]); // one of the open group has shipped with someone else
+  for (const g of [ring, open]) for (const a of g) for (const b of g) if (a !== b) vouch(a, b);
+  const S = compute();
+  const vouchCredit = (id: number) => S.get(id)!.ledger.filter((l) => l.what.startsWith("Vouch")).reduce((a, l) => a + l.n, 0);
+  for (const id of ring) assert.equal(S.get(id)!.ring, true);
+  for (const id of open) assert.equal(S.get(id)!.ring, false);
+  assert.ok(vouchCredit(ring[1]) < vouchCredit(open[1]), `ring ${vouchCredit(ring[1])} vs open ${vouchCredit(open[1])}`);
+  assert.ok(S.get(ring[1])!.cred.score < S.get(open[1])!.cred.score);
+});
+
+test("reviews that match the outcome earn a little and build credibility; ones that miss lose it", async () => {
+  const { run, now, compute, user, RULES } = await setup();
+  const [good, bad] = [user(), user()];
+  const base = compute().get(good)!.cred.score;
+  for (let i = 0; i < 8; i++) {
+    run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at) VALUES (?,?,?,?,?)", 100 + i, good, 60, 60, now());
+    run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at) VALUES (?,?,?,?,?)", 100 + i, bad, 100, 60, now());
+  }
+  const S = compute();
+  assert.equal(S.get(good)!.earned, RULES.starter + RULES.reviewRewardCap, "capped per 30 days");
+  assert.equal(S.get(bad)!.earned, RULES.starter);
+  assert.ok(S.get(good)!.cred.score > base && S.get(bad)!.cred.score < base);
+});
+
+test("a held stake lowers what you can spend, not what you have earned", async () => {
+  const { run, compute, user, project, RULES } = await setup();
+  const [lead, joiner] = [user(), user()];
+  const pid = project("building", 0, [lead]);
+  run("INSERT INTO members (project_id, user_id, stake) VALUES (?,?,?)", pid, joiner, RULES.stake);
+  const s = compute().get(joiner)!;
+  assert.equal(s.credit, RULES.starter - RULES.stake);
+  assert.equal(s.earned, RULES.starter);
 });

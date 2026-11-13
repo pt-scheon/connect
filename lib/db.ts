@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS push_subs (
 CREATE INDEX IF NOT EXISTS push_subs_user ON push_subs (user_id);
 CREATE TABLE IF NOT EXISTS blocks (user_id INTEGER, blocked_id INTEGER, PRIMARY KEY (user_id, blocked_id));
 CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER);
+CREATE TABLE IF NOT EXISTS review_log (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, reviewer_id INTEGER NOT NULL, verdict INTEGER, outcome INTEGER, created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
 CREATE INDEX IF NOT EXISTS updates_project ON updates (project_id);
@@ -99,6 +100,9 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["messages", "file_w", "INTEGER"],
   ["messages", "file_h", "INTEGER"],
   ["messages", "file_secs", "INTEGER"],
+  // Rating redesign: how a report ended ('', 'upheld', 'dismissed') and what kind it was.
+  ["reports", "result", "TEXT DEFAULT ''"],
+  ["reports", "reason_kind", "TEXT DEFAULT ''"],
 ];
 
 const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");

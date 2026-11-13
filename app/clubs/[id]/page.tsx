@@ -52,7 +52,7 @@ export default async function Club({ params }: { params: Promise<{ id: string }>
                     <button className="linkbtn small">Save</button>
                   </F>) : u.crole}</td>
                 <td className="n" data-label="Shipped">{s.shipped}/{s.joined}</td>
-                <td className="n" data-label="Credit">{s.credit}</td>
+                <td className="n" data-label="Credit">{s.earned}</td>
                 {boss && <td className="n">{u.id !== c.lead_id && <F action={A.setClubMember} back={back} hidden={{ club: id, user: u.id, do: "remove" }}><button className="linkbtn small">Remove</button></F>}</td>}
               </tr>
             );

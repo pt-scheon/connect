@@ -19,6 +19,6 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     title: u.name,
     subtitle: [u.branch, u.grad_year ? `class of ${u.grad_year}` : ""].filter(Boolean).join(", "),
     stamp: s.shipped ? "EVERY PROJECT SIGNED BY TEAMMATES" : undefined,
-    stats: [[String(s.credit), "credit"], [`${s.shipped} / ${s.joined}`, "shipped of joined"], [String(mates), "people worked with"]],
+    stats: [[String(s.earned), "credit earned"], [`${s.shipped} / ${s.joined}`, "shipped of joined"], [String(mates), "people worked with"]],
   });
 }

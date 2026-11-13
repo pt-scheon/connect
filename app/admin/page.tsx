@@ -51,6 +51,7 @@ export default async function Admin() {
         </div>
         <div className="card">
           <h2>Reports</h2>
+          <span className="small muted">Uphold a report when it was right: it lowers that person&apos;s credibility for a while. Dismiss it when it was not.</span>
           {reports.length === 0 && <span className="muted">No open reports.</span>}
           {reports.map((r) => (
             <div key={r.id} className="stack tight">
@@ -60,7 +61,8 @@ export default async function Admin() {
                 {r.kind === "user"
                   ? <F action={A.setSuspended} back="/admin" hidden={{ user: r.target_id, on: 1 }} confirm="Suspend this person?"><button className="btn danger sm">Suspend</button></F>
                   : <F action={A.setHidden} back="/admin" hidden={{ id: r.target_id, on: 1 }}><button className="btn danger sm">Hide project</button></F>}
-                <F action={A.closeReport} back="/admin" hidden={{ report: r.id }}><button className="btn ghost sm">Close report</button></F>
+                <F action={A.closeReport} back="/admin" hidden={{ report: r.id, result: "upheld" }}><button className="btn ghost sm">Uphold</button></F>
+                <F action={A.closeReport} back="/admin" hidden={{ report: r.id, result: "dismissed" }}><button className="btn ghost sm">Dismiss</button></F>
               </div>
             </div>
           ))}

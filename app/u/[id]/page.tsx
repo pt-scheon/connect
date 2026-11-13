@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ok = u && ((u.verified && u.role === "student") || me?.id === id || (me?.verified && me.college_id && me.college_id === u.college_id));
   if (!ok) return { title: "Profile" };
   const s = standings().get(u.id) ?? EMPTY;
-  const description = u.role === "alum" ? `${u.name}, class of ${u.grad_year}.` : `${s.credit} credit. ${s.shipped} shipped of ${s.joined} joined. Every line signed by teammates.`;
+  const description = u.role === "alum" ? `${u.name}, class of ${u.grad_year}.` : `${s.earned} credit earned. ${s.shipped} shipped of ${s.joined} joined. Every line signed by teammates.`;
   return { title: u.name, description, openGraph: { title: `${u.name} on Connect`, description } };
 }
 
@@ -190,6 +190,15 @@ export default async function Profile({ params, searchParams }: Props) {
             ))}
           </tbody></table></div>
         </div>
+        <div className="card">
+          <h2>Credibility: {s.cred.score} of 100</h2>
+          <span className="small muted">How far {self ? "your" : "their"} word can be trusted. It sets how much {self ? "your" : "their"} vouches, reviews and ratings of others count. <Link href="/rules">How it is worked out</Link></span>
+          <div className="tw"><table><tbody>
+            {s.cred.lines.map((l, i) => (
+              <tr key={i}><td><b>{l.what}</b><br /><span className="small muted">{l.why}</span></td><td className={`n ${l.n < 0 ? "neg" : ""}`}>{l.n < 0 ? "−" : "+"}{Math.abs(l.n)}</td></tr>
+            ))}
+          </tbody></table></div>
+        </div>
         {projects.map((p) => (
           <Link key={p.id} className="card lift" href={`/projects/${p.id}`}>
             <span className="row between"><b>{p.name}</b>
@@ -271,13 +280,15 @@ export default async function Profile({ params, searchParams }: Props) {
         {!alum && (
           <>
             <div className="stats">
-              <div className="stat"><b><Count to={s.credit} /></b><span className="small muted">credit</span></div>
+              <div className="stat"><b><Count to={s.earned} /></b><span className="small muted">credit earned</span></div>
               <div className="stat"><b>{s.shipped}<span className="muted" style={{ fontSize: "1rem" }}> / {s.joined}</span></b><span className="small muted">shipped of joined</span></div>
+              <div className="stat"><b>{s.cred.score}<span className="muted" style={{ fontSize: "1rem" }}> / 100</span></b><span className="small muted">credibility</span></div>
               <div className="stat"><b>{mates.length}</b><span className="small muted">people worked with</span></div>
               <div className="stat"><b>{claims.length}</b><span className="small muted">claims with no proof</span></div>
             </div>
             {s.left > 0 && <div className="alert">Left or dropped {s.left} of {s.joined} projects. Teams see this before accepting a join request.</div>}
             {s.circle && <div className="alert">Closed circle: all of this credit comes from projects with the same {s.mates.size} {s.mates.size === 1 ? "person" : "people"}.</div>}
+            {s.ring && <div className="alert">Vouch ring: a small group that only vouches for each other. Their vouches for one another count a quarter.</div>}
           </>
         )}
       </div>

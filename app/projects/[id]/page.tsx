@@ -44,7 +44,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const asked = new Set<number>(all("SELECT user_id FROM requests WHERE project_id=?", id).map((q) => q.user_id));
   const pool = lead ? all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND onboarded=1 AND college_id=?", me.college_id)
     .filter((u) => !team.some((t) => t.id === u.id) && !asked.has(u.id))
-    .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.credit, shipped: st.shipped, left: st.left, open: !!u.open_to_join } }; }) : [];
+    .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.earned, shipped: st.shipped, left: st.left, open: !!u.open_to_join } }; }) : [];
   const fits = new Map(roles.map((r) => [r.id, suggest(r.title, pool.map((x) => x.c)).map((sg) => ({ ...sg, u: pool.find((x) => x.u.id === sg.id)!.u, st: S.get(sg.id) ?? EMPTY }))]));
   const myRequest = get("SELECT * FROM requests WHERE project_id=? AND user_id=?", id, me.id);
   const requests = lead ? all("SELECT u.*, q.id rid, q.note pitch, r.title FROM requests q JOIN roles r ON r.id=q.role_id JOIN users u ON u.id=q.user_id WHERE q.project_id=? AND q.status='pending'", id) : [];
@@ -58,7 +58,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const solo = active.length === 1;
   const myAllocs = new Map(all("SELECT to_id, pct FROM allocations WHERE project_id=? AND from_id=?", id, me.id).map((a) => [a.to_id, a.pct]));
   const myVotes = new Set(all("SELECT target_id FROM gone_votes WHERE project_id=? AND voter_id=?", id, me.id).map((v) => v.target_id));
-  const canReview = p.status === "review" && !mine && me.verified && (me.admin || (S.get(me.id)?.credit ?? 0) >= RULES.reviewerMin);
+  const canReview = p.status === "review" && !mine && me.verified && (me.admin || (S.get(me.id)?.earned ?? 0) >= RULES.reviewerMin);
   const iReviewed = reviews.some((r) => r.reviewer_id === me.id);
   const lastMove = get("SELECT MAX(created_at) t FROM updates WHERE project_id=?", id)?.t ?? p.created_at;
   const quietDays = Math.floor((now() - lastMove) / 86400);
@@ -214,7 +214,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
                   <div key={u.rid} className="row between">
                     <div className="stack" style={{ gap: 2 }}>
                       <span><UserLink u={u} /> <span className="muted small">for {u.title}</span></span>
-                      <span className="small mono muted">{s.credit} credit · {s.shipped} shipped of {s.joined} joined{s.left ? <span className="neg"> · left {s.left}</span> : null}</span>
+                      <span className="small mono muted">{s.earned} credit · {s.shipped} shipped of {s.joined} joined{s.left ? <span className="neg"> · left {s.left}</span> : null}</span>
                       {u.pitch ? <span className="pitch">{u.pitch}</span> : <span className="small muted">No note.</span>}
                     </div>
                     <div className="row">

@@ -15,7 +15,7 @@ export default async function People() {
     const s = S.get(u.id) ?? EMPTY;
     return {
       id: u.id, name: u.name, picture: u.picture, branch: u.branch, year: u.grad_year, verified: !!u.verified, skills: skillsOf(u),
-      credit: s.credit, shipped: s.shipped, joined: s.joined, left: s.left, path: pathTo(T, me.id, u.id, names), open: !!u.open_to_join,
+      credit: s.earned, shipped: s.shipped, joined: s.joined, left: s.left, path: pathTo(T, me.id, u.id, names), open: !!u.open_to_join,
     };
   });
   return (

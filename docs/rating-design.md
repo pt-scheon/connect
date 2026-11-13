@@ -42,7 +42,7 @@ export const RULES = {
   // ---- credit (new) ----
   cutover: 0,               // unix time of the release; vouches made before it keep their old weight
   vouchesCounted: 5,        // only your 5 strongest vouches count
-  ringSize: 4,              // a closed vouch group of this size or smaller is a ring
+  ringMin: 3, ringMax: 4,   // a closed vouch group of this size is a ring
   ringFactor: 0.25,         // vouches inside a ring count a quarter
   reviewReward: 3,          // credit for a review that matched the final outcome
   reviewRewardCap: 15,      // per 30 days
@@ -143,18 +143,12 @@ For anyone who has never commissioned work, `earned` equals today's credit plus 
 `ringFactor` if both people are in the same ring. Only the `vouchesCounted` strongest count. Vouches made before
 `cutover` keep the old weight (`min(1, base/fullWeightAt)`), so nobody's credit drops on release day.
 
-**Rings.** Build the directed vouch graph. A ring is a group of 2 to `ringSize` people in which every member
-vouched for another member and nobody in the group has a vouch from outside it. Members are flagged (shown the
-same way as today's "closed circle"), their vouches to each other count a quarter, and each loses `ringPenalty`
-credibility. Today's circle flag (3+ shipped projects, 2 or fewer distinct teammates) stays.
-
-**Gifts.** A person can send credit to someone at their college, for example to cover a newcomer's stake.
-Gifts move the **balance only**: the sender's balance drops, the receiver's rises, and nobody's earned credit,
-competency or credibility changes. So a gift lets a friend stake or post a commission, but it cannot make them
-look more accomplished, and it cannot get them to the reviewer or client thresholds. Limits (all in `RULES.gift`):
-the sender needs 50 earned credit, both accounts must be 30 days old, at most 20 between the same two people in
-30 days counting both directions, and at most 40 sent and 40 received per person in 30 days. Gifted credit is
-labelled as a gift on both ledgers.
+**Rings.** Take the vouches that count (between people who shipped together). A ring is a group of 3 or 4
+people joined by those vouches where every member is vouched for by at least two others in the group, no vouch
+crosses the group's edge, and nobody in it has shipped with anyone outside it. Members are flagged on their
+profile, their new vouches for each other count a quarter, and each loses `ringPenalty` credibility. The moment
+one of them ships with someone new, the group stops being a ring. A pair is not a ring: two people vouching for
+each other is already halved. Today's circle flag (3+ shipped projects, 2 or fewer distinct teammates) stays.
 
 ## 4. Credibility (0–100)
 
@@ -176,7 +170,8 @@ credibility = 100 × Σ weight × part
 clamped to 0..100
 ```
 
-A brand-new verified student lands at 52: 0.35×0.7 + 0.25×0.7 + 0.20×0.5 = 0.52.
+A brand-new verified student lands at 53: each part is rounded to a whole number so the profile can show the
+sum line by line (25 + 18 + 10).
 
 Notes:
 
