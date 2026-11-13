@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Bricolage_Grotesque, Hanken_Grotesk, DM_Mono, Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import { get } from "@/lib/db";
 import { collegeById, isMember } from "@/lib/college";
@@ -14,11 +14,8 @@ import { Av } from "./ui";
 import "./globals.css";
 import "./public.css";
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-display" });
-const body = Hanken_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-body" });
-const mono = DM_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono" });
-/* The public site (signed out): Geist for text, Geist Mono for every number that measures something. */
-const sans = Geist({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-geist" });
+/* Geist for text, Geist Mono for every number that measures something, on the public site and in the app. */
+const sans = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const measure = Geist_Mono({ subsets: ["latin"], weight: ["400"], variable: "--font-geist-mono" });
 
 const about = "Build things with people from your college. Credit comes only from projects that ship, signed by your teammates.";
@@ -30,7 +27,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Connect", statusBarStyle: "black-translucent" },
 };
 export const viewport: Viewport = {
-  themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#131313" }, { media: "(prefers-color-scheme: light)", color: "#F3F2EF" }],
+  themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0B0A09" }, { media: "(prefers-color-scheme: light)", color: "#F7F5F2" }],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -42,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = (await cookies()).get("theme")?.value === "light" ? "light" : "dark";
   const unread = signedIn ? get("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND seen=0", me.id).n : 0;
   return (
-    <html lang="en" data-theme={theme} className={`${display.variable} ${body.variable} ${mono.variable} ${sans.variable} ${measure.variable}`}>
+    <html lang="en" data-theme={theme} className={`${sans.variable} ${measure.variable}`}>
       <body className={me ? undefined : "guest"}>
         <header className="bar">
           <div className="wrap">
