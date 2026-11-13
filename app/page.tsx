@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { all, now } from "@/lib/db";
-import { currentUser, standings } from "@/lib/auth";
+import { currentUser, standings, skillScores } from "@/lib/auth";
 import { collegeById, isMember } from "@/lib/college";
 import { EMPTY, RULES } from "@/lib/credit";
 import { ties, pathTo } from "@/lib/graph";
 import { timeAgo } from "@/lib/notify";
-import { fitFor } from "@/lib/match";
+import { needsFor, fitsMe, type Need } from "@/lib/relevance";
 import { Board, Count, type BoardItem } from "./client";
 import { Landing } from "./landing";
 import { Av, skillsOf } from "./ui";
@@ -20,22 +20,26 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
   const canReview = !!me.verified && (!!me.admin || mine.earned >= RULES.reviewerMin);
 
   const members = all("SELECT m.project_id, u.id, u.name, u.picture FROM members m JOIN users u ON u.id=m.user_id JOIN projects p ON p.id=m.project_id WHERE m.status='active' AND p.college_id=?", cid);
-  const roles = all("SELECT r.project_id, r.title FROM roles r JOIN projects p ON p.id=r.project_id WHERE r.open=1 AND p.college_id=?", cid);
+  const roles = all("SELECT r.id, r.project_id, r.title FROM roles r JOIN projects p ON p.id=r.project_id WHERE r.open=1 AND p.college_id=?", cid);
   const ms = new Map(all("SELECT project_id, COUNT(*) total, SUM(done) done FROM milestones GROUP BY project_id").map((m) => [m.project_id, m]));
   const funded = new Set(all("SELECT project_id FROM grants").map((g) => g.project_id));
   const last = new Map(all("SELECT project_id, MAX(created_at) t FROM updates GROUP BY project_id").map((x) => [x.project_id, x.t]));
-  const mySkills = me.role === "student" ? skillsOf(me) : [];
+  // "Fits you" looks at the skills others confirmed for you first, then the ones you listed.
+  const mySkills = me.role === "student" ? [...new Set([...[...(skillScores().get(me.id)?.values() ?? [])].sort((a, b) => b.score - a.score).map((k) => k.label), ...skillsOf(me)])] : [];
+  const needs = new Map<number, Need[]>();
+  for (const n of all("SELECT rs.* FROM role_skills rs JOIN roles r ON r.id=rs.role_id JOIN projects p ON p.id=r.project_id WHERE r.open=1 AND p.college_id=? ORDER BY rs.importance DESC", cid))
+    needs.set(n.role_id, [...(needs.get(n.role_id) ?? []), { skill: n.skill, importance: n.importance }]);
   const items: BoardItem[] = all("SELECT * FROM projects WHERE college_id=? ORDER BY created_at DESC", cid)
     .map((p) => {
       const team = members.filter((m) => m.project_id === p.id).map(({ id, name, picture }) => ({ id, name, picture }));
-      const open = roles.filter((r) => r.project_id === p.id).map((r) => r.title);
+      const openRoles = roles.filter((r) => r.project_id === p.id), open = openRoles.map((r) => r.title);
       const t = Math.max(last.get(p.id) ?? 0, p.created_at ?? 0);
       const live = p.status === "recruiting" || p.status === "building";
       return {
         id: p.id, name: p.name, pitch: p.pitch, status: p.status, hidden: p.hidden,
         done: ms.get(p.id)?.done ?? 0, total: ms.get(p.id)?.total ?? 0, team,
         open, funded: funded.has(p.id), mine: team.some((u) => u.id === me.id),
-        fit: [...new Set(open.flatMap((r) => fitFor(r, mySkills)))],
+        fit: [...new Set(openRoles.flatMap((r) => fitsMe(needsFor(r.title, needs.get(r.id) ?? []), r.title, mySkills)))],
         active: live && t ? timeAgo(t) : "", quiet: live && t > 0 && now() - t > 14 * 86400,
       };
     })

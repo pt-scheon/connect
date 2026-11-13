@@ -1,5 +1,5 @@
-/* Suggests people for an open role. Skills a person used in shipped projects count for far more
-   than skills they only listed, so the suggestions follow the same rule as credit: proof first. */
+/* Turns a role's title into the skills it probably means, for roles whose lead has not listed any.
+   Ranking people for a role lives in lib/relevance.ts. */
 
 /* Words that often appear in role titles, and the skills they usually mean. */
 const RELATED: Record<string, string[]> = {
@@ -20,9 +20,6 @@ const RELATED: Record<string, string[]> = {
   mechanical: ["cad", "3d printing", "mechanisms"],
 };
 
-export type Candidate = { id: number; skills: string[]; credit: number; shipped: number; left: number; open?: boolean };
-export type Suggestion = { id: number; score: number; matched: string[]; backed: boolean; open: boolean };
-
 const norm = (s: string) => s.toLowerCase().trim();
 const words = (s: string) => norm(s).split(/[^a-z0-9.+#]+/).filter(Boolean);
 
@@ -41,21 +38,6 @@ function matches(skill: string, wanted: Set<string>) {
   if (wanted.has(s)) return true;
   // "React" matches "react frontend"; "Embedded C" matches "embedded"
   return words(s).some((w) => w.length > 2 && wanted.has(w));
-}
-
-export function suggest(title: string, people: Candidate[], limit = 3): Suggestion[] {
-  const wanted = roleSkills(title);
-  return people
-    .map((p) => {
-      const matched = p.skills.filter((k) => matches(k, wanted));
-      const backed = p.shipped > 0;
-      // A listed skill with nothing shipped is worth a third of a proven one. Saying you are open to join adds a little.
-      const score = matched.length * (backed ? 3 : 1) + Math.min(p.credit, 200) / 100 - p.left * 1.5 + (p.open ? 1 : 0);
-      return { id: p.id, score, matched, backed, open: !!p.open };
-    })
-    .filter((s) => s.matched.length > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
 }
 
 /* The skills from a person's list that an open role asks for. Used for the board's "Fits you" filter. */

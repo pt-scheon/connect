@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { all, get, now } from "@/lib/db";
-import { currentUser, requireMember, standings } from "@/lib/auth";
+import { currentUser, requireMember, standings, skillScores } from "@/lib/auth";
 import { EMPTY, RULES, projectShares } from "@/lib/credit";
 import { timeAgo } from "@/lib/notify";
-import { suggest } from "@/lib/match";
+import { needsFor, rank, type Person } from "@/lib/relevance";
 import { confirmedSkills, label as skillLabel } from "@/lib/skills";
 import { skillsOf } from "../../ui";
 import * as A from "../../actions";
@@ -43,10 +43,23 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const invited = new Set<string>(lead ? all("SELECT user_id, text FROM notifications WHERE href=? AND text LIKE '%invited you%'", `/projects/${id}`)
     .map((nn) => `${nn.user_id}:${nn.text}`) : []);
   const asked = new Set<number>(all("SELECT user_id FROM requests WHERE project_id=?", id).map((q) => q.user_id));
-  const pool = lead ? all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND onboarded=1 AND college_id=?", me.college_id)
+  // Ranked by confirmed skills for what the role needs, finishing record and free time. Each one says why.
+  const K = lead ? skillScores() : new Map();
+  const loads = new Map<number, number>(lead ? all("SELECT m.user_id, COUNT(*) n FROM members m JOIN projects p ON p.id=m.project_id WHERE m.status='active' AND p.status IN ('recruiting','building','review') GROUP BY m.user_id").map((r) => [r.user_id, r.n]) : []);
+  const pool: (Person & { u: (typeof team)[number] })[] = lead ? all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND onboarded=1 AND college_id=?", me.college_id)
     .filter((u) => !team.some((t) => t.id === u.id) && !asked.has(u.id))
-    .map((u) => { const st = S.get(u.id) ?? EMPTY; return { u, c: { id: u.id, skills: skillsOf(u), credit: st.earned, shipped: st.shipped, left: st.left, open: !!u.open_to_join } }; }) : [];
-  const fits = new Map(roles.map((r) => [r.id, suggest(r.title, pool.map((x) => x.c)).map((sg) => ({ ...sg, u: pool.find((x) => x.u.id === sg.id)!.u, st: S.get(sg.id) ?? EMPTY }))]));
+    .map((u) => {
+      const st = S.get(u.id) ?? EMPTY;
+      const mate = active.find((t) => st.mates.has(t.id));
+      return { u, id: u.id, skills: K.get(u.id), listed: skillsOf(u), finishRate: st.cred.finishRate, finished: st.shipped, ended: st.shipped + st.left,
+        open: !!u.open_to_join, load: loads.get(u.id) ?? 0, shippedWith: mate ? `with ${mate.name.split(" ")[0]} before` : undefined };
+    }) : [];
+  const roleNeeds = new Map(roles.map((r) => [r.id, needsFor(r.title, all("SELECT skill, importance FROM role_skills WHERE role_id=? ORDER BY importance DESC, rowid", r.id) as { skill: string; importance: number }[])]));
+  const fits = new Map(roles.map((r) => {
+    const { ranked, fresh } = rank(roleNeeds.get(r.id)!, r.title, pool);
+    const withUser = (l: typeof ranked) => l.map((sg) => ({ ...sg, u: pool.find((x) => x.id === sg.id)!.u }));
+    return [r.id, { ranked: withUser(ranked), fresh: withUser(fresh) }];
+  }));
   const myRequest = get("SELECT * FROM requests WHERE project_id=? AND user_id=?", id, me.id);
   const requests = lead ? all("SELECT u.*, q.id rid, q.note pitch, r.title FROM requests q JOIN roles r ON r.id=q.role_id JOIN users u ON u.id=q.user_id WHERE q.project_id=? AND q.status='pending'", id) : [];
   const proofs = all("SELECT * FROM proofs WHERE project_id=?", id);
@@ -225,22 +238,33 @@ export default async function Project({ params }: { params: Promise<{ id: string
                         ? <F action={A.withdrawRequest} back={back} hidden={{ id }}><button className="btn ghost">Withdraw request</button></F> : null)
                     : myRequest ? <span className="small muted">Your request was declined</span>
                     : me.role === "student" ? <JoinAsk action={A.requestJoin} back={back} role={r.id} stake={RULES.stake} title={r.title} /> : null}
-                  {lead && (fits.get(r.id)?.length ?? 0) > 0 && (
+                  {lead && (
                     <div className="suggest">
-                      <span className="label">People who might fit</span>
-                      {fits.get(r.id)!.map((sg) => {
-                        const done = [...invited].some((k) => k.startsWith(`${sg.id}:`) && k.includes(r.title));
-                        return (
-                          <div key={sg.id} className="row between">
-                            <span className="stack" style={{ gap: 0 }}>
-                              <Who u={sg.u} />
-                              <span className="small muted">{sg.matched.join(", ")} · {sg.backed ? `${sg.st.shipped} shipped` : "listed, not yet shipped"} · {sg.st.credit} credit{sg.open ? " · open to projects" : ""}</span>
-                            </span>
-                            {done ? <span className="small muted">Invited</span>
-                              : <F action={A.inviteToRole} back={back} hidden={{ role: r.id, to: sg.id }}><button className="btn ghost sm">Invite to apply</button></F>}
-                          </div>
-                        );
-                      })}
+                      <F action={A.setRoleSkills} back={back} hidden={{ role: r.id }} className="row">
+                        <input type="text" name="skills" id={`role-skills-${r.id}`} maxLength={200} placeholder="Skills this role needs, most important first"
+                          defaultValue={roleNeeds.get(r.id)!.mode === "all" ? roleNeeds.get(r.id)!.list.map((x) => skillLabel(x.skill)).join(", ") : ""} aria-label={`Skills needed for ${r.title}`} />
+                        <button className="btn ghost sm">Save</button>
+                      </F>
+                      {roleNeeds.get(r.id)!.mode === "any" && <span className="small muted">No skills listed, so suggestions are guessed from the role&apos;s name.</span>}
+                      {(["ranked", "fresh"] as const).map((kind) => fits.get(r.id)![kind].length > 0 && (
+                        <div key={kind} className="stack tight">
+                          <span className="label">{kind === "ranked" ? "People who fit, best first" : "New here, no proof yet"}</span>
+                          {fits.get(r.id)![kind].map((sg) => {
+                            const done = [...invited].some((k) => k.startsWith(`${sg.id}:`) && k.includes(r.title));
+                            return (
+                              <div key={sg.id} className="row between">
+                                <span className="stack" style={{ gap: 0 }}>
+                                  <Who u={sg.u} />
+                                  <span className="small muted">{sg.reason}</span>
+                                </span>
+                                {done ? <span className="small muted">Invited</span>
+                                  : <F action={A.inviteToRole} back={back} hidden={{ role: r.id, to: sg.id }}><button className="btn ghost sm">Invite to apply</button></F>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                      {fits.get(r.id)!.ranked.length + fits.get(r.id)!.fresh.length === 0 && <span className="small muted">Nobody at your college has confirmed work in these skills yet.</span>}
                     </div>
                   )}
                 </div>
@@ -249,6 +273,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
               {lead && open && (
                 <F action={A.addRole} back={back} hidden={{ id }} className="row">
                   <input type="text" name="title" id="role-title" placeholder="Role, e.g. Backend (Node)" required />
+                  <input type="text" name="skills" id="role-skills" placeholder="Skills, most important first" maxLength={200} />
                   <input type="text" name="note" id="role-note" placeholder="Note (optional)" />
                   <button className="btn ghost">Add role</button>
                 </F>

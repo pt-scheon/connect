@@ -11,6 +11,7 @@ import { domainOf, isEmail, isPublicMail } from "@/lib/domains";
 import { notify, logUpdate, allow } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
+import { needsFromList } from "@/lib/relevance";
 import { mailReady, sendMail } from "@/lib/mail";
 import { remove as removeFile, save as saveFile, sniff, cleanName } from "@/lib/files";
 import { checkLive, liveUrl } from "@/lib/live";
@@ -278,8 +279,23 @@ export async function addRole(fd: FormData) {
   const p = project(n("id"), me);
   if (!p || p.lead_id !== me.id || !open(p)) fail("Only the lead can add roles to an open project.");
   if (!s("title")) fail("Name the role.");
-  run("INSERT INTO roles (project_id, title, note) VALUES (?,?,?)", p!.id, s("title", 60), s("note", 160));
+  db.transaction(() => {
+    const rid = Number(run("INSERT INTO roles (project_id, title, note) VALUES (?,?,?)", p!.id, s("title", 60), s("note", 160)).lastInsertRowid);
+    saveRoleSkills(rid, s("skills", 200));
+  })();
   done(back);
+}
+/* The skills a role needs, most important first. Used to rank who fits. */
+function saveRoleSkills(roleId: number, text: string) {
+  run("DELETE FROM role_skills WHERE role_id=?", roleId);
+  for (const n of needsFromList(parseSkills(text, 5))) run("INSERT OR IGNORE INTO role_skills (role_id, skill, importance) VALUES (?,?,?)", roleId, n.skill, n.importance);
+}
+export async function setRoleSkills(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const r = get("SELECT r.*, p.lead_id, p.college_id FROM roles r JOIN projects p ON p.id=r.project_id WHERE r.id=? AND r.open=1", n("role"));
+  if (!r || r.lead_id !== me.id || r.college_id !== me.college_id) fail("Only the lead can set what a role needs.");
+  saveRoleSkills(r.id, s("skills", 200));
+  done(back, "Saved. Suggestions now follow these skills.");
 }
 export async function closeRole(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);

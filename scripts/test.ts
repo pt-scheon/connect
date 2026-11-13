@@ -105,22 +105,6 @@ test("three shipped projects with the same two people is flagged as a closed cir
   assert.equal(compute().get(a)!.circle, true);
 });
 
-test("teammate suggestions rank proven skills above listed ones", async () => {
-  const { suggest, roleSkills } = await import("../lib/match");
-  assert.ok(roleSkills("React frontend").has("react"));
-  assert.ok(roleSkills("RFID hardware").has("esp32"));
-  const people = [
-    { id: 1, skills: ["React", "Figma"], credit: 40, shipped: 0, left: 0 }, // listed only
-    { id: 2, skills: ["React", "Node"], credit: 160, shipped: 4, left: 0 }, // proven
-    { id: 3, skills: ["Python"], credit: 300, shipped: 5, left: 0 },        // no match
-    { id: 4, skills: ["React"], credit: 120, shipped: 2, left: 3 },         // proven but quits
-  ];
-  const s = suggest("React frontend", people);
-  // Proven first; someone who quit three projects drops below someone who only listed the skill.
-  assert.deepEqual(s.map((x) => x.id), [2, 1, 4]);
-  assert.equal(s.find((x) => x.id === 3), undefined);
-});
-
 test("the board's Fits you filter matches a role to the skills a person listed", async () => {
   const { fitFor } = await import("../lib/match");
   assert.deepEqual(fitFor("Search / ML", ["Python", "ML", "FastAPI"]), ["Python", "ML"]);
@@ -602,4 +586,51 @@ test("a big share with nothing on the record is flagged for an admin, and change
   run("UPDATE members SET did='Built the backend' WHERE project_id=? AND user_id=?", pid, d);
   run("INSERT INTO updates (project_id, user_id, kind, text, created_at) VALUES (?,?,'post','Shipped the API',?)", pid, d, now());
   assert.equal(splitFlags(1).length, 0, "the flag clears once the record shows their work");
+});
+
+/* ---------- rating redesign: relevance for a role ---------- */
+
+test("relevance: confirmed skills rank people, listed skills never do, and every suggestion explains itself", async () => {
+  const { run, user, shipWith, project, compute, competency } = await skillKit();
+  const { rank, needsFor, needsFromList, fit, availability } = await import("../lib/relevance");
+  const [pro, mate, once, mate2, lister, quitter, mate3, busy, mate4] = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(() => user(1, 12));
+  for (let i = 0; i < 3; i++) shipWith([pro, mate], "react");
+  shipWith([once, mate2], "react");
+  run("UPDATE users SET skills='React, Next.js, TypeScript, Node, GraphQL' WHERE id=?", lister);
+  shipWith([quitter, mate3], "react"); shipWith([quitter, mate3], "react"); shipWith([quitter, mate3], "react");
+  for (let i = 0; i < 4; i++) project("building", 0, [mate3], { left: [quitter] });
+  for (let i = 0; i < 3; i++) shipWith([busy, mate4], "react");
+  for (let i = 0; i < 5; i++) project("building", 0, [busy]);
+  const S = compute(), K = competency(S);
+  const person = (id: number, extra = {}) => {
+    const st = S.get(id)!;
+    return { id, skills: K.get(id), listed: id === lister ? ["React", "Next.js", "TypeScript", "Node", "GraphQL"] : [], finishRate: st.cred.finishRate,
+      finished: st.shipped, ended: st.shipped + st.left, open: true, load: st.building, ...extra };
+  };
+  const people = [lister, quitter, once, busy, pro].map((id) => person(id));
+  const needs = needsFor("React frontend", needsFromList(["React", "Node"]));
+  const { ranked, fresh } = rank(needs, "React frontend", people);
+  assert.equal(ranked[0].id, pro, "three confirmed projects and a clean record come first");
+  assert.ok(ranked.findIndex((x) => x.id === once) > 0);
+  assert.ok(!ranked.some((x) => x.id === lister), "someone who only listed five skills is not ranked at all");
+  assert.deepEqual(fresh.map((x) => x.id), [lister], "they are shown apart, as new with no proof");
+  const at = (id: number) => ranked.find((x) => x.id === id)!.score;
+  assert.ok(at(quitter) < at(pro), "leaving projects lowers fit");
+  assert.ok(at(busy) < at(pro), "someone on five projects ranks lower than the same record with free time");
+  for (const f of ranked) assert.match(f.reason, /^Fits: React \d+, from \d shipped projects?.* · finished \d+ of \d+ joined/);
+  // The small parts of the formula.
+  assert.equal(availability(true, 2), 1);
+  assert.ok(availability(true, 3) < 1 && availability(false, 0) < 1 && availability(true, 50) > 0);
+  const plain = fit(needs, person(pro))!, known = fit(needs, person(pro, { shippedWith: "with Riya before" }))!;
+  assert.ok(known.score > plain.score && known.reason.includes("shipped with Riya before"));
+  // A role with no listed skills falls back to its title.
+  const guessed = rank(needsFor("React frontend", []), "React frontend", people);
+  assert.equal(guessed.ranked[0].id, pro);
+  assert.deepEqual(guessed.fresh.map((x) => x.id), [lister]);
+});
+
+test("the Fits you filter uses a role's listed skills when it has them", async () => {
+  const { fitsMe, needsFor, needsFromList } = await import("../lib/relevance");
+  assert.deepEqual(fitsMe(needsFor("Wizard", needsFromList(["NextJS", "Figma"])), "Wizard", ["Next.js", "Python"]), ["Next.js"]);
+  assert.deepEqual(fitsMe(needsFor("React frontend", []), "React frontend", ["React", "Python"]), ["React"]);
 });
