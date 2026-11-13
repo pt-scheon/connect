@@ -1,5 +1,5 @@
 import { all, get } from "@/lib/db";
-import { currentUser, standings } from "@/lib/auth";
+import { currentUser, standings, skillScores } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,14 @@ export async function GET() {
     messages: all("SELECT to_id, from_id, text, kind, file_name, file_size, created_at FROM messages WHERE from_id=? OR to_id=? ORDER BY id", id, id),
     notifications: all("SELECT text, href, seen, created_at FROM notifications WHERE user_id=?", id),
     reports_filed: all("SELECT kind, target_id, reason, created_at FROM reports WHERE by_id=?", id),
+    skills: [...(skillScores().get(id)?.values() ?? [])].map(({ label, score, conf, band, why }) => ({ skill: label, score, confidence: Math.round(conf * 100) / 100, band, why })),
+    skill_ticks_given: all("SELECT project_id, user_id, skill FROM member_skills WHERE by_id=?", id),
+    evidence: all("SELECT kind, title, url, file_name, skills, value, status, method, work_email, note, created_at, decided_at FROM evidence WHERE user_id=?", id),
+    commissions_posted: all("SELECT id, title, brief, reward, money, status, doer_id, rating, paid_credit, created_at, closed_at FROM commissions WHERE client_id=?", id),
+    commissions_done: all("SELECT id, title, reward, status, client_id, rating, rating_note, paid_credit, closed_at FROM commissions WHERE doer_id=?", id),
+    commission_applications: all("SELECT commission_id, note, status, created_at FROM commission_apps WHERE user_id=?", id),
+    credit_sent: all("SELECT to_id, amount, note, created_at FROM gifts WHERE from_id=?", id),
+    credit_received: all("SELECT from_id, amount, note, created_at FROM gifts WHERE to_id=?", id),
     alumni_grants: get("SELECT COUNT(*) n FROM grants WHERE alum_id=?", id)?.n ?? 0,
   };
   return new Response(JSON.stringify(data, null, 2), {
