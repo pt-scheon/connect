@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { get, run, now, type Row } from "./db";
 import { compute } from "./credit";
+import { competency } from "./skills";
 import { collegeForEmail, isMember } from "./college";
 
 const prod = process.env.NODE_ENV === "production";
@@ -46,6 +47,8 @@ export async function requireUser(): Promise<Row> {
 
 /* One standings calculation per page render. */
 export const standings = cache(() => compute());
+/* And one skills calculation, built on those standings. */
+export const skillScores = cache(() => competency(standings()));
 
 /* Find or create the person a sign-in provider says just signed in.
    The same person signing in with Google and LinkedIn lands on one account when both report the same verified email. */

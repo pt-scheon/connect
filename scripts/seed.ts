@@ -36,7 +36,7 @@ db.transaction(() => {
   for (const c of ["Founder at a stealth AI startup", "Built 10+ full-stack apps", "Web3 expert", "Led a 200-member tech community"])
     run("INSERT INTO claims (user_id, text) VALUES (?,?)", ids.dev, c);
 
-  type Member = [key: string, role: string, did: string, share: number];
+  type Member = [key: string, role: string, did: string, share: number, skills?: string];
   type Spec = {
     name: string; pitch: string; status: string; pot?: number; months: number; team: Member[];
     left?: string[]; proofs?: string[]; posts?: string[]; ms: [string, number][]; roles?: [string, string][];
@@ -60,6 +60,12 @@ db.transaction(() => {
     if (s.status === "dropped") log("Dropped by the lead", s.months);
     for (const text of s.posts ?? []) log(text, 0.05, lead, "post");
     for (const [title, note] of s.roles ?? []) run("INSERT INTO roles (project_id, title, note) VALUES (?,?,?)", pid, title, note);
+    // The project's skill list, and each teammate ticking what the others used.
+    const used = [...new Set(s.team.flatMap((m) => (m[4] ?? "").split(",").map((k) => k.trim().toLowerCase()).filter(Boolean)))];
+    for (const k of used) run("INSERT OR IGNORE INTO project_skills (project_id, skill) VALUES (?,?)", pid, k);
+    if (s.status === "shipped")
+      for (const [to, , , , list] of s.team) for (const k of (list ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean))
+        for (const [from] of s.team) if (from !== to) run("INSERT INTO member_skills (project_id, user_id, skill, by_id) VALUES (?,?,?,?)", pid, ids[to], k, ids[from]);
     // Each teammate splits 100 between the others, in proportion to the intended shares.
     if (s.status === "shipped" && s.team.length > 1)
       for (const [from, , , fromShare] of s.team) {
@@ -75,27 +81,27 @@ db.transaction(() => {
 
   project("busping", { name: "BusPing", pitch: "Live location of the three college buses, from an ESP32 GPS unit on each one.", status: "shipped", pot: 100, months: 8,
     proofs: ["Live site", "Repo", "Demo video"], ms: [["GPS units on 3 buses", 1], ["Running on all routes for 30 days", 1], ["Handover to transport office", 1]],
-    team: [["ishaan", "Hardware", "Built the GPS unit and firmware, fitted it on 3 buses", 40], ["riya", "Web app", "Built the map view and arrival alerts", 35], ["arjun", "Enclosure", "Designed and printed the weatherproof case", 25]] });
+    team: [["ishaan", "Hardware", "Built the GPS unit and firmware, fitted it on 3 buses", 40, "embedded c, esp32"], ["riya", "Web app", "Built the map view and arrival alerts", 35, "react, node"], ["arjun", "Enclosure", "Designed and printed the weatherproof case", 25, "cad, 3d printing"]] });
   project("festpass", { name: "FestPass", pitch: "QR entry passes for the annual fest. Scanned 3,100 entries over two days.", status: "shipped", pot: 100, months: 10,
     proofs: ["Repo", "Photos from the fest gate"], ms: [["Booking site", 1], ["Scanners at every gate", 1]],
-    team: [["tanvi", "Lead, design", "Ran the project and designed the pass flow", 40], ["riya", "Frontend", "Built the booking site and scanner app", 35], ["ishaan", "Scanner rig", "Built offline handheld scanners for the gates", 25]] });
+    team: [["tanvi", "Lead, design", "Ran the project and designed the pass flow", 40, "product, ui design"], ["riya", "Frontend", "Built the booking site and scanner app", 35, "react, node"], ["ishaan", "Scanner rig", "Built offline handheld scanners for the gates", 25, "esp32, embedded c"]] });
   project("solarlog", { name: "SolarLog", pitch: "Temperature logger for the hostel solar water heater, so you know when the water is hot.", status: "shipped", pot: 60, months: 13,
     proofs: ["Repo", "Photos of the installed unit"], ms: [["Sensor board", 1], ["Dashboard", 1]],
-    team: [["ishaan", "Firmware", "Built the sensor board and logging firmware", 55], ["omkar", "Sensors", "Calibrated the probes and wrote the dashboard", 45]] });
+    team: [["ishaan", "Firmware", "Built the sensor board and logging firmware", 55, "pcb design, embedded c"], ["omkar", "Sensors", "Calibrated the probes and wrote the dashboard", 45, "sensors"]] });
   project("messmate", { name: "MessMate", pitch: "Daily mess menu with ratings. The mess committee reads the weekly report.", status: "shipped", pot: 100, months: 9,
     proofs: ["Live app", "Repo"], ms: [["Menu and ratings", 1], ["Mobile app", 1], ["Weekly report to the committee", 1]],
-    team: [["riya", "Lead, web", "Built the web app and admin panel", 45], ["kabir", "Backend", "Built the API and weekly report job", 30], ["sneha", "Mobile", "Built the Flutter app", 25]] });
+    team: [["riya", "Lead, web", "Built the web app and admin panel", 45, "react, node"], ["kabir", "Backend", "Built the API and weekly report job", 30, "python, fastapi"], ["sneha", "Mobile", "Built the Flutter app", 25, "flutter, firebase"]] });
   project("placetrack", { name: "PlaceTrack", pitch: "Tracks placement prep: company-wise questions seniors were actually asked.", status: "shipped", pot: 100, months: 15, left: ["dev"],
     proofs: ["Live site", "Repo"], ms: [["Question bank from 40 seniors", 1], ["Search and tags", 1]],
-    team: [["tanvi", "Lead", "Collected the question bank from 40 seniors", 40], ["kabir", "Backend", "Built search and tagging", 35], ["riya", "Frontend", "Built the site", 25]] });
+    team: [["tanvi", "Lead", "Collected the question bank from 40 seniors", 40, "product"], ["kabir", "Backend", "Built search and tagging", 35, "python, ml"], ["riya", "Frontend", "Built the site", 25, "react"]] });
   project("printqueue", { name: "PrintQueue", pitch: "Booking queue for the workshop 3D printer.", status: "shipped", pot: 60, months: 12,
     proofs: ["Repo"], ms: [["Queue running at the workshop", 1]],
-    team: [["arjun", "Lead", "Set the queue rules and printer profiles", 60], ["omkar", "Display", "Built the status display at the printer", 40]] });
+    team: [["arjun", "Lead", "Set the queue rules and printer profiles", 60, "3d printing"], ["omkar", "Display", "Built the status display at the printer", 40, "sensors, fpga"]] });
   project("labslot", { name: "LabSlot", pitch: "Book lab equipment by the hour. RFID tap to check out an oscilloscope.", status: "recruiting", months: -1, left: ["dev"],
     proofs: ["Repo"], ms: [["Working booking flow", 1], ["Admin view for lab staff", 1], ["RFID readers on 5 benches", 0], ["One full semester of use", 0]],
     posts: ["Lab staff tried the booking flow on Tuesday. Two benches are live for the pilot."],
     roles: [["Backend (Node)", "Kabir's API needs a second pair of hands"], ["RFID hardware", "One ECE student for the reader units"]],
-    team: [["tanvi", "Lead", "Running the project and the lab staff pilot", 0], ["kabir", "Backend", "Building the booking API", 0]] });
+    team: [["tanvi", "Lead", "Running the project and the lab staff pilot", 0, "product"], ["kabir", "Backend", "Building the booking API", 0, "node, python"]] });
   project("lfr", { name: "Robocon line follower", pitch: "Line follower for the regional Robocon round in February.", status: "recruiting", months: -2,
     proofs: ["Repo", "Chassis photos"], ms: [["Chassis", 1], ["Follows a straight line", 0], ["Full track under 40 seconds", 0]],
     posts: ["Chassis is printed and the motors are mounted. Sensor array goes on this weekend."],
@@ -107,7 +113,7 @@ db.transaction(() => {
     team: [["sneha", "Lead", "", 0]] });
   project("hostelfix", { name: "HostelFix", pitch: "Report a broken tap or fan in the hostel and see when it gets fixed.", status: "review", months: -2,
     proofs: ["Live site", "Repo"], ms: [["Report form", 1], ["Warden dashboard", 1]],
-    team: [["sneha", "Lead", "Built the report form and app", 0], ["kabir", "Backend", "Built the warden dashboard", 0]] });
+    team: [["sneha", "Lead", "Built the report form and app", 0, "flutter, firebase"], ["kabir", "Backend", "Built the warden dashboard", 0, "python, fastapi"]] });
   project("canteenq", { name: "CanteenQ", pitch: "Pre-order from the canteen and skip the queue.", status: "dropped", months: 3,
     ms: [["Menu", 0], ["Ordering", 0]], team: [["dev", "Lead", "", 0]] });
 

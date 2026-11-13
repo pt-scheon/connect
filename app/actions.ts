@@ -10,6 +10,7 @@ import { addCollege, collegeById, collegeForEmail, isMember } from "@/lib/colleg
 import { domainOf, isEmail, isPublicMail } from "@/lib/domains";
 import { notify, logUpdate, allow } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
+import { parseSkills } from "@/lib/skills";
 import { mailReady, sendMail } from "@/lib/mail";
 import { remove as removeFile } from "@/lib/files";
 
@@ -197,6 +198,7 @@ export async function createProject(fd: FormData) {
       name, pitch, roles.length ? "recruiting" : "building", me.id, me.college_id, now()).lastInsertRowid);
     run("INSERT INTO members (project_id, user_id, role) VALUES (?,?,?)", pid, me.id, s("myrole", 60) || "Lead");
     for (const m of ms) run("INSERT INTO milestones (project_id, title) VALUES (?,?)", pid, m.slice(0, 120));
+    for (const k of parseSkills(s("skills", 300))) run("INSERT OR IGNORE INTO project_skills (project_id, skill) VALUES (?,?)", pid, k);
     for (const r of roles) {
       const [title, ...note] = r.split(" - ");
       run("INSERT INTO roles (project_id, title, note) VALUES (?,?,?)", pid, title.slice(0, 60), note.join(" - ").slice(0, 160));
@@ -215,6 +217,44 @@ export async function editProject(fd: FormData) {
   run("UPDATE projects SET name=?, pitch=? WHERE id=?", name, pitch, p!.id);
   if (name !== p!.name) logUpdate(p!.id, me.id, `Renamed from ${p!.name}`);
   done(back, "Project updated.");
+}
+/* The skills a project uses. This is only the list teammates and reviewers tick from: listing a skill here gives
+   no one any score. The lead sets it while the project is open. A project that shipped before skills existed can
+   have its list filled in once by anyone on the team. */
+export async function setProjectSkills(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  const p = project(n("id"), me);
+  const legacy = p?.status === "shipped" && (p.shipped_at ?? 0) < RULES.cutover && isActive(p.id, me.id);
+  if (!p || !((p.lead_id === me.id && open(p)) || legacy)) fail("Only the lead can set the skills, before the project goes for review.");
+  const list = parseSkills(s("skills", 300));
+  if (!list.length) fail("List at least one skill, separated by commas.");
+  db.transaction(() => {
+    run("DELETE FROM project_skills WHERE project_id=?", p!.id);
+    for (const k of list) run("INSERT INTO project_skills (project_id, skill) VALUES (?,?)", p!.id, k);
+    run(`DELETE FROM member_skills WHERE project_id=? AND skill NOT IN (${list.map(() => "?").join(",")})`, p!.id, ...list);
+  })();
+  done(back, "Skills saved.");
+}
+/* After a project ships, each teammate ticks which of its skills every other teammate actually used.
+   A skill counts for someone once half of their teammates ticked it. You never tick your own.
+   On a solo project there are no teammates, so an admin (or a reviewer, during review) does it. */
+export async function tickSkills(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const p = project(n("id"), me);
+  if (!p || p.status !== "shipped") fail("Skills are confirmed after a project ships.");
+  const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
+  const onIt = team.includes(me.id);
+  if (!(onIt && team.length > 1) && !(me.admin && team.length === 1 && !onIt)) fail("Only teammates can confirm each other's skills.");
+  const menu = new Set(all("SELECT skill FROM project_skills WHERE project_id=?", p!.id).map((r) => r.skill as string));
+  db.transaction(() => {
+    run("DELETE FROM member_skills WHERE project_id=? AND by_id=?", p!.id, me.id);
+    for (const to of team) {
+      if (to === me.id) continue;
+      for (const k of fd.getAll(`sk_${to}`).map(String)) if (menu.has(k))
+        run("INSERT OR IGNORE INTO member_skills (project_id, user_id, skill, by_id) VALUES (?,?,?,?)", p!.id, to, k, me.id);
+    }
+  })();
+  done(back, "Saved. A skill counts once half of someone's teammates have ticked it.");
 }
 export async function inviteToRole(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
@@ -337,6 +377,7 @@ export async function submitForReview(fd: FormData) {
   if (!get("SELECT 1 FROM proofs WHERE project_id=?", p!.id)) fail("Add at least one proof link first.");
   if (get("SELECT 1 FROM milestones WHERE project_id=? AND done=0", p!.id)) fail("Tick off every milestone first.");
   if (get("SELECT 1 FROM members WHERE project_id=? AND status='active' AND did=''", p!.id)) fail("Every teammate has to write what they did first.");
+  if (!get("SELECT 1 FROM project_skills WHERE project_id=?", p!.id)) fail("List the skills this project used first.");
   db.transaction(() => {
     run("DELETE FROM reviews WHERE project_id=?", p!.id);
     run("UPDATE projects SET status='review' WHERE id=?", p!.id);
@@ -362,6 +403,14 @@ export async function reviewProject(fd: FormData) {
   let msg = "Review recorded. One more is needed.";
   db.transaction(() => {
     run("INSERT OR REPLACE INTO reviews (project_id, reviewer_id, verdict, note) VALUES (?,?,?,?)", p!.id, me.id, verdict, note);
+    // A solo project has no teammates to say which skills were used, so the reviewer ticks what the proof shows.
+    const soloist = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id);
+    if (soloist.length === 1) {
+      const menu = new Set(all("SELECT skill FROM project_skills WHERE project_id=?", p!.id).map((r) => r.skill as string));
+      run("DELETE FROM member_skills WHERE project_id=? AND by_id=?", p!.id, me.id);
+      if (verdict > 0) for (const k of fd.getAll("skills").map(String)) if (menu.has(k))
+        run("INSERT OR IGNORE INTO member_skills (project_id, user_id, skill, by_id) VALUES (?,?,?,?)", p!.id, soloist[0].user_id, k, me.id);
+    }
     const rs = all("SELECT r.verdict, u.admin FROM reviews r JOIN users u ON u.id=r.reviewer_id WHERE r.project_id=?", p!.id);
     if (rs.length < RULES.reviewsNeeded && !rs.some((r) => r.admin)) return;
     const pot = Math.min(...rs.map((r) => r.verdict)); // the stricter reviewer wins

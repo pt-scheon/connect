@@ -400,3 +400,115 @@ test("a held stake lowers what you can spend, not what you have earned", async (
   assert.equal(s.credit, RULES.starter - RULES.stake);
   assert.equal(s.earned, RULES.starter);
 });
+
+/* ---------- rating redesign: competency per skill ---------- */
+
+async function skillKit() {
+  const k = await setup();
+  const { competency, rate, canon, parseSkills } = await import("../lib/skills");
+  const tick = (pid: number, to: number, skill: string, by: number) => k.run("INSERT OR IGNORE INTO member_skills (project_id, user_id, skill, by_id) VALUES (?,?,?,?)", pid, to, skill, by);
+  /* A shipped team project where every teammate ticks `skill` for every other. */
+  const shipWith = (team: number[], skill: string, pot = 100, shippedAt?: number) => {
+    const pid = k.project("shipped", pot, team, { shippedAt });
+    for (const a of team) for (const b of team) if (a !== b) tick(pid, a, skill, b);
+    return pid;
+  };
+  const skill = (id: number, name: string) => competency(k.compute()).get(id)?.get(name);
+  return { ...k, competency, rate, canon, parseSkills, tick, shipWith, skill };
+}
+
+test("skill names: different spellings are one skill", async () => {
+  const { canon, parseSkills } = await skillKit();
+  assert.equal(canon(" NextJS "), "next.js");
+  assert.equal(canon("React.js"), canon("react"));
+  assert.deepEqual(parseSkills("React, react.js, Node,  , PCB"), ["react", "node", "pcb design"]);
+});
+
+test("the skill formula starts at the prior and needs weight to move", async () => {
+  const { rate, RULES } = await skillKit();
+  const K = (await import("../lib/rules")).RULES.skill;
+  assert.equal(rate([]).score, K.prior);
+  assert.equal(rate([]).conf, 0);
+  const one = rate([{ q: 1, w: 1 }]);
+  assert.ok(Math.abs(one.score - (100 * (K.k * 0.3 + 1)) / (K.k + 1)) < 1e-9);
+  assert.ok(rate([{ q: 1, w: 0.2 }]).score < one.score, "less trusted evidence moves the score less");
+  assert.ok(rate([{ q: 0.1, w: 3 }]).score < K.prior, "poor work lowers a score");
+  assert.ok(RULES.live > RULES.demo);
+});
+
+test("typing a skill gives no score; teammates confirming it does", async () => {
+  const { run, user, project, tick, skill, competency, compute } = await skillKit();
+  const [a, b, c] = [user(1, 12), user(1, 12), user(1, 12)];
+  const pid = project("shipped", 100, [a, b, c]);
+  run("INSERT INTO project_skills (project_id, skill) VALUES (?, 'react')", pid);
+  run("UPDATE users SET skills='React, Rust, ML' WHERE id=?", a);
+  assert.equal(competency(compute()).get(a), undefined, "a listed skill and a project skill list are worth nothing");
+  tick(pid, a, "react", a);
+  assert.equal(skill(a, "react"), undefined, "ticking your own skill does nothing");
+  tick(pid, a, "react", b);
+  const s = skill(a, "react")!;
+  assert.ok(s.score > 30 && s.why === "based on 1 shipped project");
+  assert.equal(skill(a, "rust"), undefined);
+});
+
+test("a skill needs half the teammates, and outsiders cannot tick it", async () => {
+  const { user, project, tick, skill } = await skillKit();
+  const team = [user(), user(), user(), user(), user()], outsider = user();
+  const pid = project("shipped", 100, team);
+  tick(pid, team[0], "react", team[1]);
+  tick(pid, team[0], "react", outsider);
+  assert.equal(skill(team[0], "react"), undefined, "one of four teammates is not half");
+  tick(pid, team[0], "react", team[2]);
+  assert.ok(skill(team[0], "react"));
+});
+
+test("one project cannot make an expert; more projects raise the score and the confidence", async () => {
+  const { user, shipWith, skill } = await skillKit();
+  const [a, b, c] = [user(1, 12), user(1, 12), user(1, 12)];
+  shipWith([a, b, c], "react");
+  const one = skill(a, "react")!;
+  assert.ok(one.score < 50, `one project gave ${one.score}`);
+  assert.equal(one.band, "low");
+  shipWith([a, b, c], "react"); shipWith([a, b, c], "react"); shipWith([a, b, c], "react");
+  const four = skill(a, "react")!;
+  assert.ok(four.score > one.score && four.conf > one.conf);
+  assert.ok(four.score < 90, "even four live projects do not reach the top");
+  assert.equal(four.why, "based on 4 shipped projects");
+});
+
+test("old work counts half after 18 months, demo work counts less than live, and a bigger share counts more", async () => {
+  const { now, user, shipWith, skill, give, RULES } = await skillKit();
+  const K = (await import("../lib/rules")).RULES.skill;
+  const [a, b, c, d] = [user(1, 12), user(1, 12), user(1, 12), user(1, 12)];
+  shipWith([a, b], "react");
+  shipWith([a, b], "node", 100, now() - K.halfLifeMonths * 30 * 86400);
+  shipWith([a, b], "figma", RULES.demo);
+  assert.ok(Math.abs(skill(a, "node")!.items[0].w / skill(a, "react")!.items[0].w - 0.5) < 0.01);
+  assert.ok(skill(a, "figma")!.score < skill(a, "react")!.score);
+  const pid = shipWith([b, c, d], "python");
+  give(pid, b, c, 80); give(pid, b, d, 20); give(pid, d, c, 80); give(pid, d, b, 20); give(pid, c, b, 50); give(pid, c, d, 50);
+  assert.ok(skill(c, "python")!.score > skill(d, "python")!.score, "the person teammates say did most scores higher");
+});
+
+test("a skill signed by people who cannot be trusted counts for less", async () => {
+  const { run, now, user, shipWith, project, skill } = await skillKit();
+  const [a, good, b, shady] = [user(1, 12), user(1, 12), user(1, 12), user(1, 12)];
+  for (let i = 0; i < 3; i++) run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, created_at) VALUES (?,?,?,?,0,'upheld',?)", a, "user", shady, "x", now());
+  for (let i = 0; i < 4; i++) project("building", 0, [a], { left: [shady] });
+  shipWith([a, good], "react");
+  shipWith([b, shady], "react");
+  assert.ok(skill(b, "react")!.score < skill(a, "react")!.score);
+});
+
+test("a solo project's skills count only when a reviewer or admin ticks them, and at half weight", async () => {
+  const { run, now, user, project, tick, skill, shipWith } = await skillKit();
+  const [solo, reviewer, friend, mate] = [user(1, 12), user(1, 12), user(1, 12), user(1, 12)];
+  const pid = project("shipped", 100, [solo]);
+  tick(pid, solo, "rust", friend);
+  assert.equal(skill(solo, "rust"), undefined, "a friend who did not review it cannot sign");
+  run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at) VALUES (?,?,100,100,?)", pid, reviewer, now());
+  tick(pid, solo, "rust", reviewer);
+  shipWith([mate, friend], "rust");
+  assert.ok(skill(solo, "rust")!.score < skill(mate, "rust")!.score);
+  assert.equal(skill(solo, "rust")!.why, "based on 1 solo project");
+});

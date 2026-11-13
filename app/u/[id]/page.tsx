@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { all, get, type Row } from "@/lib/db";
-import { currentUser, standings } from "@/lib/auth";
+import { currentUser, standings, skillScores } from "@/lib/auth";
+import { canon } from "@/lib/skills";
 import { EMPTY } from "@/lib/credit";
 import { ties, pathTo, type Tie } from "@/lib/graph";
 import { resumeFacts } from "@/lib/resume";
@@ -98,6 +99,8 @@ export default async function Profile({ params, searchParams }: Props) {
   const shippedWithMe = viewer && T.get(viewer.id)?.get(id)?.some((t) => t.shipped);
   const vouched = viewer && !!get("SELECT 1 FROM vouches WHERE from_id=? AND to_id=?", viewer.id, id);
   const skills = skillsOf(u);
+  const proven = [...(skillScores().get(id)?.values() ?? [])].sort((a, b) => b.score * (0.5 + b.conf) - a.score * (0.5 + a.conf));
+  const listedOnly = skills.filter((k) => !proven.some((x) => x.skill === canon(k)));
   const signedIn = (all("SELECT sub FROM identities WHERE user_id=?", id)).map((r) => String(r.sub).split(":")[0]);
 
   let body;
@@ -308,11 +311,23 @@ export default async function Profile({ params, searchParams }: Props) {
               {clubs.map((c) => <div key={c.id} className="row between"><Link href={`/clubs/${c.id}`}>{c.name}</Link><span className="small muted">{c.role}</span></div>)}
             </div>
           )}
-          {!alum && skills.length > 0 && (
+          {!alum && (proven.length > 0 || skills.length > 0) && (
             <div className="card">
               <span className="label">Skills</span>
-              <div className="row">{skills.map((k) => <span key={k} className="chip">{k}</span>)}</div>
-              <span className="small muted">{s.shipped ? "Used in shipped projects." : "Self-listed. No shipped project backs them yet."}</span>
+              {proven.map((k) => (
+                <div key={k.skill} className="stack" style={{ gap: 2 }}>
+                  <div className="row between"><b>{k.label}</b><span className="mono"><b>{k.score}</b><span className="muted small"> / 100</span></span></div>
+                  <span className="meter skillbar" aria-hidden="true"><b style={{ width: `${k.score}%` }} /></span>
+                  <span className="small muted">{k.band} confidence · {k.why}</span>
+                </div>
+              ))}
+              {proven.length > 0 && <span className="small muted">Scores come only from work other people confirmed. <Link href="/rules">How they are worked out</Link></span>}
+              {listedOnly.length > 0 && (
+                <>
+                  <span className="label">Listed, not confirmed by anyone</span>
+                  <div className="row">{listedOnly.map((k) => <span key={k} className="chip">{k}</span>)}<Stamp kind="no">No proof</Stamp></div>
+                </>
+              )}
             </div>
           )}
           {!me && <div className="card"><h3>Are you a student here?</h3><p className="small muted">Join your college on Connect and build a record like this one.</p><Link className="btn" href="/signin">Sign in</Link></div>}

@@ -5,6 +5,7 @@ import { currentUser, requireMember, standings } from "@/lib/auth";
 import { EMPTY, RULES, projectShares } from "@/lib/credit";
 import { timeAgo } from "@/lib/notify";
 import { suggest } from "@/lib/match";
+import { confirmedSkills, label as skillLabel } from "@/lib/skills";
 import { skillsOf } from "../../ui";
 import * as A from "../../actions";
 import { JoinAsk, ProofHelp, SplitForm } from "../../client";
@@ -62,7 +63,18 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const iReviewed = reviews.some((r) => r.reviewer_id === me.id);
   const lastMove = get("SELECT MAX(created_at) t FROM updates WHERE project_id=?", id)?.t ?? p.created_at;
   const quietDays = Math.floor((now() - lastMove) / 86400);
+  // Skills: the project's list, who ticked what, and what counts for each person so far.
+  const pskills = all("SELECT skill FROM project_skills WHERE project_id=? ORDER BY rowid", id).map((r) => r.skill as string);
+  const ticks = all("SELECT * FROM member_skills WHERE project_id=?", id);
+  const reviewerIds = new Set<number>([...reviews.map((r) => r.reviewer_id as number), ...all("SELECT reviewer_id FROM review_log WHERE project_id=?", id).map((r) => r.reviewer_id as number)]);
+  const adminIds = new Set<number>(all("SELECT id FROM users WHERE admin=1 AND college_id=?", me.college_id).map((r) => r.id as number));
+  const confirmed = shipped ? confirmedSkills(active.map((t) => t.id as number), ticks, reviewerIds, adminIds) : new Map<number, Map<string, number[]>>();
+  const myTicks = new Set(ticks.filter((x) => x.by_id === me.id).map((x) => `${x.user_id}:${x.skill}`));
+  const legacy = shipped && (p.shipped_at ?? 0) < RULES.cutover;
+  const canSetSkills = (lead && open) || (legacy && onTeam && pskills.length === 0);
+  const canTick = shipped && pskills.length > 0 && ((onTeam && !solo) || (!!me.admin && solo && !onTeam));
   const missing = [
+    !pskills.length && "the skills it used",
     !proofs.length && "a proof link",
     done < ms.length && "every milestone ticked",
     active.some((t) => !t.did) && "each teammate's “what I did”",
@@ -108,6 +120,12 @@ export default async function Project({ params }: { params: Promise<{ id: string
               {canReview && (
                 <F action={A.reviewProject} back={back} hidden={{ id }} className="stack tight">
                   <textarea name="note" id="review-note" maxLength={400} placeholder="A note for the team: what you checked, and what is missing if it is not ready. Shown without your name." style={{ minHeight: 70 }} />
+                  {solo && pskills.length > 0 && (
+                    <fieldset className="ticks">
+                      <legend className="small muted">This is a solo project, so nobody on a team can say which skills it took. Tick the ones the proof actually shows.</legend>
+                      {pskills.map((k) => <label key={k} className="tick"><input type="checkbox" name="skills" value={k} /> {skillLabel(k)}</label>)}
+                    </fieldset>
+                  )}
                   <div className="row">
                     <button className="btn" name="verdict" value={RULES.live}>Live and in use</button>
                     <button className="btn ghost" name="verdict" value={RULES.demo}>Works, demo only</button>
@@ -130,7 +148,10 @@ export default async function Project({ params }: { params: Promise<{ id: string
                   <tr key={t.id}>
                     <td><Who u={t} /></td>
                     <td data-label="Role">{gone ? <Stamp kind="bad">Left mid-project</Stamp> : t.mrole}</td>
-                    <td className={`wide ${t.did ? "" : "muted"}`}>{gone ? (t.stake ? `Stake of ${t.stake} lost` : "") : t.did || "Not written yet"}</td>
+                    <td className={`wide ${t.did ? "" : "muted"}`}>{gone ? (t.stake ? `Stake of ${t.stake} lost` : "") : t.did || "Not written yet"}
+                      {shipped && !gone && (confirmed.get(t.id)?.size ?? 0) > 0 && (
+                        <span className="row" style={{ marginTop: 4 }}>{[...confirmed.get(t.id)!.keys()].map((k) => <span key={k} className="chip ok">{skillLabel(k)}</span>)}</span>
+                      )}</td>
                     {shipped && <><td className="n" data-label="Share">{gone ? "0%" : `${Math.round(pct)}%`}</td>
                       <td className="n" data-label="Credit">{gone ? (t.stake ? `−${t.stake}` : "0") : `+${Math.round(p.pot * pct / 100 * (solo ? RULES.soloFactor : 1))}`}</td></>}
                     {open && onTeam && <td className="n">
@@ -161,6 +182,22 @@ export default async function Project({ params }: { params: Promise<{ id: string
             <SplitForm action={A.allocate} back={back} id={id} saved={myAllocs.size > 0}
               mates={active.filter((t) => t.id !== me.id).map((t) => ({ id: t.id, name: t.name, did: t.did, pct: myAllocs.get(t.id) ?? Math.round(100 / (active.length - 1)) }))} />
           )}
+
+          {canTick && (
+            <F action={A.tickSkills} back={back} hidden={{ id }} className="card">
+              <h2>{solo ? "Admin: confirm the skills this took" : "Which skills did each teammate use?"}</h2>
+              <p className="small muted">{solo ? "A solo project has no teammates to confirm skills. Tick only what the proof shows."
+                : "Tick only what you saw them do. A skill counts for someone once half of their teammates have ticked it, and it feeds their skill score. You are not on your own list."}</p>
+              {active.filter((t) => t.id !== me.id).map((t) => (
+                <fieldset key={t.id} className="ticks">
+                  <legend><b>{t.name}</b> <span className="small muted">{t.did}</span></legend>
+                  {pskills.map((k) => <label key={k} className="tick"><input type="checkbox" name={`sk_${t.id}`} value={k} defaultChecked={myTicks.has(`${t.id}:${k}`)} /> {skillLabel(k)}</label>)}
+                </fieldset>
+              ))}
+              <div><button className="btn">{myTicks.size ? "Update" : "Save"}</button></div>
+            </F>
+          )}
+          {shipped && onTeam && pskills.length === 0 && <div className="note">This project shipped before Connect tracked skills. Add the skills it used (on the right), then tick what each teammate did, so it counts towards everyone&apos;s skill scores.</div>}
 
           {(roles.length > 0 || (lead && open)) && (
             <div className="card">
@@ -307,6 +344,19 @@ export default async function Project({ params }: { params: Promise<{ id: string
                 <button className="btn ghost sm">Add proof</button>
               </F>
             )}
+          </div>
+
+          <div className="card">
+            <span className="label">Skills it uses</span>
+            {pskills.length === 0 && <span className="small muted">None listed yet.</span>}
+            {pskills.length > 0 && <div className="row">{pskills.map((k) => <span key={k} className="chip">{skillLabel(k)}</span>)}</div>}
+            {canSetSkills && (
+              <F action={A.setProjectSkills} back={back} hidden={{ id }} className="stack tight">
+                <input type="text" name="skills" id="project-skills" defaultValue={pskills.map(skillLabel).join(", ")} placeholder="React, Node, Figma" maxLength={300} required aria-label="Skills this project uses" />
+                <button className="btn ghost sm">Save skills</button>
+              </F>
+            )}
+            <span className="small muted">{shipped ? "A skill counts for a teammate only when the others confirm they used it." : "After it ships, teammates tick who used which. Listing a skill here gives nobody a score."}</span>
           </div>
 
           <div className="card">

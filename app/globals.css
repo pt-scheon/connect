@@ -539,3 +539,11 @@ td{padding-block:11px}
 .push-toggle.off{border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:color-mix(in srgb,var(--accent) 8%,var(--sunk))}
 .push-toggle.denied,.push-toggle.ios{border-style:dashed}
 .push-ico{font-size:1.2rem}
+
+/* Rating redesign: skill ticks and bars */
+.ticks{border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;min-width:0}
+.ticks legend{padding:0 6px}
+.tick{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;cursor:pointer}
+.tick input{width:auto;margin:0}
+.chip.ok{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.meter.skillbar{flex:none;display:block;width:100%}

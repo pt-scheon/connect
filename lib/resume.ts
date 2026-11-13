@@ -1,5 +1,7 @@
 import { all, get } from "./db";
 import { askGemini } from "./gemini";
+import { compute } from "./credit";
+import { competency } from "./skills";
 
 export type ResumeFacts = {
   name: string; branch: string; classOf: number | null;
@@ -24,7 +26,8 @@ export function resumeFacts(userId: number): ResumeFacts {
       shipped: new Date(p.shipped_at * 1000).toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
     })),
     clubs: all("SELECT c.name, cm.role FROM club_members cm JOIN clubs c ON c.id=cm.club_id WHERE cm.user_id=? AND cm.confirmed=1", userId),
-    skills: projects.length ? String(u.skills || "").split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+    // Only skills someone else confirmed. The list a person types on their profile is never sent.
+    skills: [...(competency(compute()).get(userId)?.values() ?? [])].sort((a, b) => b.score - a.score).map((k) => k.label),
   };
 }
 
