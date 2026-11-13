@@ -634,3 +634,102 @@ test("the Fits you filter uses a role's listed skills when it has them", async (
   assert.deepEqual(fitsMe(needsFor("Wizard", needsFromList(["NextJS", "Figma"])), "Wizard", ["Next.js", "Python"]), ["Next.js"]);
   assert.deepEqual(fitsMe(needsFor("React frontend", []), "React frontend", ["React", "Python"]), ["React"]);
 });
+
+/* ---------- rating redesign: commissions and gifts ---------- */
+
+async function commKit() {
+  const k = await skillKit();
+  const comm = (client: number, doer: number | null, o: { status?: string; reward?: number; rating?: number; minted?: number; skills?: string[]; closedAt?: number } = {}) => {
+    const status = o.status ?? "done", reward = o.reward ?? 20;
+    const id = Number(k.run(
+      "INSERT INTO commissions (college_id, client_id, title, brief, deadline, reward, minted, status, doer_id, rating, paid_credit, created_at, closed_at) VALUES (1,?,?,?,?,?,?,?,?,?,?,?,?)",
+      client, "Job", "brief", k.now() + 86400, reward, o.minted ?? 0, status, doer, o.rating ?? null, status === "done" ? reward : null, k.now(), status === "done" ? o.closedAt ?? k.now() : null).lastInsertRowid);
+    for (const sk of o.skills ?? []) k.run("INSERT INTO commission_skills (commission_id, skill, importance) VALUES (?,?,2)", id, sk);
+    return id;
+  };
+  return { ...k, comm };
+}
+
+test("a commission's reward is set aside from the client's free credit, paid to the doer on sign-off, and returned on cancel", async () => {
+  const { run, user, project, compute, comm, RULES } = await commKit();
+  const [client, mate, doer] = [user(1, 12), user(1, 12), user(1, 12)];
+  project("shipped", 100, [client, mate]);
+  const start = compute().get(client)!;
+  const id = comm(client, null, { status: "open", reward: 20 });
+  let S = compute();
+  assert.equal(S.get(client)!.credit, start.credit - 20, "set aside while open");
+  assert.equal(S.get(client)!.earned, start.earned, "spending never lowers what was earned");
+  run("UPDATE commissions SET status='done', doer_id=?, paid_credit=20, rating=4, closed_at=? WHERE id=?", doer, Date.now() / 1000 | 0, id);
+  S = compute();
+  assert.equal(S.get(client)!.credit, start.credit - 20);
+  assert.equal(S.get(doer)!.earned, RULES.starter + 20, "the doer earns it");
+  run("UPDATE commissions SET status='cancelled', doer_id=NULL, paid_credit=NULL WHERE id=?", id);
+  assert.equal(compute().get(client)!.credit, start.credit, "a cancelled commission gives the reward back");
+});
+
+test("the same two people can only pass so much credit through commissions", async () => {
+  const { now } = await commKit();
+  const { pairBlock, pairUse } = await import("../lib/commissions");
+  const { RULES, MONTH } = await import("../lib/rules");
+  const C = RULES.comm, t = now();
+  const row = (client: number, doer: number, status: string, reward: number, closed = t) => ({ client_id: client, doer_id: doer, status, reward, paid_credit: status === "done" ? reward : null, closed_at: closed, created_at: closed });
+  assert.equal(pairBlock([], 1, 2, 20, t), null);
+  const two = [row(1, 2, "done", 20), row(2, 1, "done", 20)];
+  assert.deepEqual(pairUse(two, 1, 2, t), { count: 2, credit: 40 }, "both directions count");
+  assert.match(pairBlock(two, 1, 2, 5, t)!, /already done 2/);
+  assert.equal(pairBlock(two, 1, 3, 5, t), null, "a different person is fine");
+  assert.match(pairBlock([row(1, 2, "done", 50)], 2, 1, 20, t)!, new RegExp(`At most ${C.pairMaxCredit}`));
+  assert.match(pairBlock([row(1, 2, "assigned", 20), row(1, 2, "delivered", 20)], 1, 2, 5, t)!, /already/, "running ones count, so you cannot start several at once");
+  const old = t - (C.pairWindowMonths + 1) * MONTH;
+  assert.equal(pairBlock([row(1, 2, "done", 30, old), row(1, 2, "done", 30, old)], 1, 2, 20, t), null, "the window moves on");
+  assert.equal(pairBlock([row(1, 2, "cancelled", 30), row(1, 2, "refunded", 30)], 1, 2, 20, t), null);
+});
+
+test("an alum's commissions award credit from a monthly allowance", async () => {
+  const { now } = await commKit();
+  const { alumUsed } = await import("../lib/commissions");
+  const t = now(), r = (status: string, reward: number, minted = 1) => ({ client_id: 9, doer_id: 2, status, reward, paid_credit: status === "done" ? reward : null, minted, created_at: t });
+  assert.equal(alumUsed([r("open", 20), r("done", 15), r("cancelled", 30), r("open", 10, 0)], 9, t), 35);
+});
+
+test("a signed-off commission counts towards the doer's skills, weighted by the client's credibility", async () => {
+  const { run, now, user, comm, skill } = await commKit();
+  const [good, shady, a, b] = [user(1, 12), user(1, 12), user(1, 12), user(1, 12)];
+  for (let i = 0; i < 3; i++) run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, created_at) VALUES (?,?,?,?,0,'upheld',?)", good, "user", shady, "x", now());
+  comm(good, a, { rating: 5, skills: ["figma"] });
+  comm(shady, b, { rating: 5, skills: ["figma"] });
+  comm(good, b, { status: "assigned", rating: 5, skills: ["react"] });
+  assert.equal(skill(a, "figma")!.why, "based on 1 commission");
+  assert.ok(skill(b, "figma")!.score < skill(a, "figma")!.score);
+  assert.equal(skill(b, "react"), undefined, "work in progress counts for nothing");
+  comm(good, b, { rating: 1, skills: ["css"] });
+  assert.ok(skill(b, "css")!.score < 30, "a poor rating lowers the skill");
+});
+
+test("gifts move free credit only, inside their limits", async () => {
+  const { run, now, user, project, compute, RULES } = await commKit();
+  const { giftBlock } = await import("../lib/commissions");
+  const G = RULES.gift, t = now();
+  const [rich, mate, friend, fresh] = [user(1, 12), user(1, 12), user(1, 12), user(1, 0)];
+  project("shipped", 100, [rich, mate]);
+  const before = compute();
+  run("INSERT INTO gifts (from_id, to_id, amount, created_at) VALUES (?,?,?,?)", rich, friend, 15, t);
+  const S = compute();
+  assert.equal(S.get(friend)!.credit, before.get(friend)!.credit + 15);
+  assert.equal(S.get(friend)!.earned, before.get(friend)!.earned, "a gift is not earned");
+  assert.equal(S.get(friend)!.cred.score, before.get(friend)!.cred.score);
+  assert.equal(S.get(rich)!.earned, before.get(rich)!.earned);
+  assert.equal(S.get(rich)!.credit, before.get(rich)!.credit - 15);
+  const p = (id: number, earned = 100, credit = 100, created = t - 365 * 86400) => ({ id, earned, credit, created_at: created });
+  const g = (from: number, to: number, amount: number) => ({ from_id: from, to_id: to, amount, created_at: t });
+  assert.equal(giftBlock([], p(1), p(2), 10, t), null);
+  assert.match(giftBlock([], p(1, G.minSenderCredit - 1), p(2), 5, t)!, /earned credit/);
+  assert.match(giftBlock([], p(1), p(2, 0, 0, t), 5, t)!, /days old/, "new accounts cannot be used as mules");
+  assert.match(giftBlock([], p(1, 100, 4), p(2), 5, t)!, /free credit/);
+  assert.match(giftBlock([g(2, 1, 15)], p(1), p(2), 10, t)!, /same two people/, "both directions count");
+  assert.match(giftBlock([g(1, 3, 20), g(1, 4, 15)], p(1), p(2), 10, t)!, /You can send/);
+  assert.match(giftBlock([g(3, 2, 20), g(4, 2, 15)], p(1), p(2), 10, t)!, /They can receive/);
+  assert.match(giftBlock([], p(1), p(1), 5, t)!, /yourself/);
+  assert.equal(giftBlock([{ ...g(1, 2, 20), created_at: t - (G.windowDays + 1) * 86400 }], p(1), p(2), 15, t), null);
+  void fresh;
+});

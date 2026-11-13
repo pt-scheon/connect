@@ -18,7 +18,11 @@ export default async function Admin() {
   const review = all("SELECT * FROM projects WHERE status='review' AND college_id=?", cid);
   const reports = all("SELECT r.*, u.name by_name FROM reports r JOIN users u ON u.id=r.by_id WHERE r.open=1 AND r.college_id=? ORDER BY r.id DESC", cid);
   const label = (r: { kind: string; target_id: number }) =>
-    r.kind === "user" ? all("SELECT name FROM users WHERE id=?", r.target_id)[0]?.name : all("SELECT name FROM projects WHERE id=?", r.target_id)[0]?.name;
+    r.kind === "user" ? all("SELECT name FROM users WHERE id=?", r.target_id)[0]?.name
+      : r.kind === "commission" ? all("SELECT title FROM commissions WHERE id=?", r.target_id)[0]?.title
+      : all("SELECT name FROM projects WHERE id=?", r.target_id)[0]?.name;
+  const hrefOf = (r: { kind: string; target_id: number }) => r.kind === "user" ? `/u/${r.target_id}` : r.kind === "commission" ? `/commissions/${r.target_id}` : `/projects/${r.target_id}`;
+  const disputes = all("SELECT * FROM commissions WHERE status='disputed' AND college_id=? ORDER BY id DESC", cid);
   const evidence = all("SELECT e.*, u.name FROM evidence e JOIN users u ON u.id=e.user_id WHERE e.status='pending' AND e.college_id=? AND e.user_id<>? ORDER BY e.created_at", cid, me.id);
   const flags = splitFlags(cid);
   const nameOf = (id: number) => all("SELECT name FROM users WHERE id=?", id)[0]?.name ?? "Someone";
@@ -72,6 +76,16 @@ export default async function Admin() {
             </div>
           ))}
         </div>
+        <div className="card" id="commissions">
+          <h2>Commission disputes</h2>
+          {disputes.length === 0 && <span className="muted">No disputes.</span>}
+          {disputes.map((d) => (
+            <div key={d.id} className="stack" style={{ gap: 0 }}>
+              <Link href={`/commissions/${d.id}`}>{d.title}</Link>
+              <span className="small muted">{d.dispute_reason}</span>
+            </div>
+          ))}
+        </div>
         <div className="card">
           <h2>Credit splits to check</h2>
           <span className="small muted">Someone got at least twice an equal share, but the project&apos;s record shows nothing from them. Nothing changes automatically. Look, and act on the people if it was a favour.</span>
@@ -89,10 +103,10 @@ export default async function Admin() {
           {reports.length === 0 && <span className="muted">No open reports.</span>}
           {reports.map((r) => (
             <div key={r.id} className="stack tight">
-              <span><Link href={r.kind === "user" ? `/u/${r.target_id}` : `/projects/${r.target_id}`}>{label(r) ?? "Removed"}</Link> <span className="small muted">reported by {r.by_name}</span></span>
+              <span><Link href={hrefOf(r)}>{label(r) ?? "Removed"}</Link> <span className="small muted">{r.kind === "commission" ? "commission, " : ""}reported by {r.by_name}{r.reason_kind === "coursework" ? " as coursework" : ""}</span></span>
               <span className="small">{r.reason}</span>
               <div className="row">
-                {r.kind === "user"
+                {r.kind === "commission" ? <span className="small muted">Upholding removes the commission: nobody is paid and the reward is not returned.</span> : r.kind === "user"
                   ? <F action={A.setSuspended} back="/admin" hidden={{ user: r.target_id, on: 1 }} confirm="Suspend this person?"><button className="btn danger sm">Suspend</button></F>
                   : <F action={A.setHidden} back="/admin" hidden={{ id: r.target_id, on: 1 }}><button className="btn danger sm">Hide project</button></F>}
                 <F action={A.closeReport} back="/admin" hidden={{ report: r.id, result: "upheld" }}><button className="btn ghost sm">Uphold</button></F>

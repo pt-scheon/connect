@@ -137,5 +137,13 @@ export function competency(S: Map<number, Standing>): Map<number, Map<string, Sk
     for (const skill of parseSkills(e.skills))
       add(e.user_id, { skill, tier: "B", kind: e.kind === "hackathon" ? "hackathon" : "internship", label: e.title, at: e.created_at, q, w: K.tier.B * recency(e.created_at, t) * by });
   }
+  // Commissions the client signed off (tier A). The client's rating is the quality, and it weighs as much as
+  // the client's word can be trusted.
+  const cskills = all("SELECT * FROM commission_skills");
+  for (const c of all("SELECT * FROM commissions WHERE status='done' AND paid_credit>0 AND rating IS NOT NULL AND doer_id IS NOT NULL")) {
+    const w = K.tier.A * recency(c.closed_at ?? t, t) * credWeight(S.get(c.client_id)?.cred.score);
+    for (const k of cskills.filter((x) => x.commission_id === c.id))
+      add(c.doer_id, { skill: k.skill, tier: "A", kind: "commission", label: c.title, at: c.closed_at ?? t, q: Math.max(1, Math.min(5, c.rating)) / 5, w });
+  }
   return new Map([...items].map(([id, list]) => [id, summarise(list)]));
 }

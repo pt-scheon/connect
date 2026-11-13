@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS evidence (
   decided_by INTEGER, note TEXT DEFAULT '', created_at INTEGER NOT NULL, decided_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS evidence_user ON evidence (user_id);
+CREATE TABLE IF NOT EXISTS commissions (
+  id INTEGER PRIMARY KEY, college_id INTEGER NOT NULL, client_id INTEGER NOT NULL, club_id INTEGER, title TEXT NOT NULL, brief TEXT NOT NULL,
+  deadline INTEGER, reward INTEGER NOT NULL, minted INTEGER DEFAULT 0, money INTEGER DEFAULT 0, money_note TEXT DEFAULT '', money_paid INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'open', doer_id INTEGER, proof_url TEXT DEFAULT '', rating INTEGER, rating_note TEXT DEFAULT '',
+  reviewer_id INTEGER, review_ok INTEGER, dispute_by INTEGER, dispute_reason TEXT DEFAULT '', resolution TEXT DEFAULT '', paid_credit INTEGER,
+  hidden INTEGER DEFAULT 0, created_at INTEGER NOT NULL, assigned_at INTEGER, delivered_at INTEGER, closed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS commissions_college ON commissions (college_id, status);
+CREATE TABLE IF NOT EXISTS commission_skills (commission_id INTEGER, skill TEXT, importance INTEGER DEFAULT 2, PRIMARY KEY (commission_id, skill));
+CREATE TABLE IF NOT EXISTS commission_apps (id INTEGER PRIMARY KEY, commission_id INTEGER NOT NULL, user_id INTEGER NOT NULL, note TEXT DEFAULT '', status TEXT DEFAULT 'pending', created_at INTEGER, UNIQUE (commission_id, user_id));
+CREATE TABLE IF NOT EXISTS commission_milestones (id INTEGER PRIMARY KEY, commission_id INTEGER NOT NULL, title TEXT, done INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS gifts (id INTEGER PRIMARY KEY, college_id INTEGER, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, amount INTEGER NOT NULL, note TEXT DEFAULT '', created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
 CREATE INDEX IF NOT EXISTS updates_project ON updates (project_id);

@@ -8,7 +8,7 @@ import { Av, Meter, Pill } from "./bits";
 type Action = (fd: FormData) => Promise<void>;
 
 /* ---------- navigation ---------- */
-const NAV: [string, string][] = [["/", "Projects"], ["/people", "People"], ["/clubs", "Clubs"], ["/funding", "Funding"], ["/credit", "Credit"]];
+const NAV: [string, string][] = [["/", "Projects"], ["/people", "People"], ["/commissions", "Commissions"], ["/clubs", "Clubs"], ["/funding", "Funding"], ["/credit", "Credit"]];
 
 export function NavLinks({ admin }: { admin: boolean }) {
   const path = usePathname();

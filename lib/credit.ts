@@ -1,11 +1,12 @@
 import { all, now, type Row } from "./db";
 import { RULES, MONTH } from "./rules";
 import { credibility, credWeight, rings, type Cred } from "./credibility";
+import { HOLDING } from "./commissions";
 
 export { RULES } from "./rules";
 
-/* One ledger line. `held` lines are credit set aside for now (a stake, an escrow) or spent on a commission:
-   they lower what you can use, never what you have earned. */
+/* One ledger line. `held` lines change what you can use, never what you have earned: credit set aside for now
+   (a stake, a commission's reward), credit spent on a commission, and gifts sent or received. */
 export type Line = { what: string; why: string; n: number; held?: boolean };
 export type Standing = {
   credit: number; // what you can stake, escrow or send right now
@@ -174,6 +175,21 @@ export function compute(): Map<number, Standing> {
     const room = Math.max(0, RULES.vouchesCounted - (old.get(id) ?? 0));
     for (const n of list.sort((a, b) => b - a).slice(0, room))
       S.get(id)!.ledger.push({ what: "Vouch from a teammate", why: "Weighted by how far their word can be trusted", n: Math.max(1, Math.round(n)) });
+  }
+  // Commissions. The reward is set aside when the client posts, and moves to the doer when the client signs off.
+  // What the client spends lowers what they can use, not what they earned. An alum has no credit, so theirs is new.
+  for (const c of all("SELECT * FROM commissions")) {
+    const client = S.get(c.client_id), doer = c.doer_id ? S.get(c.doer_id) : undefined;
+    if (HOLDING.includes(c.status) && !c.minted) client?.ledger.push({ what: `Commission: ${c.title}`, why: "Reward set aside until it is done", n: -c.reward, held: true });
+    if (c.status === "done" && c.paid_credit > 0) {
+      if (!c.minted) client?.ledger.push({ what: `Commission: ${c.title}`, why: "Paid to the person who did it", n: -c.paid_credit, held: true });
+      doer?.ledger.push({ what: `Commission done: ${c.title}`, why: "Signed off by the person who asked for it", n: c.paid_credit });
+    }
+  }
+  // Gifts move spendable credit only. They never count as earned, so standing cannot be handed to a friend.
+  for (const g of all("SELECT * FROM gifts")) {
+    S.get(g.from_id)?.ledger.push({ what: "Credit sent", why: "A gift to someone at your college", n: -g.amount, held: true });
+    S.get(g.to_id)?.ledger.push({ what: "Credit received", why: "A gift. It can be staked or spent, and does not count as earned", n: g.amount, held: true });
   }
   for (const s of S.values()) {
     s.credit = Math.max(0, s.ledger.reduce((a, l) => a + l.n, 0));

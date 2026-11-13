@@ -12,6 +12,7 @@ import { notify, logUpdate, allow } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
 import { needsFromList } from "@/lib/relevance";
+import { alumUsed, giftBlock, pairBlock, type CommRow, type GiftRow } from "@/lib/commissions";
 import { mailReady, sendMail } from "@/lib/mail";
 import { remove as removeFile, save as saveFile, sniff, cleanName } from "@/lib/files";
 import { checkLive, liveUrl } from "@/lib/live";
@@ -784,6 +785,200 @@ export async function markPaid(fd: FormData) {
   done(back, "Marked as paid.");
 }
 
+/* ---------- commissions: asking someone to do a piece of work for you ---------- */
+const commission = (id: number, me: Row): Row | undefined => get("SELECT * FROM commissions WHERE id=? AND college_id=?", id, me.college_id);
+const commRows = (cid: number) => all("SELECT * FROM commissions WHERE college_id=?", cid) as CommRow[];
+const adminsOf = (cid: number) => all("SELECT id FROM users WHERE admin=1 AND suspended=0 AND college_id=?", cid).map((r) => r.id as number);
+
+export async function postCommission(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  const C = RULES.comm, alum = me.role === "alum";
+  const title = s("title", 80), brief = s("brief", 1200), skills = parseSkills(s("skills", 200), 5), ms = lines(s("milestones", 800)), reward = n("reward");
+  const deadline = Math.floor(new Date(s("deadline", 12) + "T23:59:59").getTime() / 1000);
+  if (title.length < 4 || brief.length < 20) fail("Give it a title and a few lines on what you need.");
+  if (!skills.length) fail("List the skills it needs, most important first.");
+  if (!ms.length) fail("Add at least one milestone, so both sides know what done means.");
+  if (!(deadline > now())) fail("Pick a deadline in the future.");
+  if (!fd.get("not_coursework")) fail("Tick the box to confirm this is not graded coursework, an assignment or an exam.");
+  if (reward < C.minReward || reward > C.maxReward) fail(`The reward has to be between ${C.minReward} and ${C.maxReward} credit.`);
+  if (get("SELECT COUNT(*) n FROM commissions WHERE client_id=? AND status IN ('open','assigned','delivered','disputed')", me.id).n >= C.openMax) fail(`You can have ${C.openMax} commissions running at once.`);
+  if (!allow(`commission:${me.id}`, 5, 86400)) fail("You have posted several today. Try again tomorrow.");
+  const club = n("club") ? get("SELECT * FROM clubs WHERE id=? AND lead_id=? AND college_id=?", n("club"), me.id, me.college_id) : undefined;
+  if (n("club") && !club) fail("Only a club's lead can post for the club.");
+  if (alum) {
+    const used = alumUsed(commRows(me.college_id), me.id, now());
+    if (used + reward > C.alumAllowance) fail(`Alumni commissions can award ${C.alumAllowance} credit every 30 days. Yours have used ${used}.`);
+  } else {
+    const st = compute().get(me.id);
+    if ((st?.earned ?? 0) < C.minClientCredit) fail(`You need ${C.minClientCredit} earned credit before you can commission work.`);
+    if ((st?.credit ?? 0) < reward) fail(`You have ${st?.credit ?? 0} free credit. The reward is set aside when you post.`);
+  }
+  // Money is only ever a note between the two people. Students paying students is not allowed: too close to paid homework.
+  const money = alum || club ? Math.max(0, n("money")) : 0;
+  const id = db.transaction(() => {
+    const cid = Number(run(
+      "INSERT INTO commissions (college_id, client_id, club_id, title, brief, deadline, reward, minted, money, money_note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+      me.college_id, me.id, club?.id ?? null, title, brief, deadline, reward, alum ? 1 : 0, money, money ? s("money_note", 160) : "", now()).lastInsertRowid);
+    for (const k of needsFromList(skills)) run("INSERT INTO commission_skills (commission_id, skill, importance) VALUES (?,?,?)", cid, k.skill, k.importance);
+    for (const m of ms) run("INSERT INTO commission_milestones (commission_id, title) VALUES (?,?)", cid, m.slice(0, 120));
+    return cid;
+  })();
+  done(`/commissions/${id}`, alum ? "Posted." : `Posted. ${reward} credit is set aside until it is done or you cancel.`);
+}
+export async function applyCommission(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const c = commission(n("id"), me);
+  if (!c || c.status !== "open" || c.hidden) fail("This commission is not open.");
+  if (me.role !== "student") fail("Only students take commissions.");
+  if (c.client_id === me.id) fail("You cannot apply to your own commission.");
+  if (!allow(`capply:${me.id}`, 10, 86400)) fail("You have applied to several today. Try again tomorrow.");
+  const r = run("INSERT OR IGNORE INTO commission_apps (commission_id, user_id, note, created_at) VALUES (?,?,?,?)", c.id, me.id, s("note", 400), now());
+  if (r.changes) notify(c.client_id, `${me.name} applied to do “${c.title}”`, `/commissions/${c.id}`);
+  done(back, "Applied. The person who posted it picks one applicant.");
+}
+export async function withdrawCommissionApp(fd: FormData) {
+  const { me, back, n } = await ctx(fd);
+  run("DELETE FROM commission_apps WHERE commission_id=? AND user_id=? AND status='pending'", n("id"), me.id);
+  done(back, "Application withdrawn.");
+}
+export async function pickDoer(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const app = get("SELECT * FROM commission_apps WHERE id=? AND status='pending'", n("app"));
+  const c = app && commission(app.commission_id, me);
+  if (!c || c.client_id !== me.id || c.status !== "open") fail("Only the person who posted an open commission can pick someone.");
+  const doer = colleague(app.user_id, me, "AND role='student' AND verified=1 AND suspended=0");
+  if (!doer) fail("That person can no longer take it.");
+  const block = pairBlock(commRows(me.college_id), me.id, doer.id, c.reward, now());
+  if (block) fail(block);
+  db.transaction(() => {
+    run("UPDATE commissions SET status='assigned', doer_id=?, assigned_at=? WHERE id=?", doer.id, now(), c.id);
+    run("UPDATE commission_apps SET status=CASE WHEN id=? THEN 'accepted' ELSE 'declined' END WHERE commission_id=?", app.id, c.id);
+    notify(doer.id, `You were picked to do “${c.title}”`, `/commissions/${c.id}`);
+  })();
+  done(back, `${doer.name.split(" ")[0]} is on it.`);
+}
+export async function cancelCommission(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const c = commission(n("id"), me);
+  if (!c || c.client_id !== me.id || c.status !== "open") fail("You can cancel only before you have picked someone. After that, open a dispute.");
+  run("UPDATE commissions SET status='cancelled', closed_at=? WHERE id=?", now(), c!.id);
+  done(back, "Cancelled. The reward is back with you.");
+}
+export async function toggleCommissionMilestone(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const m = get("SELECT * FROM commission_milestones WHERE id=?", n("milestone"));
+  const c = m && commission(m.commission_id, me);
+  if (!c || c.doer_id !== me.id || c.status !== "assigned") fail("Only the person doing it can tick milestones, while it is in progress.");
+  run("UPDATE commission_milestones SET done=1-done WHERE id=?", m.id);
+  done(back);
+}
+export async function deliverCommission(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const c = commission(n("id"), me);
+  if (!c || c.doer_id !== me.id || c.status !== "assigned") fail("Only the person doing it can mark it delivered.");
+  const url = s("url", 400);
+  if (!/^https?:\/\/\S+\.\S+/.test(url)) fail("Add a link to the finished work, starting with https://");
+  if (get("SELECT 1 FROM commission_milestones WHERE commission_id=? AND done=0", c!.id)) fail("Tick off every milestone first.");
+  // Larger rewards, and credit an alum creates, also need someone with no tie to either side to confirm the proof.
+  let reviewer: number | null = null;
+  if (c!.reward > RULES.comm.reviewerAbove || c!.minted) {
+    const S = compute();
+    const ok = eligibleReviewers(all("SELECT * FROM users WHERE college_id=?", me.college_id), [c!.client_id, c!.doer_id], teamTies(all("SELECT project_id, user_id FROM members")), S);
+    reviewer = pickReviewers(ok, S)[0] ?? null;
+  }
+  run("UPDATE commissions SET status='delivered', proof_url=?, delivered_at=?, reviewer_id=?, review_ok=NULL WHERE id=?", url, now(), reviewer, c!.id);
+  notify(c!.client_id, `“${c!.title}” was delivered. Check it and sign off.`, `/commissions/${c!.id}`);
+  const needs = c!.reward > RULES.comm.reviewerAbove || c!.minted;
+  if (reviewer) notify(reviewer, `You were picked to check a delivered commission: ${c!.title}`, `/commissions/${c!.id}`);
+  else if (needs) for (const a of adminsOf(me.college_id)) notify(a, `A commission needs an outside check and no reviewer is free: ${c!.title}`, `/commissions/${c!.id}`);
+  done(back, needs ? "Delivered. It also needs a check from someone outside before sign-off." : "Delivered. Waiting for sign-off.");
+}
+export async function checkCommission(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const c = commission(n("id"), me);
+  if (!c || c.status !== "delivered" || !(c.reward > RULES.comm.reviewerAbove || c.minted)) fail("This commission is not waiting for a check.");
+  if (c!.client_id === me.id || c!.doer_id === me.id || !(me.admin || c!.reviewer_id === me.id)) fail("Only the reviewer Connect picked, or an admin, can check it.");
+  const ok = s("answer") === "ok";
+  run("UPDATE commissions SET review_ok=?, reviewer_id=? WHERE id=?", ok ? 1 : 0, me.id, c!.id);
+  if (!ok) {
+    run("UPDATE commissions SET status='disputed', dispute_by=?, dispute_reason=? WHERE id=?", me.id, "The outside reviewer did not confirm the proof: " + s("note", 200), c!.id);
+    for (const a of adminsOf(me.college_id)) notify(a, `A reviewer did not confirm a commission: ${c!.title}`, "/admin#commissions");
+  } else notify(c!.client_id, `An outside reviewer confirmed “${c!.title}”. You can sign off.`, `/commissions/${c!.id}`);
+  done(back, ok ? "Confirmed." : "Sent to the admins.");
+}
+export async function signOffCommission(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const c = commission(n("id"), me);
+  if (!c || c.client_id !== me.id || c.status !== "delivered") fail("Only the person who posted it can sign off, after it is delivered.");
+  const rating = n("rating");
+  if (rating < 1 || rating > 5) fail("Rate the work from 1 to 5.");
+  if ((c!.reward > RULES.comm.reviewerAbove || c!.minted) && c!.review_ok !== 1) fail("This one also needs a check from someone outside. It is waiting for them.");
+  // The limit is checked again here: it is what actually moves the credit.
+  const others = commRows(me.college_id).filter((x) => (x as Row).id !== c!.id);
+  const block = pairBlock(others, me.id, c!.doer_id, c!.reward, now());
+  if (block) fail(block + " Open a dispute so an admin can sort this one out.");
+  run("UPDATE commissions SET status='done', rating=?, rating_note=?, paid_credit=?, closed_at=? WHERE id=?", rating, s("note", 300), c!.reward, now(), c!.id);
+  run("UPDATE users SET resume=NULL WHERE id=?", c!.doer_id);
+  notify(c!.doer_id, `“${c!.title}” was signed off. You earned ${c!.reward} credit.`, `/commissions/${c!.id}`);
+  done(back, `Signed off. ${c!.reward} credit went to them.`);
+}
+export async function markCommissionPaid(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  const c = commission(n("id"), me);
+  if (!c || c.client_id !== me.id || !c.money || c.status !== "done") fail("Only the person who posted it can mark the money as sent, after sign-off.");
+  run("UPDATE commissions SET money_paid=1 WHERE id=?", c!.id);
+  notify(c!.doer_id, `${me.name} marked the payment for “${c!.title}” as sent`, `/commissions/${c!.id}`);
+  done(back, "Marked as paid.");
+}
+export async function disputeCommission(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  const c = commission(n("id"), me);
+  if (!c || !["assigned", "delivered"].includes(c.status) || ![c.client_id, c.doer_id].includes(me.id)) fail("Only the two people on a running commission can open a dispute.");
+  const reason = s("reason", 400);
+  if (reason.length < 15) fail("Say what went wrong, so the admins can decide.");
+  run("UPDATE commissions SET status='disputed', dispute_by=?, dispute_reason=? WHERE id=?", me.id, reason, c!.id);
+  notify(c!.client_id === me.id ? c!.doer_id : c!.client_id, `A dispute was opened on “${c!.title}”. An admin will decide.`, `/commissions/${c!.id}`);
+  for (const a of adminsOf(me.college_id)) notify(a, `Dispute on a commission: ${c!.title}`, "/admin#commissions");
+  done(back, "Sent to the admins of your college.");
+}
+/* An admin ends a dispute: pay the doer, give the reward back, or split it. If one side was plainly in the wrong,
+   that goes on their record the same way an upheld report does. */
+export async function resolveCommission(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd, false);
+  if (!me.admin) fail("Admins only.");
+  const c = commission(n("id"), me);
+  if (!c || c.status !== "disputed") fail("That commission is not in dispute.");
+  if ([c!.client_id, c!.doer_id].includes(me.id)) fail("You are part of this one. Another admin has to decide it.");
+  const how = s("how"), note = s("note", 300);
+  if (!["pay", "refund", "split"].includes(how) || note.length < 10) fail("Pick an outcome and say why in a line.");
+  const paid = how === "pay" ? c!.reward : how === "split" ? Math.floor(c!.reward / 2) : 0;
+  const fault = s("fault") === "client" ? c!.client_id : s("fault") === "doer" ? c!.doer_id : null;
+  db.transaction(() => {
+    run("UPDATE commissions SET status=?, paid_credit=?, resolution=?, closed_at=? WHERE id=?", paid ? "done" : "refunded", paid, note, now(), c!.id);
+    if (fault) run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, reason_kind, created_at, college_id) VALUES (?,?,?,?,0,'upheld','dispute',?,?)",
+      me.id, "user", fault, `Commission dispute: ${note}`, now(), me.college_id);
+    for (const id of [c!.client_id, c!.doer_id]) if (id) notify(id, `An admin decided the dispute on “${c!.title}”: ${paid === c!.reward ? "paid in full" : paid ? "split" : "reward returned"}.`, `/commissions/${c!.id}`);
+  })();
+  done(back, "Decided.");
+}
+
+/* ---------- gifts: sending spendable credit to someone ---------- */
+export async function sendGift(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd);
+  if (me.role !== "student") fail("Only students have credit to send.");
+  const to = colleague(n("to"), me, "AND role='student' AND verified=1 AND suspended=0");
+  if (!to) fail("Pick a verified student at your college.");
+  const amount = n("amount"), S = compute(), mine = S.get(me.id);
+  const block = giftBlock(all("SELECT * FROM gifts WHERE college_id=?", me.college_id) as GiftRow[],
+    { id: me.id, created_at: me.created_at, earned: mine?.earned ?? 0, credit: mine?.credit ?? 0 },
+    { id: to.id, created_at: to.created_at, earned: 0, credit: 0 }, amount, now());
+  if (block) fail(block);
+  if (!allow(`gift:${me.id}`, 5, 86400)) fail("You have sent credit several times today. Try again tomorrow.");
+  run("INSERT INTO gifts (college_id, from_id, to_id, amount, note, created_at) VALUES (?,?,?,?,?,?)", me.college_id, me.id, to.id, amount, s("note", 140), now());
+  notify(to.id, `${me.name} sent you ${amount} credit to use`, "/credit");
+  done(back, `Sent ${amount} credit to ${to.name.split(" ")[0]}. It is theirs to stake or spend; it does not change what either of you has earned.`);
+}
+
 /* ---------- admin ---------- */
 export async function approveAlum(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
@@ -820,7 +1015,23 @@ export async function closeReport(fd: FormData) {
   const { s } = c;
   // Upheld means the report was right. It lowers the reported person's credibility for a while.
   const result = s("result") === "upheld" ? "upheld" : "dismissed";
-  run("UPDATE reports SET open=0, result=? WHERE id=? AND college_id=? AND open=1", result, n("report"), me.college_id);
+  const r = get("SELECT * FROM reports WHERE id=? AND college_id=? AND open=1", n("report"), me.college_id);
+  if (!r) fail("That report is already closed.");
+  db.transaction(() => {
+    run("UPDATE reports SET open=0, result=? WHERE id=?", result, r.id);
+    // A commission that turns out to be coursework, or otherwise against the rules, is stopped: nobody is paid,
+    // the client does not get the reward back, and it goes on the client's record.
+    if (r.kind === "commission" && result === "upheld") {
+      const c = get("SELECT * FROM commissions WHERE id=? AND college_id=?", r.target_id, me.college_id);
+      if (c && c.status !== "refunded" && c.status !== "cancelled") {
+        run("UPDATE commissions SET hidden=1, status=CASE WHEN status='done' THEN 'done' ELSE 'refunded' END, resolution=?, closed_at=COALESCE(closed_at, ?) WHERE id=?",
+          r.reason_kind === "coursework" ? "Removed by an admin: graded coursework is not allowed." : "Removed by an admin after a report.", now(), c.id);
+        run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, reason_kind, created_at, college_id) VALUES (?,?,?,?,0,'upheld',?,?,?)",
+          me.id, "user", c.client_id, `Commission removed: ${c.title}`, r.reason_kind || "commission", now(), me.college_id);
+        notify(c.client_id, `Your commission “${c.title}” was removed by an admin.`, "/terms");
+      }
+    }
+  })();
   done(back, result === "upheld" ? "Report upheld." : "Report dismissed.");
 }
 
@@ -840,13 +1051,15 @@ export async function readInbox(fd: FormData) {
 }
 export async function report(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const kind = s("kind") === "project" ? "project" : "user";
-  if (!s("reason")) fail("Say what is wrong.");
+  const kind = ["project", "commission"].includes(s("kind")) ? s("kind") : "user";
+  const why = ["coursework", "fake", "abuse"].includes(s("reason_kind")) ? s("reason_kind") : "";
+  const reason = s("reason", 300) || (why === "coursework" ? "This is graded coursework, an assignment or an exam." : "");
+  if (!reason) fail("Say what is wrong.");
   if (!allow(`report:${me.id}`, 5, 3600)) fail("You have sent several reports. Give the admins time to look.");
-  const where = get(`SELECT college_id FROM ${kind === "user" ? "users" : "projects"} WHERE id=?`, n("target"))?.college_id;
+  const where = get(`SELECT college_id FROM ${kind === "user" ? "users" : kind === "project" ? "projects" : "commissions"} WHERE id=?`, n("target"))?.college_id;
   if (!where) fail("Nothing to report there.");
-  run("INSERT INTO reports (by_id, kind, target_id, reason, created_at, college_id) VALUES (?,?,?,?,?,?)", me.id, kind, n("target"), s("reason", 300), now(), where);
-  for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", where)) notify(a.id, `New report on a ${kind === "user" ? "person" : "project"}`, "/admin");
+  run("INSERT INTO reports (by_id, kind, target_id, reason, reason_kind, created_at, college_id) VALUES (?,?,?,?,?,?,?)", me.id, kind, n("target"), reason, why, now(), where);
+  for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", where)) notify(a.id, `New report on a ${kind === "user" ? "person" : kind}`, "/admin");
   done(back, "Reported. An admin will look at it.");
 }
 
@@ -912,7 +1125,8 @@ export async function deleteAccount(fd: FormData) {
          github='', linkedin='', website='', sub=?, admin=0, super=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
     for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
-      "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
+      "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM commission_apps WHERE user_id=? AND status='pending'",
+      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
       "DELETE FROM requests WHERE user_id=? AND status='pending'", "DELETE FROM blocks WHERE user_id=? OR blocked_id=?", "DELETE FROM push_subs WHERE user_id=?"]) run(q, ...(q.includes("OR") ? [me.id, me.id] : [me.id]));
     // Their conversations go too, attachments included.
     for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);
