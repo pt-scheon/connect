@@ -1,42 +1,44 @@
-/* Hallmark · scope: app · genre: modern-minimal · theme: Rim (by request) · rim: night, with a light counterpart for the theme switch · redesign: restyle · v2.0.0
- * waive 56: .convos-head is sticky inside the conversation list's own scroller, not the page, so it never stacks under .bar
- * waive F7: the eight inputs share one recipe on purpose; a form reads as one family */
-/* Rim, the same system as the public site (app/public.css): warm black, warm off-white, square edges,
-   hairlines, one orange for the action and the current state, sky blue for good news. Light mode is
-   Rim's light counterpart, kept so the light/dark switch keeps working. */
+/* Connect's design system follows the apple-grade-web skill (~/.claude/skills/apple-grade-web): the system font,
+   calm neutral surfaces, one blue accent, soft rounded shapes, pills for every selection, whisper-light shadows.
+   Values are measured from apple.com and Apple's Human Interface Guidelines.
+   waive 56: .convos-head is sticky inside the conversation list's own scroller, not the page. */
 :root{
-  /* Dark is the default look. */
-  --bg:oklch(9% 0.008 75); --surface:oklch(12.5% 0.009 75); --surface2:oklch(16% 0.009 75); --sunk:oklch(6.5% 0.007 75);
-  --ink:oklch(94% 0.010 80); --muted:oklch(68% 0.012 80); --line:oklch(25% 0.010 78); --line2:oklch(34% 0.010 78); --silver:oklch(50% 0.010 80);
-  --accent:oklch(72% 0.17 45); --accent-ink:oklch(10% 0.02 45); --accent-soft:oklch(19% 0.035 45);
-  --mark:oklch(72% 0.17 45); --mark-ink:oklch(10% 0.02 45);
-  --ok:oklch(74% 0.12 250); --ok-soft:oklch(19% 0.035 250); --warn:oklch(80% 0.13 80); --warn-soft:oklch(20% 0.035 80); --bad:oklch(68% 0.17 25); --bad-soft:oklch(20% 0.045 25);
-  --shadow:none;
-  --display:var(--font-geist),ui-sans-serif,system-ui,sans-serif;
-  --body:var(--font-geist),ui-sans-serif,system-ui,sans-serif;
-  --mono:var(--font-geist-mono),ui-monospace,Menlo,Consolas,monospace;
+  /* Dark */
+  --bg:#000000; --surface:#1c1c1e; --surface2:#2c2c2e; --sunk:#2c2c2e; --pill:#3a3a3c; --pill-hover:#48484a;
+  --ink:#f5f5f7; --muted:#a1a1a6; --line:#38383a; --line2:#48484a; --silver:#86868b;
+  --accent:#0a84ff; --accent-ink:#ffffff; --accent-soft:rgba(10,132,255,.2);
+  --mark:#0a84ff; --mark-ink:#ffffff;
+  --ok:#30d158; --ok-soft:rgba(48,209,88,.16); --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.16); --bad:#ff453a; --bad-soft:rgba(255,69,58,.16);
+  --shadow:none; --shadow-pop:0 12px 40px rgba(0,0,0,.6); --bar:rgba(22,22,23,.8);
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+  /* Figures and times use the text font with tabular numbers (as apple.com does); only code is monospace. */
+  --mono:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --code:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:28px; --r-pill:980px;
+  --ease:cubic-bezier(.4,0,.6,1); --ease-out:cubic-bezier(0,0,.2,1);
   /* Same in both themes: text on photos and video, the call screen, call buttons and a brand mark. */
-  --white:oklch(99% 0.003 80); --black:oklch(5% 0.005 75); --danger:oklch(60% 0.2 25); --danger-deep:oklch(50% 0.19 25); --go:oklch(60% 0.15 150); --info:oklch(58% 0.14 255); --linkedin:oklch(51% 0.15 250);
+  --white:#ffffff; --black:#000000; --danger:#ff3b30; --danger-deep:#d70015; --go:#34c759; --info:#0a84ff; --linkedin:#0a66c2;
   color-scheme:dark;
 }
 :root[data-theme="light"]{
-  --bg:oklch(97% 0.006 80); --surface:oklch(99.5% 0.003 80); --surface2:oklch(95% 0.007 80); --sunk:oklch(93% 0.008 80);
-  --ink:oklch(18% 0.010 75); --muted:oklch(45% 0.012 78); --line:oklch(88% 0.008 78); --line2:oklch(76% 0.010 78); --silver:oklch(65% 0.010 78);
-  --accent:oklch(52% 0.16 42); --accent-ink:oklch(99% 0.003 80); --accent-soft:oklch(94% 0.03 50);
-  --mark:oklch(70% 0.17 45); --mark-ink:oklch(12% 0.02 45);
-  --ok:oklch(48% 0.12 250); --ok-soft:oklch(94% 0.025 250); --warn:oklch(50% 0.11 70); --warn-soft:oklch(95% 0.035 80); --bad:oklch(52% 0.18 27); --bad-soft:oklch(95% 0.03 25);
-  --shadow:none;
+  --bg:#f5f5f7; --surface:#ffffff; --surface2:#fbfbfd; --sunk:#f0f0f3; --pill:#e8e8ed; --pill-hover:#dedee4;
+  --ink:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea; --line2:#d2d2d7; --silver:#86868b;
+  --accent:#0071e3; --accent-ink:#ffffff; --accent-soft:rgba(0,113,227,.1);
+  --mark:#0071e3; --mark-ink:#ffffff;
+  --ok:#248a3d; --ok-soft:#e9f6ec; --warn:#b25000; --warn-soft:#fff4e5; --bad:#d70015; --bad-soft:#fdecee;
+  --shadow:0 2px 12px rgba(0,0,0,.06); --shadow-pop:0 10px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06); --bar:rgba(250,250,252,.8);
   color-scheme:light;
 }
 /* No saved choice yet: follow the device's light or dark setting. */
 @media (prefers-color-scheme: light){
   :root:not([data-theme]){
-    --bg:oklch(97% 0.006 80); --surface:oklch(99.5% 0.003 80); --surface2:oklch(95% 0.007 80); --sunk:oklch(93% 0.008 80);
-    --ink:oklch(18% 0.010 75); --muted:oklch(45% 0.012 78); --line:oklch(88% 0.008 78); --line2:oklch(76% 0.010 78); --silver:oklch(65% 0.010 78);
-    --accent:oklch(52% 0.16 42); --accent-ink:oklch(99% 0.003 80); --accent-soft:oklch(94% 0.03 50);
-    --mark:oklch(70% 0.17 45); --mark-ink:oklch(12% 0.02 45);
-    --ok:oklch(48% 0.12 250); --ok-soft:oklch(94% 0.025 250); --warn:oklch(50% 0.11 70); --warn-soft:oklch(95% 0.035 80); --bad:oklch(52% 0.18 27); --bad-soft:oklch(95% 0.03 25);
-    --shadow:none;
+  --bg:#f5f5f7; --surface:#ffffff; --surface2:#fbfbfd; --sunk:#f0f0f3; --pill:#e8e8ed; --pill-hover:#dedee4;
+    --ink:#1d1d1f; --muted:#6e6e73; --line:#e5e5ea; --line2:#d2d2d7; --silver:#86868b;
+    --accent:#0071e3; --accent-ink:#ffffff; --accent-soft:rgba(0,113,227,.1);
+    --mark:#0071e3; --mark-ink:#ffffff;
+    --ok:#248a3d; --ok-soft:#e9f6ec; --warn:#b25000; --warn-soft:#fff4e5; --bad:#d70015; --bad-soft:#fdecee;
+    --shadow:0 2px 12px rgba(0,0,0,.06); --shadow-pop:0 10px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06); --bar:rgba(250,250,252,.8);
     color-scheme:light;
   }
 }
@@ -559,22 +561,76 @@ td{padding-block:11px}
 .chip.ok{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
 .meter.skillbar{flex:none;display:block;width:100%}
 
-/* ================= Rim: medium-weight heads, numbers in mono (corners: see the Apple touches at the end) ================= */
-h1,h2,h3{font-weight:500;letter-spacing:-.03em;line-height:1.05}
-.bar{background:var(--bg);backdrop-filter:none}
-.card,a.card:hover,.card.lift:hover{box-shadow:none}
-a.card:hover,.card.lift:hover{transform:none;border-color:var(--line2)}
-.btn{background:var(--mark);color:var(--mark-ink);border:1px solid var(--mark);font-weight:500}
-.btn:hover{filter:none;background:color-mix(in oklab,var(--mark) 88%,var(--ink))}
-.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line2)}
-.btn.ghost:hover{border-color:var(--muted);background:var(--surface2)}
-.btn.danger{border-color:color-mix(in oklab,var(--bad) 60%,transparent)}
-.tabs a[aria-current="page"]{background:transparent;color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
-.tabs a:hover,.tabs button:hover{background:transparent}
-.bal{background:transparent;color:var(--ink);border:1px solid var(--line2);font-family:var(--mono)}
-.stat b,.sim .big,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.logo i{background:var(--accent);box-shadow:8px 0 0 -1px var(--silver)}
-.toast{box-shadow:none}
+/* ================= Apple-grade layer: rounded, calm, pills for selection ================= */
+body{font:400 16px/1.47 var(--body);letter-spacing:-.01em;-webkit-font-smoothing:antialiased;background:var(--bg)}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:-.02em;line-height:1.1}
+h1{font-size:2rem} h2{font-size:1.3rem;letter-spacing:-.015em} h3{font-size:1.06rem;letter-spacing:-.01em}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:2px}
+a{color:var(--accent);font-weight:400}
+.muted{color:var(--muted)}
+.label{font:600 .8rem var(--body);letter-spacing:-.005em;color:var(--muted);text-transform:none}
+
+/* top bar: translucent material */
+.bar{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.logo{font:600 1.3rem var(--display);letter-spacing:-.02em}
+.logo i{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:9px 0 0 -1px var(--silver);margin-right:16px}
+.tabs{gap:2px}
+.tabs a,.tabs button{border-radius:var(--r-pill);padding:7px 14px;font:500 .92rem var(--body);color:var(--muted);transition:background-color .24s var(--ease),color .24s var(--ease)}
+.tabs a:hover,.tabs button:hover{background:var(--pill);color:var(--ink);text-decoration:none}
+.tabs a[aria-current="page"]{background:var(--pill);color:var(--ink);box-shadow:none}
+.college-chip{border-radius:var(--r-pill);background:var(--pill);border:0;color:var(--ink);font:500 .8rem var(--body);padding:5px 12px}
+.iconbtn,.bell{border-radius:50%;border:0;background:transparent;width:36px;height:36px;transition:background-color .24s var(--ease)}
+.iconbtn:hover,.bell:hover{background:var(--pill);border:0}
+.bell b{border-radius:var(--r-pill)}
+.bal{border-radius:var(--r-pill);background:var(--pill);color:var(--ink);border:0;font:600 .8rem var(--body);font-variant-numeric:tabular-nums;padding:5px 11px}
+.av{border-radius:50%;border:0;box-shadow:none}
+.strip{background:var(--accent-soft);border-bottom:0}
+
+/* surfaces: white cards on a soft canvas, no hairline boxes */
+.card{background:var(--surface);border:0;border-radius:var(--r-lg);box-shadow:var(--shadow);padding:22px}
+a.card{transition:transform .32s var(--ease),box-shadow .32s var(--ease)}
+a.card:hover,.card.lift:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.1);border-color:transparent}
+.note{border-radius:var(--r-md);background:var(--sunk);border:0}
+.alert{border-radius:var(--r-md)}
+.dm{border-radius:var(--r-lg);border:0;box-shadow:var(--shadow)}
+
+/* controls: pills, 44px targets, press states */
+.btn{background:var(--mark);color:var(--mark-ink);border:0;border-radius:var(--r-pill);font:600 .95rem var(--body);letter-spacing:-.01em;padding:11px 20px;min-height:40px;
+  box-shadow:none;filter:none;transition:background-color .24s var(--ease),transform .12s var(--ease)}
+.btn:hover{background:color-mix(in srgb,var(--mark) 90%,white);text-decoration:none}
+.btn:active{transform:scale(.98);background:color-mix(in srgb,var(--mark) 92%,black)}
+.btn.ghost{background:var(--pill);color:var(--ink);border:0}
+.btn.ghost:hover{background:var(--pill-hover)}
+.btn.danger{background:var(--bad-soft);color:var(--bad);border:0}
+.btn.danger:hover{background:color-mix(in srgb,var(--bad) 20%,transparent)}
+.btn.sm{padding:7px 14px;min-height:32px;font-size:.85rem;border-radius:var(--r-pill)}
+.btn.lg{padding:14px 26px;font-size:1.05rem;border-radius:var(--r-pill)}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.42;cursor:default}
+input[type=text],input[type=search],input[type=email],input[type=number],input[type=url],input[type=date],textarea,select{
+  background:var(--sunk);border:1px solid transparent;border-radius:var(--r-sm);padding:11px 14px;font:400 1rem var(--body);box-shadow:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);outline:none}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
+.filters a,.filters button{border-radius:var(--r-pill);border:0;background:var(--pill);color:var(--ink);font:500 .88rem var(--body);padding:7px 14px;transition:background-color .24s var(--ease)}
+.filters a:hover,.filters button:hover{background:var(--pill-hover)}
+.filters a[aria-current="true"],.filters button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.filters .mono{font:500 .8rem var(--body);opacity:.7}
+.chip{border-radius:var(--r-pill);background:var(--pill);border:0;padding:4px 11px;font-size:.8rem}
+.pill{border-radius:var(--r-pill);padding:4px 10px;font:600 .75rem var(--body)}
+.stamp{border-radius:var(--r-pill);transform:none;border-width:1px;font:600 .75rem var(--body);padding:4px 10px}
+.meter{border-radius:var(--r-pill);border:0;background:var(--pill);overflow:hidden}
+.meter b{border-radius:var(--r-pill);background:var(--accent)}
+.stat b,.sim .big,.mono{font-family:var(--body);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+code{font-family:var(--code)}
+.mono,.bubble-time,.seen,.convo .count,.call-status,.bal,.stat b{font-variant-numeric:tabular-nums}
+.toast{border-radius:var(--r-md);border:0;box-shadow:var(--shadow-pop);background:var(--surface);color:var(--ink)}
+.toast.err{border:0;box-shadow:var(--shadow-pop),inset 3px 0 0 var(--bad)}
+.skel{border-radius:var(--r-lg)}
+.oauth{border-radius:var(--r-pill)}
+
+/* messages */
+.bubble{border-radius:18px}
+.invite-card{border-radius:var(--r-lg)}
+.send,.attach{border-radius:50%}
 table,.stat b,table.stack-sm td{font-variant-numeric:tabular-nums}
 /* Skip link: hidden until a keyboard user tabs to it */
 .skip{position:absolute;left:12px;top:-60px;z-index:400;background:var(--mark);color:var(--mark-ink);padding:10px 16px;font-weight:500;text-decoration:none}
@@ -628,64 +684,31 @@ main:focus{outline:none}
 .smenu-links a:hover{color:var(--accent);text-decoration:none}
 .smenu-out .btn{width:100%}
 body.guest .smenu-panel{background:var(--pub-paper-2)}
-
-/* ================= Apple touches on the Rim look =================
-   Same dark palette, orange accent, fonts and layout; Apple's shapes and feel (apple-grade-web skill):
-   pill buttons with a press state, soft pill highlights for selection, rounded surfaces, round avatars, gentle motion. */
-:root{--r-sm:10px;--r-md:14px;--r-lg:18px;--r-pill:980px;--ease:cubic-bezier(.4,0,.6,1);--pop:0 12px 40px rgba(0,0,0,.45)}
-:root[data-theme="light"]{--pop:0 10px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06)}
-
-/* buttons: pills, press-in, smooth hover */
-.btn{border-radius:var(--r-pill);padding:10px 20px;transition:background-color .24s var(--ease),border-color .24s var(--ease),transform .12s var(--ease)}
-.btn:active{transform:scale(.97)}
-.btn.sm{border-radius:var(--r-pill);padding:7px 14px}
-.btn.lg{border-radius:var(--r-pill);padding:14px 26px}
-.btn.ghost{border-radius:var(--r-pill)}
-.btn.danger{border-radius:var(--r-pill)}
-.iconbtn,.bell{border-radius:50%;transition:background-color .24s var(--ease),border-color .24s var(--ease)}
-.linkbtn{border-radius:var(--r-sm)}
-.send,.attach{border-radius:50%}
-
-/* selection: soft pills instead of square boxes and underline bars */
-.tabs a,.tabs button{border-radius:var(--r-pill);transition:background-color .24s var(--ease),color .24s var(--ease)}
-.tabs a:hover,.tabs button:hover{background:var(--surface2)}
-.tabs a[aria-current="page"]{background:var(--surface2);color:var(--ink);box-shadow:none}
-.filters a,.filters button{border-radius:var(--r-pill);transition:background-color .24s var(--ease),color .24s var(--ease)}
-.filters a[aria-current="true"],.filters button[aria-pressed="true"]{border-radius:var(--r-pill)}
-.chip,.pill,.bal,.college-chip,.stamp{border-radius:var(--r-pill)}
-.stamp{transform:none}
-.bell b,.bn-icon b,.convo .count{border-radius:var(--r-pill)}
-
-/* surfaces: rounded, never sharp */
-.card{border-radius:var(--r-lg)}
-a.card{transition:border-color .24s var(--ease),transform .32s var(--ease)}
-.note,.alert,.toast,.skel{border-radius:var(--r-md)}
-.dm{border-radius:var(--r-lg);overflow:hidden}
-.bubble{border-radius:18px}
-.invite-card,.voice{border-radius:var(--r-lg)}
-.meter,.meter b,.ov-bar,.ov-bar i{border-radius:var(--r-pill)}
-.ov-figures{border:0;gap:12px}
-.ov-figures>div,.ov-figures>div+div{border:1px solid var(--line);border-radius:var(--r-md);padding:16px}
-.file-ico,.lightbox img{border-radius:var(--r-sm)}
-.av{border-radius:50%}
-.logo i{border-radius:50%}
-
-/* inputs: rounded, with a soft focus glow */
-input[type=text],input[type=search],input[type=email],input[type=number],input[type=url],input[type=date],textarea,select{border-radius:var(--r-sm);transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
-input:focus,textarea:focus,select:focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
-:focus-visible{border-radius:inherit}
-
-/* menus and the settings popover */
-.smenu-panel{border-radius:var(--r-lg);box-shadow:var(--pop)}
-.seg{border-radius:var(--r-pill);padding:3px;gap:2px;border:1px solid var(--line2)}
-.seg button{border-radius:var(--r-pill);transition:background-color .24s var(--ease)}
-.seg button+button{border-left:0}
-.seg button[aria-checked="true"]{box-shadow:none;background:var(--accent-soft);color:var(--ink)}
-.smenu-links a{border-radius:var(--r-sm);padding-inline:10px;margin-inline:-10px;border-bottom:0;transition:background-color .2s var(--ease)}
-.smenu-links a:hover{background:var(--surface2);color:var(--ink)}
+/* Apple-grade finish for components added later */
 .skip{border-radius:var(--r-pill)}
-
-/* phone tab bar: the current tab is tinted, no hard bar */
 @media (max-width:40rem){
+  .bottom-nav{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+  .bottom-nav a{font:500 .68rem/1 var(--body);letter-spacing:0}
   .bottom-nav a[aria-current="page"]{color:var(--accent);box-shadow:none}
+  .bn-icon b{border-radius:var(--r-pill);font:600 .62rem/16px var(--body)}
 }
+.smenu-panel{border:0;border-radius:var(--r-lg);box-shadow:var(--shadow-pop);padding:14px;gap:10px}
+.smenu-who{border-bottom:1px solid var(--line)}
+.seg{border:0;background:var(--pill);border-radius:var(--r-pill);padding:3px;gap:2px}
+.seg button{border-radius:var(--r-pill);padding:6px 0;color:var(--ink);transition:background-color .24s var(--ease)}
+.seg button+button{border-left:0}
+.seg button:hover{background:var(--pill-hover)}
+.seg button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.smenu-links{border-top:0}
+.smenu-links a{border-radius:var(--r-sm);padding:9px 10px;margin:0 -10px;border-bottom:0;transition:background-color .2s var(--ease)}
+.smenu-links a:hover{background:var(--pill);color:var(--ink)}
+.ov-figures{border:0;gap:12px;grid-template-columns:repeat(4,minmax(0,1fr))}
+.ov-figures>div,.ov-figures>div+div{background:var(--sunk);border:0;border-radius:var(--r-md);padding:16px}
+.ov-figures b{font:600 1.9rem/1 var(--display);letter-spacing:-.02em}
+@media (max-width:40rem){.ov-figures{grid-template-columns:repeat(2,minmax(0,1fr))}.ov-figures>div:nth-child(n+3){border-top:0}}
+.ov-bar{border-radius:var(--r-pill);border:0;background:var(--pill);overflow:hidden}
+.ov-bar i{border-radius:var(--r-pill)}
+.card.invite{background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--surface)}
+/* Figures in tables use the text font with lining numbers, as apple.com does; only code is monospace. */
+td.n,th.n{font-family:var(--body)}
+.linkbtn{font-family:var(--body);font-weight:500}
