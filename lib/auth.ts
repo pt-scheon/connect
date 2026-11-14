@@ -11,7 +11,11 @@ const prod = process.env.NODE_ENV === "production";
 export const baseUrl = () => process.env.APP_URL || "http://localhost:3000";
 /* A cloud test copy of Connect, filled with invented sample people. Needs DEMO_MODE=1 and an address that says so
    (staging, demo or localhost), so it can never switch on for the real site by a stray setting. */
-export const demoMode = process.env.DEMO_MODE === "1" && /(^|[.-])(staging|demo)([.-])|localhost/.test(new URL(baseUrl()).hostname);
+export function demoAllowed(flag: string | undefined, appUrl: string): boolean {
+  if (flag !== "1") return false;
+  try { return /(^|[.-])(staging|demo)([.-])|(^|\.)localhost$/.test(new URL(appUrl).hostname); } catch { return false; }
+}
+export const demoMode = demoAllowed(process.env.DEMO_MODE, baseUrl());
 /* Sample sign-in (pick any seeded person). Only in development, or on a demo copy. */
 export const devLogin = demoMode || (!prod && process.env.ALLOW_DEV_LOGIN !== "0");
 

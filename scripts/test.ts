@@ -745,3 +745,19 @@ test("the rules page states every rule from the same numbers the code uses", asy
   assert.match(text, /coursework/);
   assert.match(text, /CGPA, grades and exam results are not part of any score/);
 });
+
+test("the sample-person sign-in only switches on for a test copy, never the real site", async () => {
+  const { demoAllowed } = await import("../lib/auth");
+  assert.equal(demoAllowed("1", "https://connect-staging-e918ea27.up.railway.app"), true);
+  assert.equal(demoAllowed("1", "https://demo.connect.example"), true);
+  assert.equal(demoAllowed("1", "http://localhost:3000"), true);
+  assert.equal(demoAllowed("1", "http://test.localhost:3000"), true);
+  // The real site stays closed even if the switch is set by mistake.
+  assert.equal(demoAllowed("1", "https://connect-production-77ec4d79.up.railway.app"), false);
+  assert.equal(demoAllowed("1", "https://demographics.example"), false);
+  assert.equal(demoAllowed("1", "https://localhost.evil.example"), false);
+  assert.equal(demoAllowed("1", "not a url"), false);
+  // And a test address alone is not enough without the switch.
+  assert.equal(demoAllowed(undefined, "https://connect-staging-e918ea27.up.railway.app"), false);
+  assert.equal(demoAllowed("true", "https://connect-staging-e918ea27.up.railway.app"), false);
+});
