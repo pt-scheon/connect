@@ -5,6 +5,7 @@ import { requireMember } from "@/lib/auth";
 import { splitFlags } from "@/lib/reviewers";
 import * as A from "../actions";
 import { F, Who } from "../ui";
+import { CollegeOverview } from "./overview";
 
 export const metadata = { title: "Admin" };
 
@@ -30,6 +31,7 @@ export default async function Admin() {
   return (
     <>
       <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your college only. Verify students and alumni, register clubs, and clear the review queue.{me.super ? <> Site admin: <Link href="/admin/colleges">manage colleges</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
+      <CollegeOverview cid={cid} />
       <div className="grid">
         <div className="card">
           <h2>Students not verified</h2>

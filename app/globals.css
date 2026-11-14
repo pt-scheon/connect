@@ -586,3 +586,16 @@ main:focus{outline:none}
   body:has(.bottom-nav) main{padding-bottom:24px}
   .top-only{display:none!important}
 }
+/* Admin: the college at a glance (app/admin/overview.tsx) */
+.overview{gap:20px}
+.ov-figures{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-block:1px solid var(--line)}
+.ov-figures>div{display:flex;flex-direction:column;gap:6px;padding:16px 16px 16px 0}
+.ov-figures>div+div{border-left:1px solid var(--line);padding-left:16px}
+.ov-figures b{font:400 2rem/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.ov-figures span{font-size:.85rem;color:var(--muted)}
+@media (max-width:40rem){.ov-figures{grid-template-columns:repeat(2,minmax(0,1fr))}.ov-figures>div:nth-child(3){border-left:0;padding-left:0}.ov-figures>div:nth-child(n+3){border-top:1px solid var(--line)}}
+.ov-skills{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ov-skills li{display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr) 2.5rem;gap:12px;align-items:center;font-size:.9rem}
+.ov-skills .mono{text-align:right;color:var(--muted)}
+.ov-bar{height:8px;background:var(--sunk);border:1px solid var(--line)}
+.ov-bar i{display:block;height:100%;background:var(--accent)}
