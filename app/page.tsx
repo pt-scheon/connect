@@ -9,7 +9,11 @@ import { timeAgo } from "@/lib/notify";
 import { needsFor, fitsMe, type Need } from "@/lib/relevance";
 import { Board, Count, type BoardItem } from "./client";
 import { Landing } from "./landing";
+
+/* Below this many verified students, the board asks people to bring their classmates. */
+const INVITE_UNTIL = 25;
 import { Av, skillsOf } from "./ui";
+import { ShareLink } from "./messages/media";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
   const me = await currentUser();
@@ -58,6 +62,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
     `SELECT up.*, p.name FROM updates up JOIN projects p ON p.id=up.project_id
      WHERE p.hidden=0 AND p.status<>'dropped' AND p.college_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 8`, cid);
 
+  const classmates = Number(all("SELECT COUNT(*) n FROM users WHERE college_id=? AND role='student' AND verified=1 AND suspended=0 AND deleted=0", cid)[0]?.n ?? 0);
   return (
     <>
       <div className="head">
@@ -94,6 +99,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
       <div className="cols">
         <Board items={items} canReview={canReview} initial={(await searchParams).f ?? "all"} />
         <aside className="stack">
+          {classmates < INVITE_UNTIL && (
+            <div className="card invite">
+              <span className="label">{college.name} is new on Connect</span>
+              <p className="small">{classmates <= 1 ? "You are the first one here." : `${classmates} students are here so far.`} A board works when your classmates are on it. Send them the link.</p>
+              <ShareLink path={`/c/${college.slug}`} title={`${college.name} on Connect`} text={`Join ${college.name} on Connect: find teammates and earn credit only for what ships.`} label="Invite classmates" />
+            </div>
+          )}
           {me.role === "student" && (
             <div className="card">
               <span className="label">Your standing</span>
