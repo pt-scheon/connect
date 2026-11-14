@@ -43,6 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" data-theme={theme} className={`${sans.variable} ${measure.variable}`}>
       <body className={me ? undefined : "guest"}>
+        <a className="skip" href="#main">Skip to content</a>
         <header className="bar">
           <div className="wrap">
             <Link href="/" className="logo"><i />Connect</Link>
@@ -83,7 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               : <>Your college&rsquo;s projects and people stay hidden until you <Link href="/onboarding">prove your college email</Link>.</>}
           </div></div>
         )}
-        <main className="wrap">{children}</main>
+        <main id="main" tabIndex={-1} className="wrap">{children}</main>
         <footer className="foot"><div className="wrap">
           <span>Connect. Credit comes only from what ships.</span>
           <span className="row"><Link href="/rules">How credit works</Link><Link href="/colleges">Colleges</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <Link href="/settings">Settings</Link> : <Link href="/signin">Sign in</Link>}</span>
