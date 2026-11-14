@@ -39,7 +39,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const member = signedIn && isMember(me);
   const college = member ? collegeById(me.college_id) : null;
   const dms = member ? unreadMessages(me.id) : 0;
-  const theme = (await cookies()).get("theme")?.value === "light" ? "light" : "dark";
+  const saved = (await cookies()).get("theme")?.value;
+  // A saved choice wins; with none, the page follows the device setting (see globals.css).
+  const theme = saved === "light" || saved === "dark" ? saved : undefined;
   const unread = signedIn ? get("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND seen=0", me.id).n : 0;
   return (
     <html lang="en" data-theme={theme} className={`${sans.variable} ${measure.variable}`}>

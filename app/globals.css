@@ -28,6 +28,18 @@
   --shadow:none;
   color-scheme:light;
 }
+/* No saved choice yet: follow the device's light or dark setting. */
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]){
+    --bg:oklch(97% 0.006 80); --surface:oklch(99.5% 0.003 80); --surface2:oklch(95% 0.007 80); --sunk:oklch(93% 0.008 80);
+    --ink:oklch(18% 0.010 75); --muted:oklch(45% 0.012 78); --line:oklch(88% 0.008 78); --line2:oklch(76% 0.010 78); --silver:oklch(65% 0.010 78);
+    --accent:oklch(52% 0.16 42); --accent-ink:oklch(99% 0.003 80); --accent-soft:oklch(94% 0.03 50);
+    --mark:oklch(70% 0.17 45); --mark-ink:oklch(12% 0.02 45);
+    --ok:oklch(48% 0.12 250); --ok-soft:oklch(94% 0.025 250); --warn:oklch(50% 0.11 70); --warn-soft:oklch(95% 0.035 80); --bad:oklch(52% 0.18 27); --bad-soft:oklch(95% 0.03 25);
+    --shadow:none;
+    color-scheme:light;
+  }
+}
 
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body)}

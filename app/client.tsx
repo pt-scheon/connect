@@ -317,8 +317,10 @@ export function Simulator() {
 }
 
 /* ---------- light / dark switch, remembered in a cookie so the server renders the right one ---------- */
-export function ThemeToggle({ theme }: { theme: "light" | "dark" }) {
-  const [t, setT] = useState(theme);
+export function ThemeToggle({ theme }: { theme?: "light" | "dark" }) {
+  const [t, setT] = useState<"light" | "dark">(theme ?? "dark");
+  // With no saved choice the page follows the device, so the button starts from what is showing.
+  useEffect(() => { if (!theme && window.matchMedia("(prefers-color-scheme: light)").matches) setT("light"); }, [theme]);
   const flip = () => {
     const next = t === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
