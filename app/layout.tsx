@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 import { get } from "@/lib/db";
 import { collegeById, isMember } from "@/lib/college";
@@ -17,9 +16,6 @@ import { Av } from "./ui";
 import "./globals.css";
 import "./public.css";
 
-/* Geist for text, Geist Mono for every number that measures something, on the public site and in the app. */
-const sans = Geist({ subsets: ["latin"], variable: "--font-geist" });
-const measure = Geist_Mono({ subsets: ["latin"], weight: ["400"], variable: "--font-geist-mono" });
 
 const about = "Build things with people from your college. Credit comes only from projects that ship, signed by your teammates.";
 export const metadata: Metadata = {
@@ -46,7 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = saved === "light" || saved === "dark" ? saved : undefined;
   const unread = signedIn ? get("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND seen=0", me.id).n : 0;
   return (
-    <html lang="en" data-theme={theme} className={`${sans.variable} ${measure.variable}`}>
+    <html lang="en" data-theme={theme}>
       <body className={me ? undefined : "guest"}>
         <a className="skip" href="#main">Skip to content</a>
         <header className="bar">
