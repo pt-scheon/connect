@@ -43,7 +43,7 @@ export function Landing() {
       <section className="pub-hero">
         <div className="pub-wrap pub-hero-grid">
           <div className="pub-hero-text">
-            <h1>Credit only for what ships.</h1>
+            <h1>Credit only for <span className="grad">what ships.</span></h1>
             <p className="lead">Find a team at your college. Your teammates sign what you built.</p>
             <SignInButtons large />
             <p className="pub-byline">Free for students. One account per college email, and each college is its own private space. <Link href="/colleges">See the colleges</Link>.</p>

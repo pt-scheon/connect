@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
-import { Av, Meter, Pill } from "./bits";
+import { Av, Meter, PIcon, Pill } from "./bits";
 
 type Action = (fd: FormData) => Promise<void>;
 
@@ -132,7 +132,7 @@ export function Board({ items, canReview, initial }: { items: BoardItem[]; canRe
       {list.length === 0 && <div className="note">{items.length ? "Nothing matches. Try another filter." : "No projects yet. Post the first one."}</div>}
       {list.map((p) => (
         <Link key={p.id} className="card lift" href={`/projects/${p.id}`}>
-          <span className="row between"><h2>{p.name}</h2><Pill status={p.status} /></span>
+          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} /><h2>{p.name}</h2></span><Pill status={p.status} /></span>
           <span className="muted">{p.pitch}</span>
           <span className="row">
             <span className="avs">{p.team.map((u) => <Av key={u.id} u={u} />)}</span>

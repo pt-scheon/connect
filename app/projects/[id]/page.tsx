@@ -11,7 +11,7 @@ import * as A from "../../actions";
 import { JoinAsk, ProofHelp, SplitForm } from "../../client";
 import { ShareLink } from "../../messages/media";
 import { toggleFollow } from "../../follow";
-import { F, Meter, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
+import { F, Meter, PIcon, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const me = await currentUser();
@@ -109,7 +109,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
       )}
       <div className="head">
         <div className="stack tight">
-          <div className="row"><h1>{p.name}</h1><Pill status={p.status} />
+          <div className="row"><PIcon id={p.id} name={p.name} lg /><h1>{p.name}</h1><Pill status={p.status} />
             <ShareLink path={`/projects/${id}`} title={`${p.name} on Connect`} text={p.status === "shipped" ? `${p.name}: shipped and reviewed on Connect` : `${p.name} is looking for people on Connect`} />
             {!onTeam && !p.hidden && (
               <form action={toggleFollow}>

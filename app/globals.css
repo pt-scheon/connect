@@ -712,3 +712,55 @@ body.guest .smenu-panel{background:var(--pub-paper-2)}
 /* Figures in tables use the text font with lining numbers, as apple.com does; only code is monospace. */
 td.n,th.n{font-family:var(--body)}
 .linkbtn{font-family:var(--body);font-weight:500}
+
+/* ================= More colour: Apple's system palette as accents =================
+   Fills are Apple's system colours; the -t versions are the deeper shades Apple uses for text on light
+   backgrounds, so coloured words keep 4.5:1. Dark mode uses the brighter dark-appearance colours. */
+:root{
+  --blue:#0a84ff; --green:#30d158; --orange:#ff9f0a; --purple:#bf5af2; --pink:#ff375f; --teal:#40c8e0; --indigo:#5e5ce6; --yellow:#ffd60a; --red:#ff453a;
+  --blue-t:#409cff; --green-t:#30d158; --orange-t:#ffb340; --purple-t:#da8fff; --pink-t:#ff6482; --teal-t:#5de6ff; --indigo-t:#7d7aff; --red-t:#ff6961;
+}
+:root[data-theme="light"]{
+  --blue:#007aff; --green:#34c759; --orange:#ff9500; --purple:#af52de; --pink:#ff2d55; --teal:#30b0c7; --indigo:#5856d6; --yellow:#ffcc00; --red:#ff3b30;
+  --blue-t:#0071e3; --green-t:#248a3d; --orange-t:#c93400; --purple-t:#8944ab; --pink-t:#d30f45; --teal-t:#0071a4; --indigo-t:#3634a3; --red-t:#d70015;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]){
+    --blue:#007aff; --green:#34c759; --orange:#ff9500; --purple:#af52de; --pink:#ff2d55; --teal:#30b0c7; --indigo:#5856d6; --yellow:#ffcc00; --red:#ff3b30;
+    --blue-t:#0071e3; --green-t:#248a3d; --orange-t:#c93400; --purple-t:#8944ab; --pink-t:#d30f45; --teal-t:#0071a4; --indigo-t:#3634a3; --red-t:#d70015;
+  }
+}
+
+/* project icons: a letter on a soft vertical gradient, like an app icon */
+.picon{--c:var(--blue);display:inline-grid;place-items:center;flex:none;width:32px;height:32px;border-radius:9px;color:#fff;
+  font:600 .95rem/1 var(--display);letter-spacing:-.02em;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--c) 78%,white),var(--c));box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)}
+.picon.lg{width:48px;height:48px;border-radius:12px;font-size:1.4rem}
+.picon.c0{--c:#007aff}.picon.c1{--c:#34a853}.picon.c2{--c:#ff9500}.picon.c3{--c:#af52de}
+.picon.c4{--c:#ff2d55}.picon.c5{--c:#5856d6}.picon.c6{--c:#30b0c7}.picon.c7{--c:#ff6b00}
+a.card .row.nowrap{gap:12px}
+
+/* status badges: each status its own colour */
+.pill.ok{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green-t)}
+.pill.warn{background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange-t)}
+.pill.info{background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue-t)}
+.pill.purple{background:color-mix(in srgb,var(--purple) 16%,transparent);color:var(--purple-t)}
+.pill.bad{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red-t)}
+
+/* the credit badge in the header reads as money earned */
+.bal{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green-t)}
+.chip.fit,.pill.fit{background:color-mix(in srgb,var(--teal) 16%,transparent);color:var(--teal-t)}
+
+/* admin figures: one colour each */
+.ov-figures>div:nth-child(1) b{color:var(--blue-t)}
+.ov-figures>div:nth-child(2) b{color:var(--green-t)}
+.ov-figures>div:nth-child(3) b{color:var(--orange-t)}
+.ov-figures>div:nth-child(4) b{color:var(--purple-t)}
+.ov-bar i{background:linear-gradient(90deg,var(--blue),var(--purple))}
+
+/* progress bars: a blue-to-teal sweep */
+.meter b{background:linear-gradient(90deg,var(--blue),var(--teal))}
+
+/* the getting-started card and invite card get a gentle colour wash */
+.card.start{background:linear-gradient(135deg,color-mix(in srgb,var(--blue) 9%,var(--surface)),color-mix(in srgb,var(--purple) 7%,var(--surface)))}
+.card.invite{background:linear-gradient(135deg,color-mix(in srgb,var(--green) 10%,var(--surface)),color-mix(in srgb,var(--teal) 8%,var(--surface)))}

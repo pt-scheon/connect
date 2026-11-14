@@ -152,3 +152,35 @@ body.guest .move .neg { color: var(--bad); }
 .pub-actions a:not(.btn)::after { content: " ›"; }
 
 @media (prefers-reduced-motion: reduce) { body.guest *, body.guest *::before, body.guest *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+
+/* ================= More colour on the home page ================= */
+/* the headline's key words in an Apple-style colour sweep */
+.pub-hero h1 .grad{background:linear-gradient(90deg,var(--blue) 0%,var(--purple) 45%,var(--pink) 75%,var(--orange) 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+@media (forced-colors: active){.pub-hero h1 .grad{color:CanvasText;background:none}}
+
+/* the four steps: one colour each */
+.pub-rows li:nth-child(1)::before{background:var(--blue)}
+.pub-rows li:nth-child(2)::before{background:var(--green)}
+.pub-rows li:nth-child(3)::before{background:var(--orange)}
+.pub-rows li:nth-child(4)::before{background:var(--purple)}
+.pub-rows li{position:relative;overflow:hidden}
+.pub-rows li:nth-child(1){background:linear-gradient(160deg,color-mix(in srgb,var(--blue) 8%,var(--surface)),var(--surface) 60%)}
+.pub-rows li:nth-child(2){background:linear-gradient(160deg,color-mix(in srgb,var(--green) 8%,var(--surface)),var(--surface) 60%)}
+.pub-rows li:nth-child(3){background:linear-gradient(160deg,color-mix(in srgb,var(--orange) 9%,var(--surface)),var(--surface) 60%)}
+.pub-rows li:nth-child(4){background:linear-gradient(160deg,color-mix(in srgb,var(--purple) 9%,var(--surface)),var(--surface) 60%)}
+
+/* the four readers: a coloured letter tile each */
+.pub-cols > div::before{display:grid;place-items:center;width:40px;height:40px;border-radius:11px;color:#fff;font:600 1.1rem/1 var(--display);margin-bottom:6px}
+.pub-cols > div:nth-child(1)::before{content:"S";background:linear-gradient(180deg,color-mix(in srgb,var(--blue) 78%,white),var(--blue))}
+.pub-cols > div:nth-child(2)::before{content:"C";background:linear-gradient(180deg,color-mix(in srgb,var(--green) 78%,white),var(--green))}
+.pub-cols > div:nth-child(3)::before{content:"A";background:linear-gradient(180deg,color-mix(in srgb,var(--orange) 78%,white),var(--orange))}
+.pub-cols > div:nth-child(4)::before{content:"R";background:linear-gradient(180deg,color-mix(in srgb,var(--purple) 78%,white),var(--purple))}
+
+/* the two profiles: earned credit in green, none in grey */
+.pub-versus .pub-record:first-child .pub-credit b{color:var(--green-t)}
+.pub-versus .pub-record:last-child .pub-credit b{color:var(--muted)}
+
+/* the calculator's chosen row and the closing statement */
+body.guest .move.on{background:color-mix(in srgb,var(--blue) 12%,var(--surface))}
+.pub-statement .grad{background:linear-gradient(90deg,var(--blue),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
