@@ -7,7 +7,7 @@ import { get } from "@/lib/db";
 import { collegeById, isMember } from "@/lib/college";
 import { unreadMessages } from "@/lib/chat";
 import { CallProvider } from "./calls/ui";
-import { baseUrl, currentUser, standings } from "@/lib/auth";
+import { baseUrl, currentUser, demoMode, standings } from "@/lib/auth";
 import { signOut } from "./actions";
 import { NavLinks, ThemeToggle, Toast } from "./client";
 import { Av } from "./ui";
@@ -25,6 +25,8 @@ export const metadata: Metadata = {
   description: about,
   openGraph: { title: "Connect", description: about, type: "website" },
   appleWebApp: { capable: true, title: "Connect", statusBarStyle: "black-translucent" },
+  // The test copy stays out of search engines.
+  ...(demoMode ? { robots: { index: false, follow: false } } : {}),
 };
 export const viewport: Viewport = {
   themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0B0A09" }, { media: "(prefers-color-scheme: light)", color: "#F7F5F2" }],
@@ -74,6 +76,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
         </header>
+        {demoMode && <div className="strip"><div className="wrap">Test site with invented sample people. Nothing here is real. The real Connect is at <a href="https://connect-production-77ec4d79.up.railway.app">connect-production-77ec4d79.up.railway.app</a>.</div></div>}
         {signedIn && !member && (
           <div className="strip"><div className="wrap">
             {me.role === "alum" ? "Your alumni account is waiting for an admin of your college to approve it."

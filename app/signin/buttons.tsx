@@ -1,4 +1,5 @@
 import { PROVIDERS, ready } from "@/lib/oauth";
+import { demoMode } from "@/lib/auth";
 
 const GoogleMark = () => (
   <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -25,7 +26,9 @@ export function SignInButtons({ large }: { large?: boolean }) {
           {p.key === "google" ? <GoogleMark /> : <LinkedInMark />}Continue with {p.label}
         </a>
       ))}
-      {show.length === 0 && <div className="note">Sign-in is not set up yet. Add Google or LinkedIn keys to the server.</div>}
+      {show.length === 0 && (demoMode
+        ? <a className="btn lg" href="/signin">Sign in as a sample person</a>
+        : <div className="note">Sign-in is not set up yet. Add Google or LinkedIn keys to the server.</div>)}
     </div>
   );
 }

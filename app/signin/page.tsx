@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { all } from "@/lib/db";
-import { currentUser, devLogin } from "@/lib/auth";
+import { currentUser, demoMode, devLogin } from "@/lib/auth";
 import { readyProviders } from "@/lib/oauth";
 import { devSignIn } from "../actions";
 import { Av } from "../ui";
@@ -12,7 +12,7 @@ export const metadata = { title: "Sign in" };
 export default async function SignIn() {
   if (await currentUser()) redirect("/");
   const people = devLogin ? all("SELECT u.*, c.name college FROM users u LEFT JOIN colleges c ON c.id=u.college_id WHERE u.suspended=0 ORDER BY c.name, u.role DESC, u.name LIMIT 40") : [];
-  const missing = devLogin && readyProviders().length < 2;
+  const missing = devLogin && !demoMode && readyProviders().length < 2;
   return (
     <div className="stack narrow">
       <div className="card">
@@ -24,8 +24,8 @@ export default async function SignIn() {
       </div>
       {devLogin && (
         <div className="card">
-          <span className="label">Development only</span>
-          <p className="small muted">Sign in as a sample person. This list never appears in production.</p>
+          <span className="label">{demoMode ? "Test site" : "Development only"}</span>
+          <p className="small muted">{demoMode ? "Sign in as any of these invented people to try Connect. Nothing here is real, and this test site is wiped from time to time." : "Sign in as a sample person. This list never appears in production."}</p>
           {people.length === 0 && <p className="small">No sample people yet. Run <code>npm run seed</code>.</p>}
           {people.map((u) => (
             <form key={u.id} action={devSignIn} className="row between">

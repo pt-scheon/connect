@@ -135,7 +135,8 @@ const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "conn
 
 function open() {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const d = new Database(file);
+  // Wait up to 30 seconds for a lock rather than failing: during `next build` several workers open the same file at once.
+  const d = new Database(file, { timeout: 30_000 });
   d.pragma("journal_mode = WAL");
   migrate(d);
   return d;
