@@ -761,3 +761,24 @@ test("the sample-person sign-in only switches on for a test copy, never the real
   assert.equal(demoAllowed(undefined, "https://connect-staging-e918ea27.up.railway.app"), false);
   assert.equal(demoAllowed("true", "https://connect-staging-e918ea27.up.railway.app"), false);
 });
+
+test("following a project brings its main moments to the inbox, never to its own team or the author", async () => {
+  const { run, now, user, project } = await setup();
+  const { logUpdate } = await import("../lib/notify");
+  const { get } = await import("../lib/db");
+  const lead = user(), mate = user(), fan = user();
+  const pid = project("building", 0, [lead, mate]);
+  run("INSERT INTO follows (project_id, user_id, created_at) VALUES (?,?,?)", pid, fan, now());
+  run("INSERT INTO follows (project_id, user_id, created_at) VALUES (?,?,?)", pid, mate, now()); // a teammate who also follows
+  const notes = (u: number) => get("SELECT COUNT(*) n FROM notifications WHERE user_id=?", u).n as number;
+  logUpdate(pid, lead, "Two benches are live", "post");
+  logUpdate(pid, lead, "Milestone done: Booking flow");
+  logUpdate(pid, lead, "Renamed from Old name"); // not worth an alert
+  assert.equal(notes(fan), 2);
+  assert.equal(notes(mate), 0);
+  assert.equal(notes(lead), 0);
+  // A hidden project tells no one.
+  run("UPDATE projects SET hidden=1 WHERE id=?", pid);
+  logUpdate(pid, lead, "Shipped with a pot of 100");
+  assert.equal(notes(fan), 2);
+});

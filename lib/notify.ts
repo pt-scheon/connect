@@ -1,4 +1,4 @@
-import { run, now } from "./db";
+import { all, get, run, now } from "./db";
 import { emailNote } from "./mail";
 
 /* An entry in someone's inbox. */
@@ -10,6 +10,20 @@ export function notify(userId: number, text: string, href: string) {
 /* A line on a project's timeline. kind "event" is written by the app, "post" by a teammate. */
 export function logUpdate(projectId: number, userId: number | null, text: string, kind: "event" | "post" = "event") {
   run("INSERT INTO updates (project_id, user_id, kind, text, created_at) VALUES (?,?,?,?,?)", projectId, userId, kind, text, now());
+  if (kind === "post" || FOLLOWED.test(text)) tellFollowers(projectId, userId, text);
+}
+
+/* The moments worth telling followers about; renames, joins and reviewer notes stay on the timeline only. */
+const FOLLOWED = /^(Milestone done|Sent for review|Shipped|Dropped|Reviewers sent it back)/;
+function tellFollowers(projectId: number, actor: number | null, text: string) {
+  const p = get("SELECT name FROM projects WHERE id=? AND hidden=0", projectId);
+  if (!p) return;
+  const short = text.length > 90 ? text.slice(0, 87) + "..." : text;
+  // Teammates already hear about their own project; only outsiders who follow it are told here.
+  for (const f of all(
+    "SELECT f.user_id FROM follows f JOIN users u ON u.id=f.user_id WHERE f.project_id=? AND u.deleted=0 AND u.suspended=0 AND f.user_id NOT IN (SELECT user_id FROM members WHERE project_id=? AND status='active')",
+    projectId, projectId))
+    if (f.user_id !== actor) notify(f.user_id, `${p.name}: ${short}`, `/projects/${projectId}`);
 }
 
 /* Simple per-person rate limit, kept in memory. Good for one server; swap for Redis if you run several. */

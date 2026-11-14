@@ -1126,7 +1126,7 @@ export async function deleteAccount(fd: FormData) {
     for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
       "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM commission_apps WHERE user_id=? AND status='pending'",
-      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?",
+      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?",
       "DELETE FROM requests WHERE user_id=? AND status='pending'", "DELETE FROM blocks WHERE user_id=? OR blocked_id=?", "DELETE FROM push_subs WHERE user_id=?"]) run(q, ...(q.includes("OR") ? [me.id, me.id] : [me.id]));
     // Their conversations go too, attachments included.
     for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);

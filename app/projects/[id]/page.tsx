@@ -10,6 +10,7 @@ import { skillsOf } from "../../ui";
 import * as A from "../../actions";
 import { JoinAsk, ProofHelp, SplitForm } from "../../client";
 import { ShareLink } from "../../messages/media";
+import { toggleFollow } from "../../follow";
 import { F, Meter, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -34,6 +35,8 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const comments = all("SELECT c.*, u.name, u.picture, u.id uid FROM comments c JOIN users u ON u.id=c.user_id WHERE c.project_id=? ORDER BY c.created_at, c.id", id);
   const updates = all("SELECT up.*, u.name uname FROM updates up LEFT JOIN users u ON u.id=up.user_id WHERE up.project_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 30", id);
   const onTeam = mine?.mstatus === "active";
+  const following = !!get("SELECT 1 FROM follows WHERE project_id=? AND user_id=?", id, me.id);
+  const followers = get("SELECT COUNT(*) n FROM follows WHERE project_id=?", id).n as number;
   const lead = p.lead_id === me.id;
   const open = p.status === "recruiting" || p.status === "building";
   const shipped = p.status === "shipped";
@@ -107,7 +110,14 @@ export default async function Project({ params }: { params: Promise<{ id: string
       <div className="head">
         <div className="stack tight">
           <div className="row"><h1>{p.name}</h1><Pill status={p.status} />
-            <ShareLink path={`/projects/${id}`} title={`${p.name} on Connect`} text={p.status === "shipped" ? `${p.name}: shipped and reviewed on Connect` : `${p.name} is looking for people on Connect`} /></div>
+            <ShareLink path={`/projects/${id}`} title={`${p.name} on Connect`} text={p.status === "shipped" ? `${p.name}: shipped and reviewed on Connect` : `${p.name} is looking for people on Connect`} />
+            {!onTeam && !p.hidden && (
+              <form action={toggleFollow}>
+                <input type="hidden" name="id" value={id} />
+                <button className={`btn sm ${following ? "ghost" : ""}`} aria-pressed={following}>{following ? "Following" : "Follow"}</button>
+              </form>
+            )}
+            {followers > 0 && <span className="small muted">{followers} following</span>}</div>
           <p>{p.pitch}</p>
           {lead && open && (
             <details className="small">
