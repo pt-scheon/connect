@@ -29,6 +29,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
   const needs = new Map<number, Need[]>();
   for (const n of all("SELECT rs.* FROM role_skills rs JOIN roles r ON r.id=rs.role_id JOIN projects p ON p.id=r.project_id WHERE r.open=1 AND p.college_id=? ORDER BY rs.importance DESC", cid))
     needs.set(n.role_id, [...(needs.get(n.role_id) ?? []), { skill: n.skill, importance: n.importance }]);
+  const followed = new Set(all("SELECT project_id FROM follows WHERE user_id=?", me.id).map((r) => r.project_id as number));
   const items: BoardItem[] = all("SELECT * FROM projects WHERE college_id=? ORDER BY created_at DESC", cid)
     .map((p) => {
       const team = members.filter((m) => m.project_id === p.id).map(({ id, name, picture }) => ({ id, name, picture }));
@@ -38,7 +39,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
       return {
         id: p.id, name: p.name, pitch: p.pitch, status: p.status, hidden: p.hidden,
         done: ms.get(p.id)?.done ?? 0, total: ms.get(p.id)?.total ?? 0, team,
-        open, funded: funded.has(p.id), mine: team.some((u) => u.id === me.id),
+        open, funded: funded.has(p.id), mine: team.some((u) => u.id === me.id), followed: followed.has(p.id),
         fit: [...new Set(openRoles.flatMap((r) => fitsMe(needsFor(r.title, needs.get(r.id) ?? []), r.title, mySkills)))],
         active: live && t ? timeAgo(t) : "", quiet: live && t > 0 && now() - t > 14 * 86400,
       };

@@ -108,13 +108,14 @@ export function CopyLink({ path, label = "Copy profile link" }: { path: string; 
 /* ---------- projects board: instant filter and search ---------- */
 export type BoardItem = {
   id: number; name: string; pitch: string; status: string; done: number; total: number;
-  team: { id: number; name: string; picture: string | null }[]; open: string[]; funded: boolean; mine: boolean; hidden?: number;
+  team: { id: number; name: string; picture: string | null }[]; open: string[]; funded: boolean; mine: boolean; followed?: boolean; hidden?: number;
   fit: string[]; active: string; quiet: boolean;
 };
 export function Board({ items, canReview, initial }: { items: BoardItem[]; canReview: boolean; initial: string }) {
   const [f, setF] = useState(initial);
   const [q, setQ] = useState("");
   const filters: [string, string][] = [["all", "All"], ...(items.some((p) => p.fit.length) ? [["fit", "Fits you"] as [string, string]] : []), ["open", "Needs people"], ["building", "Building"], ["shipped", "Shipped"], ["mine", "Mine"]];
+  if (items.some((p) => p.followed && !p.mine)) filters.push(["following", "Following"]);
   if (canReview) filters.push(["review", "To review"]);
   const count = (k: string) => items.filter((p) => match(p, k)).length;
   const list = items.filter((p) => match(p, f) && (!q || `${p.name} ${p.pitch} ${p.open.join(" ")}`.toLowerCase().includes(q.toLowerCase())));
@@ -150,6 +151,7 @@ function match(p: BoardItem, k: string) {
   if (k === "fit") return p.fit.length > 0 && !p.mine;
   if (k === "open") return p.open.length > 0;
   if (k === "mine") return p.mine;
+  if (k === "following") return !!p.followed && !p.mine;
   if (k === "review") return p.status === "review" && !p.mine;
   if (k === "all") return p.status !== "dropped" || p.mine;
   return p.status === k;
