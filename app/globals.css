@@ -559,8 +559,7 @@ td{padding-block:11px}
 .chip.ok{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
 .meter.skillbar{flex:none;display:block;width:100%}
 
-/* ================= Rim: nothing round, medium-weight heads, numbers in mono ================= */
-*,*::before,*::after{border-radius:0!important}
+/* ================= Rim: medium-weight heads, numbers in mono (corners: see the Apple touches at the end) ================= */
 h1,h2,h3{font-weight:500;letter-spacing:-.03em;line-height:1.05}
 .bar{background:var(--bg);backdrop-filter:none}
 .card,a.card:hover,.card.lift:hover{box-shadow:none}
@@ -629,3 +628,64 @@ main:focus{outline:none}
 .smenu-links a:hover{color:var(--accent);text-decoration:none}
 .smenu-out .btn{width:100%}
 body.guest .smenu-panel{background:var(--pub-paper-2)}
+
+/* ================= Apple touches on the Rim look =================
+   Same dark palette, orange accent, fonts and layout; Apple's shapes and feel (apple-grade-web skill):
+   pill buttons with a press state, soft pill highlights for selection, rounded surfaces, round avatars, gentle motion. */
+:root{--r-sm:10px;--r-md:14px;--r-lg:18px;--r-pill:980px;--ease:cubic-bezier(.4,0,.6,1);--pop:0 12px 40px rgba(0,0,0,.45)}
+:root[data-theme="light"]{--pop:0 10px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06)}
+
+/* buttons: pills, press-in, smooth hover */
+.btn{border-radius:var(--r-pill);padding:10px 20px;transition:background-color .24s var(--ease),border-color .24s var(--ease),transform .12s var(--ease)}
+.btn:active{transform:scale(.97)}
+.btn.sm{border-radius:var(--r-pill);padding:7px 14px}
+.btn.lg{border-radius:var(--r-pill);padding:14px 26px}
+.btn.ghost{border-radius:var(--r-pill)}
+.btn.danger{border-radius:var(--r-pill)}
+.iconbtn,.bell{border-radius:50%;transition:background-color .24s var(--ease),border-color .24s var(--ease)}
+.linkbtn{border-radius:var(--r-sm)}
+.send,.attach{border-radius:50%}
+
+/* selection: soft pills instead of square boxes and underline bars */
+.tabs a,.tabs button{border-radius:var(--r-pill);transition:background-color .24s var(--ease),color .24s var(--ease)}
+.tabs a:hover,.tabs button:hover{background:var(--surface2)}
+.tabs a[aria-current="page"]{background:var(--surface2);color:var(--ink);box-shadow:none}
+.filters a,.filters button{border-radius:var(--r-pill);transition:background-color .24s var(--ease),color .24s var(--ease)}
+.filters a[aria-current="true"],.filters button[aria-pressed="true"]{border-radius:var(--r-pill)}
+.chip,.pill,.bal,.college-chip,.stamp{border-radius:var(--r-pill)}
+.stamp{transform:none}
+.bell b,.bn-icon b,.convo .count{border-radius:var(--r-pill)}
+
+/* surfaces: rounded, never sharp */
+.card{border-radius:var(--r-lg)}
+a.card{transition:border-color .24s var(--ease),transform .32s var(--ease)}
+.note,.alert,.toast,.skel{border-radius:var(--r-md)}
+.dm{border-radius:var(--r-lg);overflow:hidden}
+.bubble{border-radius:18px}
+.invite-card,.voice{border-radius:var(--r-lg)}
+.meter,.meter b,.ov-bar,.ov-bar i{border-radius:var(--r-pill)}
+.ov-figures{border:0;gap:12px}
+.ov-figures>div,.ov-figures>div+div{border:1px solid var(--line);border-radius:var(--r-md);padding:16px}
+.file-ico,.lightbox img{border-radius:var(--r-sm)}
+.av{border-radius:50%}
+.logo i{border-radius:50%}
+
+/* inputs: rounded, with a soft focus glow */
+input[type=text],input[type=search],input[type=email],input[type=number],input[type=url],input[type=date],textarea,select{border-radius:var(--r-sm);transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
+input:focus,textarea:focus,select:focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+:focus-visible{border-radius:inherit}
+
+/* menus and the settings popover */
+.smenu-panel{border-radius:var(--r-lg);box-shadow:var(--pop)}
+.seg{border-radius:var(--r-pill);padding:3px;gap:2px;border:1px solid var(--line2)}
+.seg button{border-radius:var(--r-pill);transition:background-color .24s var(--ease)}
+.seg button+button{border-left:0}
+.seg button[aria-checked="true"]{box-shadow:none;background:var(--accent-soft);color:var(--ink)}
+.smenu-links a{border-radius:var(--r-sm);padding-inline:10px;margin-inline:-10px;border-bottom:0;transition:background-color .2s var(--ease)}
+.smenu-links a:hover{background:var(--surface2);color:var(--ink)}
+.skip{border-radius:var(--r-pill)}
+
+/* phone tab bar: the current tab is tinted, no hard bar */
+@media (max-width:40rem){
+  .bottom-nav a[aria-current="page"]{color:var(--accent);box-shadow:none}
+}

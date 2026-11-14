@@ -227,3 +227,50 @@ body.guest .move .neg { color: var(--pub-orange); }
 
 @media (prefers-reduced-motion: reduce) { body.guest *, body.guest *::before, body.guest *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
 @media (max-width: 40rem) { body.guest .sim { padding: 16px; } body.guest .move { padding-inline: 8px; gap: 12px; } .pub-record { padding: 24px 16px; } }
+
+/* ================= Apple touches on the public site =================
+   Same dark Rim look and orange; Apple's pill buttons, rounded panels and soft selection. */
+body.guest .btn, body.guest .btn.sm, body.guest .btn.lg, body.guest .oauth { border-radius: 980px; }
+body.guest .btn:active, body.guest .oauth:active { transform: scale(.97); }
+body.guest .oauth { min-height: 50px; }
+body.guest .oauth svg { border-radius: 50%; }
+body.guest .card { border-radius: 18px; }
+body.guest .note { border-radius: 14px; }
+body.guest .av { border-radius: 50%; }
+body.guest .logo i { border-radius: 50%; }
+body.guest input[type=text], body.guest input[type=email], body.guest input[type=search], body.guest textarea, body.guest select { border-radius: 10px; }
+body.guest .guest-nav a:not(.btn) { padding: 8px 12px; border-radius: 980px; transition: background-color .24s cubic-bezier(.4,0,.6,1); }
+body.guest .guest-nav a:not(.btn):hover { background: var(--pub-paper-2); }
+
+/* the calculator: a rounded panel, no corner ticks; rows as a rounded inset list */
+body.guest .sim { border-radius: 24px; }
+body.guest .sim::before, body.guest .sim::after { content: none; }
+body.guest .sim .stack.tight { border-top: 0; border-radius: 14px; overflow: hidden; background: var(--pub-paper); }
+body.guest .move { transition: background-color .2s cubic-bezier(.4,0,.6,1); }
+body.guest .move:last-child { border-bottom: 0; }
+body.guest .move.on { box-shadow: none; background: color-mix(in srgb, var(--pub-orange) 14%, var(--pub-paper)); }
+body.guest .move input { border-radius: 5px; }
+
+/* the steps and the four readers: rounded panels */
+.pub-rows { border-top: 0; display: flex; flex-direction: column; gap: 12px; }
+.pub-rows li { background: var(--pub-paper-2); border: 0; border-radius: 18px; padding: 24px 28px; }
+.pub-rows li::before { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--pub-orange) 18%, transparent); }
+.pub-sec > .pub-wrap > h2 { border-top: 0; padding-top: 0; }
+.pub-cols { border-top: 0; gap: 16px; }
+.pub-cols > div, .pub-cols > div:first-child, .pub-cols > div:last-child, .pub-cols > div:nth-child(n) {
+  background: var(--pub-paper-2); border: 0; border-radius: 18px; padding: 24px; margin-top: 0;
+}
+
+/* the two profiles: rounded panels, no corner ticks */
+.pub-record { border-radius: 24px; }
+.pub-record:first-child::before, .pub-record:first-child::after { content: none; }
+.pub-record table { border-radius: 14px; overflow: hidden; background: var(--pub-paper); }
+.pub-record tr:first-child { border-top: 0; }
+.pub-record th { padding-left: 16px; }
+.pub-record td { padding-right: 16px; }
+.pub-mark { border-radius: 980px; padding: 5px 10px; }
+.pub-facts li + li { border-left: 0; margin-left: 8px; padding-left: 0; }
+.pub-facts li { background: var(--pub-paper); border-radius: 980px; padding: 4px 12px; }
+
+/* the closing panel */
+.pub-ink { border-top: 0; }
