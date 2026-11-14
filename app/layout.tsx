@@ -8,6 +8,7 @@ import { collegeById, isMember } from "@/lib/college";
 import { unreadMessages } from "@/lib/chat";
 import { CallProvider } from "./calls/ui";
 import { BottomNav } from "./bottom-nav";
+import { Shortcuts } from "./shortcuts";
 import { baseUrl, currentUser, demoMode, standings } from "@/lib/auth";
 import { signOut } from "./actions";
 import { NavLinks, ThemeToggle, Toast } from "./client";
@@ -95,6 +96,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Suspense><Toast /></Suspense>
         {member && <CallProvider />}
         {member && <BottomNav me={me.id} dms={dms} unread={unread} />}
+        {member && <Shortcuts />}
       </body>
     </html>
   );
