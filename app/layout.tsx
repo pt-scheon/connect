@@ -7,6 +7,7 @@ import { get } from "@/lib/db";
 import { collegeById, isMember } from "@/lib/college";
 import { unreadMessages } from "@/lib/chat";
 import { CallProvider } from "./calls/ui";
+import { BottomNav } from "./bottom-nav";
 import { baseUrl, currentUser, demoMode, standings } from "@/lib/auth";
 import { signOut } from "./actions";
 import { NavLinks, ThemeToggle, Toast } from "./client";
@@ -57,12 +58,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <div className="right">
                   <ThemeToggle theme={theme} />
                   {member && (
-                    <Link href="/messages" className="bell" aria-label={dms ? `Messages, ${dms} unread` : "Messages"}>
+                    <Link href="/messages" className="bell top-only" aria-label={dms ? `Messages, ${dms} unread` : "Messages"}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                       {dms > 0 && <b>{dms > 9 ? "9+" : dms}</b>}
                     </Link>
                   )}
-                  <Link href="/inbox" className="bell" aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"}>
+                  <Link href="/inbox" className="bell top-only" aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
                     {unread > 0 && <b>{unread > 9 ? "9+" : unread}</b>}
                   </Link>
@@ -91,6 +92,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </div></footer>
         <Suspense><Toast /></Suspense>
         {member && <CallProvider />}
+        {member && <BottomNav me={me.id} dms={dms} unread={unread} />}
       </body>
     </html>
   );
