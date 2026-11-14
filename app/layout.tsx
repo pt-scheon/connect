@@ -9,9 +9,10 @@ import { unreadMessages } from "@/lib/chat";
 import { CallProvider } from "./calls/ui";
 import { BottomNav } from "./bottom-nav";
 import { Shortcuts } from "./shortcuts";
+import { SettingsMenu } from "./settings-menu";
 import { baseUrl, currentUser, demoMode, standings } from "@/lib/auth";
 import { signOut } from "./actions";
-import { NavLinks, ThemeToggle, Toast } from "./client";
+import { NavLinks, Toast } from "./client";
 import { Av } from "./ui";
 import "./globals.css";
 import "./public.css";
@@ -56,10 +57,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <>
                 <nav className="tabs" aria-label="Sections">
                   {member ? <NavLinks admin={!!me.admin} /> : <span className="small muted">Finish verifying to see your college</span>}
-                  <form action={signOut}><button>Sign out</button></form>
                 </nav>
                 <div className="right">
-                  <ThemeToggle theme={theme} />
                   {member && (
                     <Link href="/messages" className="bell top-only" aria-label={dms ? `Messages, ${dms} unread` : "Messages"}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
@@ -74,10 +73,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     {me.role === "student" && <span className="bal">{standings().get(me.id)?.credit ?? 0}<span className="hide-sm"> credit</span></span>}
                     <Av u={me} />
                   </Link>
+                  <SettingsMenu name={me.name} profile={`/u/${me.id}`} saved={theme} signOut={signOut} member={member} />
                 </div>
               </>
             ) : (
-              <nav className="right guest-nav" aria-label="Site" style={{ marginLeft: "auto" }}>{me ? <ThemeToggle theme={theme} /> : <><Link href="/rules">How credit works</Link><Link href="/colleges">Colleges</Link><Link className="btn sm" href="/signin">Sign in</Link></>}</nav>
+              <nav className="right guest-nav" aria-label="Site" style={{ marginLeft: "auto" }}>{me ? <SettingsMenu name={me.name} saved={theme} signOut={signOut} member={false} /> : <><Link href="/rules">How credit works</Link><Link href="/colleges">Colleges</Link><Link className="btn sm" href="/signin">Sign in</Link></>}</nav>
             )}
           </div>
         </header>

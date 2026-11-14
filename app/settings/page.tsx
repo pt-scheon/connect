@@ -19,7 +19,7 @@ export default async function Settings() {
       </div></div>
 
       <F action={saveSettings} back="/settings" className="card stack">
-        <span className="label">Alerts and visibility</span>
+        <span className="label" id="alerts">Alerts and visibility</span>
         <PushToggle publicKey={pushPublicKey()} />
         <label className="check">
           <input type="checkbox" name="email_notes" id="email_notes" defaultChecked={!!me.email_notes} />

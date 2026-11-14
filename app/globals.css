@@ -611,3 +611,21 @@ main:focus{outline:none}
 .ov-skills .mono{text-align:right;color:var(--muted)}
 .ov-bar{height:8px;background:var(--sunk);border:1px solid var(--line)}
 .ov-bar i{display:block;height:100%;background:var(--accent)}
+/* Settings menu (app/settings-menu.tsx) */
+.smenu{position:relative}
+.smenu-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:60;width:min(300px,calc(100vw - 32px));display:flex;flex-direction:column;gap:12px;
+  padding:16px;background:var(--surface);border:1px solid var(--line2);color:var(--ink);text-align:left}
+.smenu-who{display:flex;flex-direction:column;gap:2px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.smenu-who a,.smenu-who b{font-weight:500;color:var(--ink)}
+.smenu-theme{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.smenu-theme legend{padding:0;margin-bottom:6px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line2)}
+.seg button{background:transparent;border:0;padding:8px 0;color:var(--muted);font:500 .85rem var(--body);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button:hover{color:var(--ink);background:var(--surface2)}
+.seg button[aria-checked="true"]{background:var(--accent-soft);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.smenu-links{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.smenu-links a{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--line);color:var(--ink);font-weight:500;text-decoration:none}
+.smenu-links a:hover{color:var(--accent);text-decoration:none}
+.smenu-out .btn{width:100%}
+body.guest .smenu-panel{background:var(--pub-paper-2)}
