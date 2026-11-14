@@ -140,7 +140,9 @@ function open() {
   // Wait up to 30 seconds for a lock rather than failing: during `next build` several workers open the same file at once.
   const d = new Database(file, { timeout: 30_000 });
   d.pragma("journal_mode = WAL");
-  migrate(d);
+  // One write lock around the whole set-up, so two processes opening a fresh file take turns instead of both
+  // adding the same column (or the same home college) and one failing with "duplicate column name".
+  d.transaction(() => migrate(d)).immediate();
   return d;
 }
 
