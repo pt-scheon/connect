@@ -787,3 +787,18 @@ a.card .row.nowrap{gap:12px}
 .code-input{font:600 1.5rem var(--body);letter-spacing:.3em;text-align:center;font-variant-numeric:tabular-nums}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
 .linkbtn:hover{text-decoration:underline}
+
+/* ---------- Touch screens: every control at least about 44px to tap (Apple's guideline) ---------- */
+@media (pointer:coarse){
+  .tabs a,.tabs button{min-height:44px;display:inline-flex;align-items:center}
+  .filters a,.filters button{min-height:40px;display:inline-flex;align-items:center}
+  .filters button.quiet{min-height:36px}
+  .seg button{padding-block:11px}
+  .tick{min-height:40px;padding-right:4px}
+  .tick input,.check input{width:22px;height:22px}
+  input[type=range]{height:32px}
+  .foot .row a,.foot a{display:inline-flex;align-items:center;min-height:40px}
+  .chat-back{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  .linkbtn,.linklike{min-height:40px}
+}
+.inbox-day{font:600 .95rem var(--body);color:var(--muted);display:flex;align-items:center;gap:8px;margin:10px 0 2px}

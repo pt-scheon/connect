@@ -8,6 +8,7 @@ import { unreadMessages } from "@/lib/chat";
 import { CallProvider } from "./calls/ui";
 import { BottomNav } from "./bottom-nav";
 import { Shortcuts } from "./shortcuts";
+import { UnreadBadge } from "./unread-badge";
 import { SettingsMenu } from "./settings-menu";
 import { baseUrl, currentUser, demoMode, standings } from "@/lib/auth";
 import { signOut } from "./actions";
@@ -93,6 +94,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {member && <CallProvider />}
         {member && <BottomNav me={me.id} dms={dms} unread={unread} />}
         {member && <Shortcuts />}
+        {signedIn && <UnreadBadge count={unread + dms} />}
       </body>
     </html>
   );

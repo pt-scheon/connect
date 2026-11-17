@@ -148,7 +148,7 @@ export default async function Commission({ params }: { params: Promise<{ id: str
             <details className="small">
               <summary className="muted" style={{ cursor: "pointer" }}>{mineAs === "doer" && silent ? `No answer for ${C.silentDays} days? Send it to the admins` : "Something went wrong? Open a dispute"}</summary>
               <F action={A.disputeCommission} back={back} hidden={{ id }} className="stack tight">
-                <input type="text" name="reason" id="dispute-reason" maxLength={400} placeholder="What happened?" required />
+                <input type="text" name="reason" id="dispute-reason" aria-label="What happened" maxLength={400} placeholder="What happened?" required />
                 <button className="btn ghost sm">Send to admins</button>
               </F>
             </details>
@@ -188,7 +188,7 @@ export default async function Commission({ params }: { params: Promise<{ id: str
                 <select name="reason_kind" id="report-kind" defaultValue="coursework" aria-label="What is wrong">
                   <option value="coursework">It is graded coursework, an assignment or an exam</option><option value="fake">It is not real work (credit passing)</option><option value="abuse">Something else</option>
                 </select>
-                <input type="text" name="reason" id="report-reason" placeholder="Anything the admins should know (optional)" maxLength={300} />
+                <input type="text" name="reason" id="report-reason" aria-label="Reason for the report" placeholder="Anything the admins should know (optional)" maxLength={300} />
                 <button className="btn ghost sm">Send to admins</button>
               </F>
             </details>

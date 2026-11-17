@@ -349,7 +349,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
             </div>
             {me.verified && p.status !== "dropped" ? (
               <F action={A.postComment} back={back} hidden={{ id }} className="row">
-                <input type="text" name="text" id="comment-text" maxLength={500} placeholder={onTeam ? "Answer a question or add a note" : "Ask the team a question"} required />
+                <input type="text" name="text" id="comment-text" maxLength={500} aria-label={onTeam ? "Answer or note" : "Your question"} placeholder={onTeam ? "Answer or add a note" : "Ask the team a question"} required />
                 <button className="btn ghost">Post</button>
               </F>
             ) : null}
@@ -359,7 +359,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
             <h2>Updates</h2>
             {onTeam && p.status !== "dropped" && (
               <F action={A.postUpdate} back={back} hidden={{ id }} className="row">
-                <input type="text" name="text" id="update-text" maxLength={280} placeholder="What moved this week?" required />
+                <input type="text" name="text" id="update-text" aria-label="Project update" maxLength={280} placeholder="What moved this week?" required />
                 <button className="btn ghost">Post</button>
               </F>
             )}
@@ -457,7 +457,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
             <details className="small">
               <summary className="muted" style={{ cursor: "pointer" }}>Report this project</summary>
               <F action={A.report} back={back} hidden={{ kind: "project", target: id }} className="stack tight">
-                <input type="text" name="reason" id="report-reason" placeholder="What is wrong?" maxLength={300} required />
+                <input type="text" name="reason" id="report-reason" aria-label="What is wrong" placeholder="What is wrong?" maxLength={300} required />
                 <button className="btn ghost sm">Send to admins</button>
               </F>
             </details>

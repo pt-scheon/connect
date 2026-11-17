@@ -394,7 +394,7 @@ export default async function Profile({ params, searchParams }: Props) {
             <details className="small">
               <summary className="muted" style={{ cursor: "pointer" }}>Report this profile</summary>
               <F action={A.report} back={back} hidden={{ kind: "user", target: id }} className="stack tight" >
-                <input type="text" name="reason" id="report-reason" placeholder="What is wrong?" maxLength={300} required />
+                <input type="text" name="reason" id="report-reason" aria-label="What is wrong" placeholder="What is wrong?" maxLength={300} required />
                 <button className="btn ghost sm">Send to admins</button>
               </F>
             </details>

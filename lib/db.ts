@@ -148,7 +148,10 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // When and from what kind of device the person last signed in, shown to them in Settings.
   ["users", "last_login_at", "INTEGER"],
   ["users", "last_login_ua", "TEXT DEFAULT ''"],
-  ["users", "two_step", "INTEGER DEFAULT 1"], // ask for an emailed code when signing in on a new device
+  ["users", "two_step", "INTEGER DEFAULT 1"],
+  // The inbox shows "new" for entries since the visit before this one; kept for a minute so a refresh does not lose it.
+  ["users", "inbox_prev", "INTEGER DEFAULT 0"],
+  ["users", "inbox_read_at", "INTEGER DEFAULT 0"], // ask for an emailed code when signing in on a new device
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
 ];
 
