@@ -20,6 +20,16 @@ export default async function SignIn() {
         <p className="muted">For students and alumni of one college. Build things with each other, and let the record speak.</p>
         <SignInButtons />
         <p className="small muted">We get your name, photo and email. Students then confirm a college email, unless they signed in with it. Alumni are approved by an admin. By continuing you agree to the <Link href="/terms">terms</Link> and <Link href="/privacy">privacy policy</Link>.</p>
+        <details className="help">
+          <summary>Trouble signing in?</summary>
+          <div className="stack tight small">
+            <p><b>Forgot your password?</b> Connect has no password of its own. You sign in with your Google or LinkedIn account, so reset it there: <a href="https://accounts.google.com/signin/recovery" target="_blank" rel="noopener noreferrer">recover a Google account</a> or <a href="https://www.linkedin.com/uas/request-password-reset" target="_blank" rel="noopener noreferrer">reset a LinkedIn password</a>. Then come back and sign in.</p>
+            <p><b>No sign-in code in your email?</b> Check spam, wait a minute, then press &ldquo;send a new code&rdquo;. The code goes to your college address.</p>
+            <p><b>Landed on an empty new account?</b> You probably picked a different account from the one you joined with. Sign out, then choose the Google or LinkedIn account you used the first time.</p>
+            <p><b>Lost a phone or used a shared computer?</b> Sign in on a device you trust, open Settings and press <b>Sign out of all other devices</b>.</p>
+            <p><b>Told your account is suspended?</b> Only an admin of your college can restore it.</p>
+          </div>
+        </details>
         {missing && <div className="note">Development note: a button without keys in <code>.env.local</code> sends you back here with a message. See the README for the two-minute setup.</div>}
       </div>
       {devLogin && (

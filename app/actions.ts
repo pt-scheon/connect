@@ -2,14 +2,16 @@
 
 import crypto from "crypto";
 import { redirect } from "next/navigation";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { all, get, run, db, now, type Row } from "@/lib/db";
 import { compute, RULES } from "@/lib/credit";
-import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify } from "@/lib/auth";
+import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify, recordLogin } from "@/lib/auth";
 import { addFeedback, answerFeedback } from "@/lib/feedback";
+import { CODE_MINUTES, TRUST_DAYS, checkLoginCode, domainTakesMail, forgetDevices, needsCode, pendingToken, readPending, sendLoginCode, trustDevice } from "@/lib/twostep";
 import { addCollege, collegeById, collegeForEmail, isMember } from "@/lib/college";
 import { domainOf, isEmail, isPublicMail } from "@/lib/domains";
-import { notify, logUpdate, allow } from "@/lib/notify";
+import { notify, logUpdate, allow, deviceName } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
 import { needsFromList } from "@/lib/relevance";
@@ -62,9 +64,46 @@ const open = (p: Row) => p.status === "recruiting" || p.status === "building";
 /* ---------- sign-in, onboarding, verification ---------- */
 export async function devSignIn(fd: FormData) {
   if (!devLogin) redirect("/signin");
-  const u = get("SELECT id FROM users WHERE id=?", Number(fd.get("id")));
-  if (u) await setSession(u.id);
+  const u = get("SELECT * FROM users WHERE id=?", Number(fd.get("id")));
+  if (!u) redirect("/");
+  const jar = await cookies();
+  // With TWO_STEP_DEV=1 the sample sign-in also stops for a code, so the second step can be tried without Google.
+  if (process.env.TWO_STEP_DEV === "1" && needsCode(u, jar.get("td")?.value) && (await sendLoginCode(u))) {
+    jar.set("pending", pendingToken(u.id), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: CODE_MINUTES * 60 });
+    redirect("/signin/verify");
+  }
+  await setSession(u.id);
   redirect("/");
+}
+/* Step two of sign-in: the code from the email. Right code: signed in, and the device is remembered if they asked. */
+export async function verifyLogin(fd: FormData) {
+  const jar = await cookies();
+  const id = readPending(jar.get("pending")?.value);
+  if (!id) redirect("/signin?err=" + encodeURIComponent("That sign-in ran out of time. Start again."));
+  const say = (m: string): never => redirect("/signin/verify?err=" + encodeURIComponent(m));
+  if (!allow(`2fav:${id}`, 12, 600)) say("Too many tries. Wait ten minutes.");
+  const r = checkLoginCode(id!, String(fd.get("code") ?? ""));
+  if (r === "expired") say("That code has expired. Send a new one.");
+  if (r === "locked") say("Too many wrong tries. Send a new code.");
+  if (r === "wrong") say("Wrong code. Check the latest email.");
+  const u = get("SELECT id, suspended FROM users WHERE id=?", id);
+  if (!u || u.suspended) redirect("/signin?err=" + encodeURIComponent("This account has been suspended by an admin."));
+  const device = deviceName((await headers()).get("user-agent"));
+  if (fd.get("trust")) jar.set("td", trustDevice(id!, device), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: TRUST_DAYS * 86400 });
+  jar.delete("pending");
+  recordLogin(id!, device, notify);
+  await setSession(id!);
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+export async function resendLogin() {
+  const id = readPending((await cookies()).get("pending")?.value);
+  if (!id) redirect("/signin?err=" + encodeURIComponent("That sign-in ran out of time. Start again."));
+  const say = (k: "ok" | "err", m: string): never => redirect(`/signin/verify?${k}=` + encodeURIComponent(m));
+  if (!allow(`2fa:${id}`, 5, 900)) say("err", "Too many codes requested. Wait fifteen minutes.");
+  const u = get("SELECT * FROM users WHERE id=? AND suspended=0", id);
+  if (!u || !(await sendLoginCode(u))) say("err", "We could not email the code. Try again in a minute.");
+  say("ok", "A new code is on its way. Older codes no longer work.");
 }
 export async function signOut() {
   await clearSession();
@@ -119,6 +158,8 @@ export async function sendCode(fd: FormData) {
   if (get("SELECT 1 FROM users WHERE college_email=? AND id<>?", email, me.id)) fail("That college email is already linked to another account.");
   const known = collegeForEmail(email), name = s("college_name", 80);
   if (!known && name.length < 3) fail(`@${domain} is not on Connect yet. Add your college's full name and we will set it up.`);
+  // Before spending a code: can that domain receive email at all? Catches typos and invented domains.
+  if (mailReady() && !(await domainTakesMail(domain))) fail(`@${domain} cannot receive email, so it cannot be verified. Check the spelling of your college address.`);
   if (!allow(`code:${me.id}`, 3, 600)) fail("Too many codes requested. Wait ten minutes.");
   const code = String(crypto.randomInt(100000, 1000000));
   run("INSERT OR REPLACE INTO codes (user_id, email, code, expires, tries, college_name) VALUES (?,?,?,?,0,?)", me.id, email, code, now() + 900, known ? "" : name);
@@ -138,7 +179,8 @@ export async function verifyCode(fd: FormData) {
   const c = get("SELECT * FROM codes WHERE user_id=?", me.id);
   if (!c || c.expires < now()) fail("That code has expired. Send a new one.");
   if (c.tries >= 5) fail("Too many wrong tries. Send a new code.");
-  if (c.code !== s("code")) {
+  const typed = Buffer.from(s("code", 12)), real = Buffer.from(String(c.code));
+  if (typed.length !== real.length || !crypto.timingSafeEqual(typed, real)) {
     run("UPDATE codes SET tries=tries+1 WHERE user_id=?", me.id);
     fail("Wrong code.");
   }
@@ -1110,6 +1152,7 @@ export async function saveSettings(fd: FormData) {
   const on = (k: string) => (fd.get(k) ? 1 : 0);
   run("UPDATE users SET email_notes=?, open_to_join=?, follow_notes=?, calls_on=?, dm_from=? WHERE id=?",
     on("email_notes"), on("open_to_join"), on("follow_notes"), on("calls_on"), fd.get("dm_from") === "team" ? "team" : "all", me.id);
+  run("UPDATE users SET two_step=? WHERE id=?", on("two_step"), me.id);
   done(back, "Settings saved.");
 }
 /* Raises the person's session counter, so every cookie made before now stops working, then signs this device back in.
@@ -1118,6 +1161,7 @@ export async function signOutEverywhere(fd: FormData) {
   const { me, back } = await ctx(fd, false);
   run("UPDATE users SET session_v=COALESCE(session_v,0)+1 WHERE id=?", me.id);
   run("DELETE FROM push_subs WHERE user_id=?", me.id);
+  forgetDevices(me.id); // every device, this one included, is asked for a code at its next sign-in
   await setSession(me.id);
   done(back, "Signed out on every other device.");
 }
@@ -1153,7 +1197,7 @@ export async function deleteAccount(fd: FormData) {
     for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
       "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM commission_apps WHERE user_id=? AND status='pending'",
-      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?", "DELETE FROM feedback WHERE user_id=?",
+      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?", "DELETE FROM feedback WHERE user_id=?", "DELETE FROM trusted_devices WHERE user_id=?", "DELETE FROM login_codes WHERE user_id=?",
       "DELETE FROM requests WHERE user_id=? AND status='pending'", "DELETE FROM blocks WHERE user_id=? OR blocked_id=?", "DELETE FROM push_subs WHERE user_id=?"]) run(q, ...(q.includes("OR") ? [me.id, me.id] : [me.id]));
     // Their conversations go too, attachments included.
     for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);

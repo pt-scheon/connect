@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { tone } from "./tones";
 import { useRouter } from "next/navigation";
 
 /* Voice and video calls, for any page of the app. One CallProvider lives in the layout; it listens for rings,
@@ -34,27 +35,6 @@ function Face({ u, size }: { u: Peer; size: number }) {
     : <span className="call-face" style={{ width: size, height: size, fontSize: size / 2.6, background: `hsl(${(u.id * 67) % 360} 55% 42%)` }}>{u.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}</span>;
 }
 
-/* Ringtone and ringback, made with the Web Audio API so there are no sound files to load. */
-function tone(kind: "ring" | "back") {
-  let ctx: AudioContext | null = null, stop = false;
-  try { ctx = new AudioContext(); } catch { return () => {}; }
-  const beep = (f: number, at: number, len: number) => {
-    const o = ctx!.createOscillator(), g = ctx!.createGain();
-    o.frequency.value = f; o.connect(g); g.connect(ctx!.destination);
-    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(kind === "ring" ? 0.18 : 0.08, at + 0.02);
-    g.gain.setValueAtTime(kind === "ring" ? 0.18 : 0.08, at + len - 0.05); g.gain.linearRampToValueAtTime(0, at + len);
-    o.start(at); o.stop(at + len);
-  };
-  const cycle = () => {
-    if (stop || !ctx) return;
-    const t = ctx.currentTime;
-    if (kind === "ring") { beep(880, t, 0.25); beep(660, t + 0.3, 0.25); beep(880, t + 0.6, 0.25); beep(660, t + 0.9, 0.25); }
-    else { beep(425, t, 0.4); beep(425, t + 0.6, 0.4); }
-    setTimeout(cycle, kind === "ring" ? 2400 : 3000);
-  };
-  void ctx.resume().then(cycle);
-  return () => { if (stop) return; stop = true; ctx?.close().catch(() => {}); };
-}
 
 export function CallProvider() {
   const [s, setS] = useState<State>({ phase: "idle" });

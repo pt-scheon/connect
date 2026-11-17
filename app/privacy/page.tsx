@@ -16,6 +16,8 @@ export default function Privacy() {
         <li><b>From you:</b> branch, graduation year, skills, a line about you, optional GitHub, LinkedIn and website links, and your college email if you verify with a code.</li>
         <li><b>From using Connect:</b> projects you post or join, milestones, proof links, reviews, vouches, credit splits, questions, club roles and funding applications.</li>
         <li><b>From messages and calls:</b> the messages you send, and the photos, videos, files and voice notes you attach. For calls we keep a log of who called whom, when, and for how long. Calls are not recorded.</li>
+        <li><b>When you sign in:</b> the time and the kind of device (for example &ldquo;Chrome on Windows&rdquo;) of your latest sign-in, so we can show it to you and tell you about a sign-in you did not make. We do not keep your network address.</li>
+        <li><b>Sign-in codes:</b> when a code is emailed to you we keep only a scrambled copy of it until it is used or expires, and a scrambled marker for each device you chose to trust.</li>
         <li><b>If you turn on alerts:</b> an address your browser gives us for that device, so we can send it notifications. Turning alerts off removes it.</li>
       </ul>
 
@@ -33,7 +35,7 @@ export default function Privacy() {
       </ul>
 
       <h2>Cookies</h2>
-      <p>One cookie keeps you signed in, one remembers light or dark mode, and one lasts a few minutes while you sign in with Google or LinkedIn. No tracking or advertising cookies.</p>
+      <p>One cookie keeps you signed in, one remembers light or dark mode, one remembers a device you chose to trust at sign-in, and one lasts a few minutes while you sign in with Google or LinkedIn. No tracking or advertising cookies.</p>
 
       <h2>Your choices</h2>
       <ul>

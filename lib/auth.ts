@@ -85,6 +85,16 @@ export function upsertUser(p: { sub: string; name: string; email?: string; email
   return id;
 }
 
+/* Notes a completed sign-in. From the second sign-in on, the person gets an inbox line naming the device, so a
+   sign-in they did not make is noticed and can be undone from Settings. Returns whether it was their first. */
+export function recordLogin(userId: number, device: string, tell: (userId: number, text: string, href: string) => void): boolean {
+  const u = get("SELECT last_login_at, onboarded FROM users WHERE id=?", userId);
+  const first = !u?.last_login_at;
+  run("UPDATE users SET last_login_at=?, last_login_ua=? WHERE id=?", now(), device.slice(0, 60), userId);
+  if (!first && u.onboarded) tell(userId, `New sign-in to your account from ${device}. Not you? Sign out of all other devices in Settings.`, "/settings#devices");
+  return first;
+}
+
 /* A student who signed in with a verified email on a college's domain needs no code: that email is the proof.
    Only that college can be joined this way, and someone already verified at a college never moves. */
 export function autoVerify(userId: number) {

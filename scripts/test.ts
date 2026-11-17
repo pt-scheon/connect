@@ -849,3 +849,87 @@ test("signing out everywhere makes older sign-in cookies stop working", async ()
   assert.equal(tokenOk("7.", 7, 0), false);
   assert.equal(tokenOk("7", 7, 0), false);
 });
+
+test("a new sign-in is noted and, after the first, announced in the inbox with the device", async () => {
+  const { user } = await setup();
+  const { recordLogin } = await import("../lib/auth");
+  const { deviceName, notify } = await import("../lib/notify");
+  const { get } = await import("../lib/db");
+  assert.equal(deviceName("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"), "Chrome on Windows");
+  assert.equal(deviceName("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"), "Safari on iPhone or iPad");
+  assert.equal(deviceName("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"), "Edge on Mac");
+  assert.equal(deviceName(""), "an unknown device");
+  const u = user();
+  const notes = () => get("SELECT COUNT(*) n FROM notifications WHERE user_id=?", u).n as number;
+  assert.equal(recordLogin(u, "Chrome on Windows", notify), true); // the first sign-in is not news
+  assert.equal(notes(), 0);
+  assert.equal(recordLogin(u, "Safari on iPhone or iPad", notify), false);
+  assert.equal(notes(), 1);
+  const row = get("SELECT last_login_ua, last_login_at FROM users WHERE id=?", u);
+  assert.equal(row.last_login_ua, "Safari on iPhone or iPad");
+  assert.ok(row.last_login_at > 0);
+});
+
+test("two-step sign-in: a code works once, expires, locks after five wrong tries, and a trusted device skips it", async () => {
+  const { run, now, user } = await setup();
+  process.env.TWO_STEP_DEV = "1";
+  const T = await import("../lib/twostep");
+  const { get } = await import("../lib/db");
+  const id = user();
+  run("UPDATE users SET college_email='a.student@college.example' WHERE id=?", id);
+  const me = () => get("SELECT * FROM users WHERE id=?", id);
+  // A verified member on an unknown device is asked; switching the setting off, or not being verified, is not.
+  assert.equal(T.needsCode(me()), true);
+  run("UPDATE users SET two_step=0 WHERE id=?", id);
+  assert.equal(T.needsCode(me()), false);
+  run("UPDATE users SET two_step=1, verified=0 WHERE id=?", id);
+  assert.equal(T.needsCode(me()), false);
+  run("UPDATE users SET verified=1 WHERE id=?", id);
+  // The code itself is never stored, only a hash.
+  const code = T.newLoginCode(id);
+  assert.match(code, /^\d{6}$/);
+  assert.ok(!String(get("SELECT code_hash FROM login_codes WHERE user_id=?", id).code_hash).includes(code));
+  assert.equal(T.checkLoginCode(id, code === "111111" ? "222222" : "111111"), "wrong");
+  assert.equal(T.checkLoginCode(id, ` ${code.slice(0, 3)} ${code.slice(3)} `), "ok"); // spaces are fine
+  assert.equal(T.checkLoginCode(id, code), "expired"); // used once, gone
+  // Five wrong tries lock that code, even for the right answer.
+  const c2 = T.newLoginCode(id);
+  for (let i = 0; i < 5; i++) assert.equal(T.checkLoginCode(id, "000000" === c2 ? "000001" : "000000"), "wrong");
+  assert.equal(T.checkLoginCode(id, c2), "locked");
+  // An old code is refused.
+  const c3 = T.newLoginCode(id);
+  run("UPDATE login_codes SET expires=? WHERE user_id=?", now() - 1, id);
+  assert.equal(T.checkLoginCode(id, c3), "expired");
+  // Another person's code is no use.
+  const other = user();
+  assert.equal(T.checkLoginCode(other, T.newLoginCode(id)), "expired");
+  // A trusted device is not asked again; someone else's device cookie, an old one, or a forgotten one is.
+  const device = T.trustDevice(id, "Chrome on Windows");
+  assert.equal(T.needsCode(me(), device), false);
+  assert.equal(T.needsCode(me(), "made-up"), true);
+  assert.equal(T.needsCode(get("SELECT * FROM users WHERE id=?", other), device), false); // other has no college email, so never asked
+  run("UPDATE trusted_devices SET created_at=? WHERE user_id=?", now() - 91 * 86400, id);
+  assert.equal(T.needsCode(me(), device), true);
+  const d2 = T.trustDevice(id, "Safari on Mac");
+  T.forgetDevices(id);
+  assert.equal(T.needsCode(me(), d2), true);
+  // The waiting cookie is signed and short-lived.
+  assert.equal(T.readPending(T.pendingToken(id)), id);
+  assert.equal(T.readPending(T.pendingToken(id, now() - 1)), null);
+  assert.equal(T.readPending(T.pendingToken(id).replace(/^\d+/, String(other))), null);
+  assert.equal(T.readPending("junk"), null);
+  assert.equal(T.maskEmail("a.student@college.example"), "a.••••••@college.example");
+  delete process.env.TWO_STEP_DEV;
+});
+
+test("a college domain that cannot receive email is caught before a code is sent", async () => {
+  const { domainTakesMail } = await import("../lib/twostep");
+  const fails = (code: string) => async () => { throw Object.assign(new Error(code), { code }); };
+  assert.equal(await domainTakesMail("typo.example", fails("ENOTFOUND")), false); // no such domain
+  assert.equal(await domainTakesMail("web-only.example", fails("ENODATA")), false); // a domain with no mail servers
+  assert.equal(await domainTakesMail("empty.example", async () => []), false);
+  assert.equal(await domainTakesMail("nullmx.example", async () => [{ exchange: "." }]), false); // says outright it takes no mail
+  assert.equal(await domainTakesMail("college.example", async () => [{ exchange: "mx.college.example" }]), true);
+  // If the lookup itself breaks, the student is not blocked: the emailed code is still the real proof.
+  assert.equal(await domainTakesMail("college.example", fails("ETIMEOUT")), true);
+});

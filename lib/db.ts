@@ -73,6 +73,10 @@ CREATE TABLE IF NOT EXISTS feedback (
   status TEXT DEFAULT 'new', reply TEXT DEFAULT '', replied_by INTEGER, created_at INTEGER NOT NULL, replied_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS feedback_user ON feedback (user_id);
+-- Two-step sign-in: the code waiting to be typed (hashed), and devices a person chose to trust (hashed cookie value).
+CREATE TABLE IF NOT EXISTS login_codes (user_id INTEGER PRIMARY KEY, code_hash TEXT NOT NULL, expires INTEGER NOT NULL, tries INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS trusted_devices (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, label TEXT DEFAULT '', created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS trusted_devices_user ON trusted_devices (user_id);
 CREATE TABLE IF NOT EXISTS review_log (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, reviewer_id INTEGER NOT NULL, verdict INTEGER, outcome INTEGER, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS project_skills (project_id INTEGER, skill TEXT, PRIMARY KEY (project_id, skill));
 CREATE TABLE IF NOT EXISTS member_skills (project_id INTEGER, user_id INTEGER, skill TEXT, by_id INTEGER, PRIMARY KEY (project_id, user_id, skill, by_id));
@@ -141,6 +145,10 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["users", "calls_on", "INTEGER DEFAULT 1"],
   ["users", "dm_from", "TEXT DEFAULT 'all'"],
   ["users", "session_v", "INTEGER DEFAULT 0"],
+  // When and from what kind of device the person last signed in, shown to them in Settings.
+  ["users", "last_login_at", "INTEGER"],
+  ["users", "last_login_ua", "TEXT DEFAULT ''"],
+  ["users", "two_step", "INTEGER DEFAULT 1"], // ask for an emailed code when signing in on a new device
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
 ];
 

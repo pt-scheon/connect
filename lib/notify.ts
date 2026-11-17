@@ -46,3 +46,14 @@ export function timeAgo(t: number): string {
   if (s < 86400 * 30) return `${Math.floor(s / 86400)} d ago`;
   return new Date(t * 1000).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
+
+/* The visitor's address as the host in front of us reports it. Only used to slow down floods, never stored. */
+export const ipOf = (req: Request) => (req.headers.get("x-forwarded-for") || "").split(",")[0].trim().slice(0, 60) || "unknown";
+
+/* "Chrome on Windows" from a browser's user-agent line. Rough on purpose: enough for someone to recognise their own device. */
+export function deviceName(ua: string | null | undefined): string {
+  const u = String(ua || "");
+  const os = /iPhone|iPad|iPod/.test(u) ? "iPhone or iPad" : /Android/.test(u) ? "Android" : /Windows/.test(u) ? "Windows" : /Mac OS X|Macintosh/.test(u) ? "Mac" : /CrOS/.test(u) ? "Chromebook" : /Linux/.test(u) ? "Linux" : "";
+  const br = /Edg\//.test(u) ? "Edge" : /OPR\/|Opera/.test(u) ? "Opera" : /Firefox\/|FxiOS/.test(u) ? "Firefox" : /Chrome\/|CriOS/.test(u) ? "Chrome" : /Safari\//.test(u) ? "Safari" : "";
+  return br && os ? `${br} on ${os}` : br || os || "an unknown device";
+}

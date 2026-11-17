@@ -777,3 +777,13 @@ a.card .row.nowrap{gap:12px}
 .choice input:focus-visible+span{outline:3px solid color-mix(in srgb,var(--accent) 50%,transparent);outline-offset:2px}
 .fb-reply{background:color-mix(in srgb,var(--blue) 9%,transparent);border-radius:var(--r-md);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
 .set-gap{margin-top:10px;padding-top:16px;border-top:1px solid var(--line)}
+.help{border-top:1px solid var(--line);padding-top:12px}
+.help>summary{cursor:pointer;font-weight:600;font-size:.92rem;color:var(--accent);list-style:none;border-radius:var(--r-sm)}
+.help>summary::-webkit-details-marker{display:none}
+.help>summary::after{content:" ›"}
+.help[open]>summary::after{content:" ⌄"}
+.help>div{margin-top:10px;color:var(--muted)}
+.help b{color:var(--ink)}
+.code-input{font:600 1.5rem var(--body);letter-spacing:.3em;text-align:center;font-variant-numeric:tabular-nums}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
+.linkbtn:hover{text-decoration:underline}

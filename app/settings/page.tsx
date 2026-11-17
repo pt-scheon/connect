@@ -3,7 +3,9 @@ import { cookies } from "next/headers";
 import { all } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { isMember } from "@/lib/college";
+import { timeAgo } from "@/lib/notify";
 import { mailReady } from "@/lib/mail";
+import { TRUST_DAYS, codeAddress, twoStepOn } from "@/lib/twostep";
 import { pushPublicKey } from "@/lib/push";
 import { PushToggle } from "../push-toggle";
 import { ThemeSeg } from "../settings-menu";
@@ -71,6 +73,15 @@ export default async function Settings() {
           </select>
           <small>You can always reply to someone you wrote to first, and a project lead can still send you a role invite.</small>
         </label>
+
+        <span className="label set-gap" id="two-step">Sign-in security</span>
+        <label className="check">
+          <input type="checkbox" name="two_step" id="two_step" defaultChecked={me.two_step !== 0} />
+          <span><b>Ask for an emailed code on a new device</b><br />
+            <small className="muted">{!twoStepOn() ? "Starts working once email is switched on for this site. Until then sign-in is Google or LinkedIn only."
+              : codeAddress(me) ? `After Google or LinkedIn, a six-digit code goes to ${codeAddress(me)}. A device you trust is not asked again for ${TRUST_DAYS} days.`
+              : "Needs a verified college email first."}</small></span>
+        </label>
         <div><button className="btn">Save</button></div>
       </F>
 
@@ -89,11 +100,12 @@ export default async function Settings() {
 
       <div className="card stack" id="devices">
         <span className="label">Sign-in and devices</span>
-        <p className="small muted">You sign in with {ways.length ? ways.join(" and ") : "your sign-in provider"}{me.email ? ` as ${me.email}` : ""}. Connect never sees your password.</p>
+        <p className="small muted">You sign in with {ways.length ? ways.join(" and ") : "your sign-in provider"}{me.email ? ` as ${me.email}` : ""}. Connect has no password of its own and never sees yours.</p>
+        {me.last_login_at ? <p className="small muted">Last sign-in: {timeAgo(me.last_login_at)}{me.last_login_ua ? `, from ${me.last_login_ua}` : ""}. Each new sign-in also shows in your inbox.</p> : null}
         <F action={signOutEverywhere} back="/settings" confirm="Sign out everywhere except this device?">
           <button className="btn ghost">Sign out of all other devices</button>
         </F>
-        <p className="small muted">Use this if you signed in on a shared or lost phone or computer. It also turns off alerts on those devices.</p>
+        <p className="small muted">Use this if you signed in on a shared or lost phone or computer. It also turns off alerts on those devices and forgets every trusted device, so each one is asked for a code again.</p>
       </div>
 
       <div className="card stack">
