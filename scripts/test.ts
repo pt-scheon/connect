@@ -782,3 +782,70 @@ test("following a project brings its main moments to the inbox, never to its own
   logUpdate(pid, lead, "Shipped with a pot of 100");
   assert.equal(notes(fan), 2);
 });
+
+test("feedback reaches the site admins, and their answer reaches the sender", async () => {
+  const { run, user } = await setup();
+  const { addFeedback, answerFeedback, cleanPage } = await import("../lib/feedback");
+  const { get } = await import("../lib/db");
+  const sender = user(), boss = user(), other = user();
+  run("UPDATE users SET super=1 WHERE id=?", boss);
+  const notes = (u: number) => get("SELECT COUNT(*) n FROM notifications WHERE user_id=?", u).n as number;
+  const id = addFeedback({ id: sender, college_id: null }, "bug", "The board does not load on my phone.", "/projects/3?tab=team");
+  const f = get("SELECT * FROM feedback WHERE id=?", id);
+  assert.equal(f.kind, "bug");
+  assert.equal(f.status, "new");
+  assert.equal(f.page, "/projects/3"); // the query string is dropped
+  assert.equal(notes(boss), 1);
+  assert.equal(notes(other), 0);
+  // An unknown kind is filed as "other", and an outside address is never kept as the page.
+  assert.equal(get("SELECT kind FROM feedback WHERE id=?", addFeedback({ id: sender }, "nonsense", "Just saying hello there.")).kind, "other");
+  assert.equal(cleanPage("https://evil.example/x"), "");
+  assert.equal(cleanPage("//evil.example"), "");
+  // Answering tells the sender once; saving the same thing again tells nobody.
+  assert.equal(answerFeedback({ id: boss }, id, "planned", "Thanks, we are fixing it this week."), null);
+  assert.equal(notes(sender), 1);
+  answerFeedback({ id: boss }, id, "planned", "Thanks, we are fixing it this week.");
+  assert.equal(notes(sender), 1);
+  answerFeedback({ id: boss }, id, "done", "Thanks, we are fixing it this week.");
+  assert.equal(notes(sender), 2);
+  assert.equal(get("SELECT status FROM feedback WHERE id=?", id).status, "done");
+  assert.equal(answerFeedback({ id: boss }, 99999, "done", ""), "That feedback is gone.");
+});
+
+test("settings: quiet following, and chats only from people you have built with", async () => {
+  const { run, now, user, project } = await setup();
+  const { logUpdate } = await import("../lib/notify");
+  const { canMessage } = await import("../lib/chat");
+  const { get } = await import("../lib/db");
+  const cid = Number(run("INSERT INTO colleges (slug, name, domains, created_at) VALUES ('s','S','s.example',?)", now()).lastInsertRowid);
+  const lead = user(), mate = user(), fan = user(), stranger = user();
+  run("UPDATE users SET college_id=?", cid);
+  const me = (id: number) => get("SELECT * FROM users WHERE id=?", id);
+  const pid = project("building", 0, [lead, mate]);
+  // Following quietly: still a follower, but nothing lands in the inbox.
+  run("INSERT INTO follows (project_id, user_id, created_at) VALUES (?,?,?)", pid, fan, now());
+  run("UPDATE users SET follow_notes=0 WHERE id=?", fan);
+  logUpdate(pid, lead, "Milestone done: Booking flow");
+  assert.equal(get("SELECT COUNT(*) n FROM notifications WHERE user_id=?", fan).n, 0);
+  // By default anyone verified at the college can write.
+  assert.ok("them" in canMessage(me(stranger), lead));
+  run("UPDATE users SET dm_from='team' WHERE id=?", lead);
+  assert.ok("error" in canMessage(me(stranger), lead));
+  assert.ok("them" in canMessage(me(mate), lead)); // a teammate still can
+  // And once the lead writes first, the stranger can reply.
+  run("INSERT INTO messages (from_id, to_id, text, created_at) VALUES (?,?,?,?)", lead, stranger, "Hi", now());
+  assert.ok("them" in canMessage(me(stranger), lead));
+});
+
+test("signing out everywhere makes older sign-in cookies stop working", async () => {
+  await setup();
+  const { sessionToken, tokenOk } = await import("../lib/auth");
+  const old = sessionToken(7); // made before the counter existed
+  assert.ok(tokenOk(old, 7, 0));
+  assert.equal(tokenOk(old, 7, 1), false); // the counter went up: the old cookie is dead
+  assert.ok(tokenOk(sessionToken(7, 1), 7, 1));
+  assert.equal(tokenOk(sessionToken(7, 1), 7, 2), false);
+  assert.equal(tokenOk(sessionToken(8), 7, 0), false); // someone else's cookie
+  assert.equal(tokenOk("7.", 7, 0), false);
+  assert.equal(tokenOk("7", 7, 0), false);
+});

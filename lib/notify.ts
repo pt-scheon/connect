@@ -21,7 +21,7 @@ function tellFollowers(projectId: number, actor: number | null, text: string) {
   const short = text.length > 90 ? text.slice(0, 87) + "..." : text;
   // Teammates already hear about their own project; only outsiders who follow it are told here.
   for (const f of all(
-    "SELECT f.user_id FROM follows f JOIN users u ON u.id=f.user_id WHERE f.project_id=? AND u.deleted=0 AND u.suspended=0 AND f.user_id NOT IN (SELECT user_id FROM members WHERE project_id=? AND status='active')",
+    "SELECT f.user_id FROM follows f JOIN users u ON u.id=f.user_id WHERE f.project_id=? AND u.deleted=0 AND u.suspended=0 AND u.follow_notes=1 AND f.user_id NOT IN (SELECT user_id FROM members WHERE project_id=? AND status='active')",
     projectId, projectId))
     if (f.user_id !== actor) notify(f.user_id, `${p.name}: ${short}`, `/projects/${projectId}`);
 }

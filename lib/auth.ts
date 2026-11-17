@@ -25,9 +25,18 @@ function secret() {
   return s || "dev-only-secret";
 }
 const sign = (v: string) => crypto.createHmac("sha256", secret()).update(v).digest("hex");
+/* The cookie is "<id>.<signature>". The signature also covers the person's session counter once it is above zero,
+   so "sign out everywhere" (which raises the counter) makes every older cookie stop working, while cookies made
+   before the counter existed keep working. */
+export const sessionToken = (userId: number, v = 0) => `${userId}.${sign(v ? `${userId}:${v}` : String(userId))}`;
+export function tokenOk(token: string, userId: number, v = 0): boolean {
+  const sig = token.split(".")[1], want = sessionToken(userId, v).split(".")[1];
+  return !!sig && sig.length === want.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want));
+}
 
 export async function setSession(userId: number) {
-  (await cookies()).set("sid", `${userId}.${sign(String(userId))}`, {
+  const v = get("SELECT session_v FROM users WHERE id=?", userId)?.session_v ?? 0;
+  (await cookies()).set("sid", sessionToken(userId, v), {
     httpOnly: true, sameSite: "lax", secure: prod, path: "/", maxAge: 60 * 60 * 24 * 30,
   });
 }
@@ -38,10 +47,10 @@ export async function clearSession() {
 export const currentUser = cache(async (): Promise<Row | null> => {
   const c = (await cookies()).get("sid")?.value;
   if (!c) return null;
-  const [id, sig] = c.split(".");
-  const want = sign(id);
-  if (!sig || sig.length !== want.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(want))) return null;
-  return get("SELECT * FROM users WHERE id=? AND suspended=0", Number(id)) ?? null;
+  const id = Number(c.split(".")[0]);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const u = get("SELECT * FROM users WHERE id=? AND suspended=0", id);
+  return u && tokenOk(c, id, u.session_v ?? 0) ? u : null;
 });
 
 /* Signed in and finished onboarding, or sent to the right page. */

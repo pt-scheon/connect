@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { all } from "@/lib/db";
+import { all, get } from "@/lib/db";
 import { requireMember } from "@/lib/auth";
 import { splitFlags } from "@/lib/reviewers";
 import * as A from "../actions";
@@ -28,9 +28,10 @@ export default async function Admin() {
   const flags = splitFlags(cid);
   const nameOf = (id: number) => all("SELECT name FROM users WHERE id=?", id)[0]?.name ?? "Someone";
   const suspended = all("SELECT * FROM users WHERE suspended=1 AND deleted=0 AND college_id=?", cid);
+  const fresh = me.super ? (get("SELECT COUNT(*) n FROM feedback WHERE status='new'").n as number) : 0;
   return (
     <>
-      <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your college only. Verify students and alumni, register clubs, and clear the review queue.{me.super ? <> Site admin: <Link href="/admin/colleges">manage colleges</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
+      <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your college only. Verify students and alumni, register clubs, and clear the review queue.{me.super ? <> Site admin: <Link href="/admin/colleges">manage colleges</Link> or <Link href="/admin/feedback">read feedback{fresh ? ` (${fresh} new)` : ""}</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
       <CollegeOverview cid={cid} />
       <div className="grid">
         <div className="card">

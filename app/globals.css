@@ -764,3 +764,16 @@ a.card .row.nowrap{gap:12px}
 /* the getting-started card and invite card get a gentle colour wash */
 .card.start{background:linear-gradient(135deg,color-mix(in srgb,var(--blue) 9%,var(--surface)),color-mix(in srgb,var(--purple) 7%,var(--surface)))}
 .card.invite{background:linear-gradient(135deg,color-mix(in srgb,var(--green) 10%,var(--surface)),color-mix(in srgb,var(--teal) 8%,var(--surface)))}
+
+/* ---------- Feedback and the longer Settings page ---------- */
+.pill.plain{background:var(--pill);color:var(--ink)}
+.choice{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.choice legend{padding:0;margin-bottom:8px}
+.choice label{position:relative;cursor:pointer}
+.choice input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0}
+.choice span{display:inline-block;background:var(--pill);color:var(--ink);border-radius:var(--r-pill);padding:8px 15px;font:500 .9rem var(--body);transition:background-color .24s var(--ease)}
+.choice label:hover span{background:var(--pill-hover)}
+.choice input:checked+span{background:var(--ink);color:var(--bg)}
+.choice input:focus-visible+span{outline:3px solid color-mix(in srgb,var(--accent) 50%,transparent);outline-offset:2px}
+.fb-reply{background:color-mix(in srgb,var(--blue) 9%,transparent);border-radius:var(--r-md);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.set-gap{margin-top:10px;padding-top:16px;border-top:1px solid var(--line)}

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { all, get, run, db, now, type Row } from "@/lib/db";
 import { compute, RULES } from "@/lib/credit";
 import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify } from "@/lib/auth";
+import { addFeedback, answerFeedback } from "@/lib/feedback";
 import { addCollege, collegeById, collegeForEmail, isMember } from "@/lib/college";
 import { domainOf, isEmail, isPublicMail } from "@/lib/domains";
 import { notify, logUpdate, allow } from "@/lib/notify";
@@ -1106,8 +1107,34 @@ export async function summariseProof(projectId: number): Promise<{ text?: string
 /* ---------- settings and your data ---------- */
 export async function saveSettings(fd: FormData) {
   const { me, back } = await ctx(fd, false);
-  run("UPDATE users SET email_notes=?, open_to_join=? WHERE id=?", fd.get("email_notes") ? 1 : 0, fd.get("open_to_join") ? 1 : 0, me.id);
+  const on = (k: string) => (fd.get(k) ? 1 : 0);
+  run("UPDATE users SET email_notes=?, open_to_join=?, follow_notes=?, calls_on=?, dm_from=? WHERE id=?",
+    on("email_notes"), on("open_to_join"), on("follow_notes"), on("calls_on"), fd.get("dm_from") === "team" ? "team" : "all", me.id);
   done(back, "Settings saved.");
+}
+/* Raises the person's session counter, so every cookie made before now stops working, then signs this device back in.
+   Push alerts are removed everywhere too: a signed-out phone must not keep showing message previews. */
+export async function signOutEverywhere(fd: FormData) {
+  const { me, back } = await ctx(fd, false);
+  run("UPDATE users SET session_v=COALESCE(session_v,0)+1 WHERE id=?", me.id);
+  run("DELETE FROM push_subs WHERE user_id=?", me.id);
+  await setSession(me.id);
+  done(back, "Signed out on every other device.");
+}
+export async function sendFeedback(fd: FormData) {
+  const { me, s, fail } = await ctx(fd, false);
+  const text = s("text", 1500);
+  if (text.length < 10) fail("Tell us a little more, at least a sentence.");
+  if (!allow(`feedback:${me.id}`, 5, 3600)) fail("You have sent a lot of feedback this hour. Thank you. Try again later.");
+  addFeedback(me, s("kind"), text, s("page"));
+  done("/feedback", "Sent. Thank you. You will see the answer here and in your inbox.");
+}
+export async function replyFeedback(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd, false);
+  if (!me.super) fail("Site admins only.");
+  const err = answerFeedback(me, n("feedback"), s("status"), s("reply", 1000));
+  if (err) fail(err);
+  done(back, "Saved.");
 }
 export async function toggleOpen(fd: FormData) {
   const { me, back } = await ctx(fd, false);
@@ -1126,7 +1153,7 @@ export async function deleteAccount(fd: FormData) {
     for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
       "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM commission_apps WHERE user_id=? AND status='pending'",
-      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?",
+      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?", "DELETE FROM feedback WHERE user_id=?",
       "DELETE FROM requests WHERE user_id=? AND status='pending'", "DELETE FROM blocks WHERE user_id=? OR blocked_id=?", "DELETE FROM push_subs WHERE user_id=?"]) run(q, ...(q.includes("OR") ? [me.id, me.id] : [me.id]));
     // Their conversations go too, attachments included.
     for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);

@@ -129,5 +129,6 @@ export async function setBlocked(fd: FormData) {
     else run("DELETE FROM blocks WHERE user_id=? AND blocked_id=?", me.id, id);
   }
   revalidatePath("/", "layout");
+  if (!on && fd.get("back") === "/settings") redirect("/settings?ok=Unblocked.");
   redirect(on ? `/messages?ok=${encodeURIComponent("Blocked. They cannot message or invite you, and you will not see their messages.")}` : `/messages/${id}?ok=Unblocked.`);
 }

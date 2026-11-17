@@ -23,6 +23,7 @@ export async function GET() {
     clubs: all("SELECT c.name, cm.role, cm.confirmed FROM club_members cm JOIN clubs c ON c.id=cm.club_id WHERE cm.user_id=?", id),
     questions_and_answers: all("SELECT project_id, text, created_at FROM comments WHERE user_id=?", id),
     projects_followed: all("SELECT project_id, created_at FROM follows WHERE user_id=?", id),
+    feedback_sent: all("SELECT kind, text, page, status, reply, created_at, replied_at FROM feedback WHERE user_id=?", id),
     messages: all("SELECT to_id, from_id, text, kind, file_name, file_size, created_at FROM messages WHERE from_id=? OR to_id=? ORDER BY id", id, id),
     notifications: all("SELECT text, href, seen, created_at FROM notifications WHERE user_id=?", id),
     reports_filed: all("SELECT kind, target_id, reason, created_at FROM reports WHERE by_id=?", id),

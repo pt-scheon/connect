@@ -37,7 +37,7 @@ export default function Privacy() {
 
       <h2>Your choices</h2>
       <ul>
-        <li>Turn email alerts off, download everything we hold about you, or delete your account from <Link href="/settings">Settings</Link>.</li>
+        <li>Turn email alerts off, switch calls off, choose who can start a chat with you, sign out of your other devices, download everything we hold about you, or delete your account from <Link href="/settings">Settings</Link>.</li>
         <li>Deleting erases your personal details. Your place in past project teams stays as &ldquo;Deleted user&rdquo;, so your teammates&rsquo; history remains accurate.</li>
       </ul>
 
@@ -45,7 +45,7 @@ export default function Privacy() {
       <p>Connect is for college students and alumni. If you are under 18, use it only with the consent of a parent or guardian.</p>
 
       <h2>Contact</h2>
-      <p>Questions or requests: {contact ? <>email <a href={`mailto:${contact}`}>{contact}</a>, or </> : null}use <b>Report</b> on the project or profile concerned.</p>
+      <p>Questions or requests: {contact ? <>email <a href={`mailto:${contact}`}>{contact}</a>, or </> : null}use <b>Report</b> on the project or profile concerned. Once signed in you can also write to the team from <Link href="/feedback">Feedback</Link>; we keep what you send there, with the page you came from, until you delete your account.</p>
     </article>
   );
 }

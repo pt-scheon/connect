@@ -34,6 +34,9 @@ export function canMessage(me: Row | null, to: number): { them: Row } | { error:
   if (!them) return { error: "You can only message verified people at your college." };
   if (get("SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)", me.id, to, to, me.id)) return { error: "You cannot message this person." };
   const replied = get("SELECT 1 FROM messages WHERE from_id=? AND to_id=? LIMIT 1", to, me.id);
+  // Their choice in Settings: only people they have built with (or already written to) may start a chat.
+  if (them.dm_from === "team" && !replied && !get("SELECT 1 FROM members a JOIN members b ON b.project_id=a.project_id WHERE a.user_id=? AND b.user_id=? LIMIT 1", me.id, to))
+    return { error: `${them.name.split(" ")[0]} only takes messages from people they have been on a project with.` };
   if (!replied && get("SELECT COUNT(*) n FROM messages WHERE from_id=? AND to_id=?", me.id, to).n >= 5)
     return { error: `Wait for ${them.name.split(" ")[0]} to reply before sending more.` };
   return { them };

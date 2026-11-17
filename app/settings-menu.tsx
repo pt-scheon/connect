@@ -1,18 +1,48 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 type Mode = "light" | "dark" | "device";
+
+/* Light, dark, or follow the device. Used in the gear menu and on the Settings page; the two stay in step. */
+export function ThemeSeg({ saved }: { saved?: "light" | "dark" }) {
+  const [mode, setMode] = useState<Mode>(saved ?? "device");
+  useEffect(() => {
+    const hear = (e: Event) => setMode((e as CustomEvent<Mode>).detail);
+    window.addEventListener("connect-theme", hear);
+    return () => window.removeEventListener("connect-theme", hear);
+  }, []);
+  const pick = (m: Mode) => {
+    const root = document.documentElement;
+    if (m === "device") {
+      delete root.dataset.theme;
+      document.cookie = "theme=; path=/; max-age=0; samesite=lax";
+    } else {
+      root.dataset.theme = m;
+      document.cookie = `theme=${m}; path=/; max-age=31536000; samesite=lax`;
+    }
+    window.dispatchEvent(new CustomEvent("connect-theme", { detail: m }));
+  };
+  return (
+    <div className="seg" role="radiogroup" aria-label="Appearance">
+      {(["light", "dark", "device"] as Mode[]).map((m) => (
+        <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => pick(m)}>
+          {m === "light" ? "Light" : m === "dark" ? "Dark" : "Device"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /* The gear in the header: who you are, light / dark / follow the device, the settings pages, and sign out. */
 export function SettingsMenu({ name, profile, saved, signOut, member }: {
   name: string; profile?: string; saved?: "light" | "dark"; signOut: () => Promise<void>; member: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>(saved ?? "device");
   const box = useRef<HTMLDivElement>(null), btn = useRef<HTMLButtonElement>(null);
-  const id = useId();
+  const id = useId(), path = usePathname();
 
   // Close on a click outside or on Escape, and hand focus back to the gear.
   useEffect(() => {
@@ -23,18 +53,6 @@ export function SettingsMenu({ name, profile, saved, signOut, member }: {
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", esc); };
   }, [open]);
-
-  const pick = (m: Mode) => {
-    setMode(m);
-    const root = document.documentElement;
-    if (m === "device") {
-      delete root.dataset.theme;
-      document.cookie = "theme=; path=/; max-age=0; samesite=lax";
-    } else {
-      root.dataset.theme = m;
-      document.cookie = `theme=${m}; path=/; max-age=31536000; samesite=lax`;
-    }
-  };
 
   return (
     <div className="smenu" ref={box}>
@@ -53,18 +71,13 @@ export function SettingsMenu({ name, profile, saved, signOut, member }: {
           </div>
           <fieldset className="smenu-theme">
             <legend className="small muted">Appearance</legend>
-            <div className="seg" role="radiogroup" aria-label="Appearance">
-              {(["light", "dark", "device"] as Mode[]).map((m) => (
-                <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => pick(m)}>
-                  {m === "light" ? "Light" : m === "dark" ? "Dark" : "Device"}
-                </button>
-              ))}
-            </div>
+            <ThemeSeg saved={saved} />
           </fieldset>
           <nav className="smenu-links" aria-label="Settings pages">
-            {member && <Link href="/settings" onClick={() => setOpen(false)}>Settings<span className="small muted">Email alerts, open to projects, your data</span></Link>}
+            {member && <Link href="/settings" onClick={() => setOpen(false)}>Settings<span className="small muted">Alerts, privacy, devices, your data</span></Link>}
             {member && <Link href="/settings#alerts" onClick={() => setOpen(false)}>Alerts on this device<span className="small muted">Calls and messages when Connect is closed</span></Link>}
             {profile && <Link href="/onboarding?edit=1" onClick={() => setOpen(false)}>Edit your profile<span className="small muted">Skills, links, a line about you</span></Link>}
+            <Link href={`/feedback?from=${encodeURIComponent(path)}`} onClick={() => setOpen(false)}>Send feedback<span className="small muted">Report a problem or suggest an idea</span></Link>
             <Link href="/rules" onClick={() => setOpen(false)}>How credit works</Link>
           </nav>
           <form action={signOut} className="smenu-out">

@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     const to = Number(b.to);
     const ok = canMessage(me, to);
     if ("error" in ok) return no(ok.error, 403);
+    if (ok.them.calls_on === 0) return no(`${ok.them.name.split(" ")[0]} has calls switched off. Send a message instead.`, 403);
     if (!allow(`call:${me.id}`, 12, 600)) return no("You have started a lot of calls. Wait a few minutes.", 429);
     if (liveCall(me.id)) return no("You are already in a call.", 409);
     if (liveCall(to)) return no(`${ok.them.name.split(" ")[0]} is on another call.`, 409);

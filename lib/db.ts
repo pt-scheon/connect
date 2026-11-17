@@ -67,6 +67,12 @@ CREATE TABLE IF NOT EXISTS blocks (user_id INTEGER, blocked_id INTEGER, PRIMARY 
 CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, text TEXT NOT NULL, created_at INTEGER);
 -- People following a project they are not on; they get its main moments in their inbox.
 CREATE TABLE IF NOT EXISTS follows (project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, created_at INTEGER, PRIMARY KEY (project_id, user_id));
+-- What people tell the Connect team: a problem, an idea, or praise. Site admins answer it; the answer lands in the sender's inbox.
+CREATE TABLE IF NOT EXISTS feedback (
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, college_id INTEGER, kind TEXT DEFAULT 'idea', text TEXT NOT NULL, page TEXT DEFAULT '',
+  status TEXT DEFAULT 'new', reply TEXT DEFAULT '', replied_by INTEGER, created_at INTEGER NOT NULL, replied_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS feedback_user ON feedback (user_id);
 CREATE TABLE IF NOT EXISTS review_log (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, reviewer_id INTEGER NOT NULL, verdict INTEGER, outcome INTEGER, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS project_skills (project_id INTEGER, skill TEXT, PRIMARY KEY (project_id, skill));
 CREATE TABLE IF NOT EXISTS member_skills (project_id INTEGER, user_id INTEGER, skill TEXT, by_id INTEGER, PRIMARY KEY (project_id, user_id, skill, by_id));
@@ -130,6 +136,11 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["reports", "result", "TEXT DEFAULT ''"],
   ["reports", "reason_kind", "TEXT DEFAULT ''"],
   ["projects", "live_url", "TEXT DEFAULT ''"],
+  // Settings: alerts from followed projects, whether people may call, who may start a chat, and a counter that signs out other devices.
+  ["users", "follow_notes", "INTEGER DEFAULT 1"],
+  ["users", "calls_on", "INTEGER DEFAULT 1"],
+  ["users", "dm_from", "TEXT DEFAULT 'all'"],
+  ["users", "session_v", "INTEGER DEFAULT 0"],
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
 ];
 
