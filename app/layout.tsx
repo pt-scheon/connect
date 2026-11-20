@@ -11,8 +11,10 @@ import { Shortcuts } from "./shortcuts";
 import { UnreadBadge } from "./unread-badge";
 import { SettingsMenu } from "./settings-menu";
 import { baseUrl, currentUser, demoMode, standings } from "@/lib/auth";
-import { signOut } from "./actions";
+import { setConsent, signOut } from "./actions";
 import { NavLinks, Toast } from "./client";
+import { ConsentBanner } from "./consent";
+import { CONSENT_COOKIE, readConsent } from "@/lib/consent";
 import { Av } from "./ui";
 import "./globals.css";
 import "./public.css";
@@ -38,7 +40,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const member = signedIn && isMember(me);
   const college = member ? collegeById(me.college_id) : null;
   const dms = member ? unreadMessages(me.id) : 0;
-  const saved = (await cookies()).get("theme")?.value;
+  const jar = await cookies();
+  const saved = jar.get("theme")?.value;
+  // The cookie notice shows until this device answers. Someone who already chose "no statistics" in Settings has answered.
+  const consent = readConsent(jar.get(CONSENT_COOKIE)?.value) ?? (me?.stats_on === 0 ? "necessary" : null);
   // A saved choice wins; with none, the page follows the device setting (see globals.css).
   const theme = saved === "light" || saved === "dark" ? saved : undefined;
   const unread = signedIn ? get("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND seen=0", me.id).n : 0;
@@ -88,9 +93,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main id="main" tabIndex={-1} className="wrap">{children}</main>
         <footer className="foot"><div className="wrap">
           <span>Connect. Credit comes only from what ships.</span>
-          <span className="row"><Link href="/rules">How credit works</Link><Link href="/colleges">Communities</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <><Link href="/feedback">Feedback</Link><Link href="/settings">Settings</Link></> : <Link href="/signin">Sign in</Link>}</span>
+          <span className="row"><Link href="/rules">How credit works</Link><Link href="/colleges">Communities</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/cookies">Cookies</Link>{signedIn ? <><Link href="/feedback">Feedback</Link><Link href="/settings">Settings</Link></> : <Link href="/signin">Sign in</Link>}</span>
         </div></footer>
         <Suspense><Toast /></Suspense>
+        {!consent && <ConsentBanner action={setConsent} />}
         {member && <CallProvider />}
         {member && <BottomNav me={me.id} dms={dms} unread={unread} />}
         {member && <Shortcuts />}

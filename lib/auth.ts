@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { get, run, now, type Row } from "./db";
+import { CONSENT_COOKIE } from "./consent";
 import { compute } from "./credit";
 import { competency } from "./skills";
 import { collegeForEmail, isMember } from "./college";
@@ -56,6 +57,8 @@ export const currentUser = cache(async (): Promise<Row | null> => {
   // stream, prefetches, form actions). Next.js hides its own navigation headers from page code, so a click from one
   // page to another inside Connect looks like a prefetch and is not counted either.
   try {
+    // Not counted when the person said no to statistics, in Settings or in the cookie notice on this device.
+    if (u.stats_on === 0 || (await cookies()).get(CONSENT_COOKIE)?.value === "necessary") return u;
     const h = await headers(), dest = h.get("sec-fetch-dest");
     if (dest ? dest === "document" : (h.get("accept") ?? "").includes("text/html"))
       run("INSERT INTO activity (day, user_id) VALUES (?,?) ON CONFLICT (day, user_id) DO UPDATE SET hits=hits+1", Math.floor((now() + 19800) / 86400), id);

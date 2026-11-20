@@ -179,6 +179,9 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // The inbox shows "new" for entries since the visit before this one; kept for a minute so a refresh does not lose it.
   ["users", "inbox_prev", "INTEGER DEFAULT 0"],
   ["users", "inbox_read_at", "INTEGER DEFAULT 0"], // ask for an emailed code when signing in on a new device
+  // Whether this person's visit days count in the admin statistics (the cookie notice and Settings), and when they agreed to the terms.
+  ["users", "stats_on", "INTEGER DEFAULT 1"],
+  ["users", "terms_at", "INTEGER"],
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
 ];
 

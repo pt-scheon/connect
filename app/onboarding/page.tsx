@@ -52,6 +52,12 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
         <label className="field"><span>LinkedIn</span><input type="url" name="linkedin" id="linkedin" defaultValue={me.linkedin ?? ""} placeholder="https://www.linkedin.com/in/you" /></label>
         <label className="field"><span>Portfolio or website</span><input type="url" name="website" id="website" defaultValue={me.website ?? ""} placeholder="https://" />
           <small>Optional. Shown on your profile and resume link.</small></label>
+        {!me.onboarded && (
+          <label className="check">
+            <input type="checkbox" name="terms" id="terms" required />
+            <span>I agree to the <Link href="/terms" target="_blank">Terms of Service</Link> and the <Link href="/privacy" target="_blank">Privacy policy</Link>.</span>
+          </label>
+        )}
         <button className="btn">Save</button>
       </form>
     </div>

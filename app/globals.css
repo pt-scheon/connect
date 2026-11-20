@@ -903,3 +903,19 @@ body:not(.guest)::before{content:"";position:fixed;inset:0;z-index:-1;pointer-ev
 body:not(.guest) .foot{background:transparent}
 @media (prefers-contrast: more){body:not(.guest)::before{display:none}}
 @media print{body::before{display:none}}
+
+/* The cookie notice (app/consent.tsx): a small card at the bottom, above the phone tab bar, until this device answers */
+.consent{position:fixed;left:16px;right:16px;bottom:16px;z-index:60;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px;
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;box-shadow:0 12px 40px rgb(0 0 0 / .28)}
+.consent p{margin:0;font-size:.9rem;line-height:1.5}
+.consent-btns{gap:8px}
+.consent-btns .btn{flex:1 1 140px}
+@media (max-width:40rem){body:has(.bottom-nav) .consent{bottom:calc(76px + env(safe-area-inset-bottom))}}
+@media print{.consent{display:none}}
+.cookie-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.cookie-table th,.cookie-table td{text-align:left;vertical-align:top;padding:10px 8px;border-bottom:1px solid var(--line)}
+.cookie-table thead th{font-size:.8rem;font-weight:500;color:var(--muted)}
+.cookie-table tbody tr:last-child th,.cookie-table tbody tr:last-child td{border-bottom:0}
+.cookie-table code{font:500 .85rem var(--mono);white-space:nowrap}
+@media (max-width:40rem){.cookie-table thead{display:none}.cookie-table tr{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .cookie-table th,.cookie-table td{border:0;padding:0}.cookie-table td:nth-child(3){grid-column:1 / -1}.cookie-table td:nth-child(4){grid-column:1 / -1;color:var(--muted)}}

@@ -13,6 +13,7 @@ import { CODE_MINUTES, TRUST_DAYS, checkLoginCode, domainTakesMail, forgetDevice
 import { addCollege, collegeById, collegeForEmail, isMember } from "@/lib/college";
 import { domainOf, isEmail, isPublicMail, slugify } from "@/lib/domains";
 import { notify, logUpdate, allow, deviceName } from "@/lib/notify";
+import { CONSENT_COOKIE, CONSENT_DAYS, type Consent } from "@/lib/consent";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
 import { needsFromList } from "@/lib/relevance";
@@ -137,6 +138,8 @@ export async function saveProfile(fd: FormData) {
   // Alumni say which college they are from; an admin of that college approves them by hand.
   const alumCollege = !me.onboarded && role === "alum" ? get("SELECT * FROM colleges WHERE id=? AND status='active'", Number(fd.get("college"))) : null;
   if (!me.onboarded && role === "alum" && !alumCollege) redirect(back + "?err=" + encodeURIComponent("Pick the community you used to be part of."));
+  if (!me.onboarded && !fd.get("terms")) redirect(back + "?err=" + encodeURIComponent("Tick the box to agree to the Terms and the Privacy policy."));
+  if (!me.onboarded) run("UPDATE users SET terms_at=? WHERE id=?", now(), me.id);
   run("UPDATE users SET branch=?, grad_year=?, skills=?, about=?, role=?, github=?, linkedin=?, website=?, onboarded=1 WHERE id=?",
     s("branch", 60), year, s("skills"), s("about"), role, links.github, links.linkedin, links.website, me.id);
   if (alumCollege) {
@@ -1250,7 +1253,20 @@ export async function saveSettings(fd: FormData) {
   run("UPDATE users SET email_notes=?, open_to_join=?, follow_notes=?, calls_on=?, dm_from=? WHERE id=?",
     on("email_notes"), on("open_to_join"), on("follow_notes"), on("calls_on"), fd.get("dm_from") === "team" ? "team" : "all", me.id);
   run("UPDATE users SET two_step=? WHERE id=?", on("two_step"), me.id);
+  run("UPDATE users SET stats_on=? WHERE id=?", on("stats_on"), me.id);
+  await rememberConsent(on("stats_on") ? "all" : "necessary"); // so this device's cookie notice agrees with Settings
   done(back, "Settings saved.");
+}
+async function rememberConsent(c: Consent) {
+  (await cookies()).set(CONSENT_COOKIE, c, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: CONSENT_DAYS * 86400 });
+}
+/* The cookie notice's answer. Anyone can give it, signed in or not; for a signed-in person it is also saved to their account. */
+export async function setConsent(choice: string): Promise<void> {
+  const c: Consent = choice === "all" ? "all" : "necessary";
+  await rememberConsent(c);
+  const me = await currentUser();
+  if (me) run("UPDATE users SET stats_on=? WHERE id=?", c === "all" ? 1 : 0, me.id);
+  revalidatePath("/", "layout");
 }
 /* Raises the person's session counter, so every cookie made before now stops working, then signs this device back in.
    Push alerts are removed everywhere too: a signed-out phone must not keep showing message previews. */

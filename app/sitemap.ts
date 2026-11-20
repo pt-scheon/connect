@@ -15,6 +15,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/colleges`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/privacy`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${base}/terms`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${base}/cookies`, changeFrequency: "yearly", priority: 0.3 },
   ];
   return [...fixed, ...activeColleges().map((c) => ({ url: `${base}/c/${c.slug}`, changeFrequency: "weekly" as const, priority: 0.6 }))];
 }
