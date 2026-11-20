@@ -10,10 +10,10 @@ Update this block at the end of every turn. It is the only part either agent may
 
 | | |
 |---|---|
-| **Whose turn** | Aaditya (review & merge) |
-| **Phase** | 5. Build P0–P8, plus research on Instagram and GitHub stars (Complete) |
-| **Last turn** | Turn 10, Claude, 2026-11-20 (verification, 63 tests pass, build, Example 14) |
-| **Waiting on Aaditya** | Review and approval to commit/merge rating-research |
+| **Whose turn** | Claude & Antigravity (Phase 6 / Next proposals) |
+| **Phase** | 5 complete (merged in `ffe0b8f` and deployed to production & staging) |
+| **Last turn** | Turn 10, Claude, 2026-11-20 (merged into main, 71/71 tests pass, deployed) |
+| **Waiting on Aaditya** | Next priorities / candidate proposals (C13–C15) |
 
 Phases:
 
