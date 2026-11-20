@@ -374,9 +374,11 @@ td{padding-block:11px}
 .stats4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .stats4 .big{font:700 2rem var(--display);display:block}
 .college-list{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
-.proof-ways{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.proof-ways>div{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-@media (max-width:560px){.proof-ways{grid-template-columns:1fr}.college-chip{display:none}}
+.proof-ways{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.proof-way{display:flex;flex-direction:column;gap:8px;background:var(--sunk);border-radius:var(--r-md);padding:16px 18px}
+.proof-way .label{color:var(--accent)}
+.proof-way input[type=text],.proof-way input[type=email],.proof-way select{background:var(--surface)}
+@media (max-width:560px){.college-chip{display:none}}
 .pending-college{border-color:color-mix(in srgb,var(--warn) 55%,transparent)}
 
 /* ---------- direct messages ---------- */

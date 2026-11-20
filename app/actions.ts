@@ -110,6 +110,12 @@ export async function signOut() {
   await clearSession();
   redirect("/signin");
 }
+/* Step 2's "use my college or work Google account": leave this account and go straight to Google's account picker,
+   so the person can choose the account whose verified email proves their community. */
+export async function switchToWorkGoogle() {
+  await clearSession();
+  redirect("/api/auth/google");
+}
 export async function saveProfile(fd: FormData) {
   const me = await currentUser();
   if (!me) redirect("/signin");

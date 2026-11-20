@@ -5,7 +5,8 @@ import { currentUser } from "@/lib/auth";
 import { RULES } from "@/lib/credit";
 import { mailReady } from "@/lib/mail";
 import { activeColleges, collegeById, domainsOf, isMember } from "@/lib/college";
-import { askCollegeAdmin, joinWithSignInEmail, saveProfile, sendCode, verifyCode } from "../actions";
+import { askCollegeAdmin, joinWithSignInEmail, saveProfile, sendCode, switchToWorkGoogle, verifyCode } from "../actions";
+import { readyProviders } from "@/lib/oauth";
 import { collegeForEmail } from "@/lib/college";
 import { domainOf, isAcademic, isPublicMail } from "@/lib/domains";
 import { F } from "../ui";
@@ -26,6 +27,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const prod = process.env.NODE_ENV === "production";
   const showCode = !prod && !mailReady();
   const noMail = prod && !mailReady();
+  const googleOn = readyProviders().some((p) => p.key === "google");
 
   if (editing) return (
     <div className="card narrow">
@@ -94,22 +96,32 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
         );
       })()}
       {!signInProof && <div className="proof-ways">
-        <div><b>Fastest</b><span className="small muted">Sign out and sign in with your college or work Google account. Its verified email is the proof.</span></div>
-        <div><b>Or</b><span className="small muted">Get a 6-digit code in your college or work email below.</span></div>
+        {googleOn && (
+          <form action={switchToWorkGoogle} className="proof-way">
+            <span className="label">Fastest</span>
+            <b>Use your college or work Google account</b>
+            <span className="small muted">You leave this account, then Google asks which account to use. Pick the one with your college or work email: its verified address proves your community straight away.</span>
+            <div><button className="btn">Continue with Google</button></div>
+          </form>
+        )}
+        {noMail ? (
+          <span className="small muted">Getting a code by email is not switched on for this site yet.</span>
+        ) : (
+          <div className="proof-way" id="email-code">
+            <span className="label">{googleOn ? "Or" : "Fastest"}</span>
+            <b>Get a 6-digit code at your college or work email</b>
+            <F action={sendCode} back="/onboarding" className="stack tight">
+              <EmailField colleges={colleges.map((c) => ({ name: c.name, domains: c.domains }))} initial={pending?.email ?? ""} />
+            </F>
+            {pending && (
+              <F action={verifyCode} back="/onboarding" className="row">
+                <input type="text" name="code" id="code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" aria-label="6-digit code" required />
+                <button className="btn">Verify</button>
+              </F>
+            )}
+          </div>
+        )}
       </div>}
-      {noMail ? (
-        <div className="note">Email codes are not switched on for this site yet. Use your college or work Google account, or ask your community&rsquo;s admins below.</div>
-      ) : <>
-      <F action={sendCode} back="/onboarding" className="stack tight">
-        <EmailField colleges={colleges.map((c) => ({ name: c.name, domains: c.domains }))} initial={pending?.email ?? ""} />
-      </F>
-      {pending && (
-        <F action={verifyCode} back="/onboarding" className="row">
-          <input type="text" name="code" id="code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" required />
-          <button className="btn">Verify</button>
-        </F>
-      )}
-      </>}
       {pending && showCode && <div className="note">Development mode: no email service is set up, so the code is shown here: <b className="mono">{pending.code}</b></div>}
       {colleges.length > 0 && (
         <details className="small">
@@ -118,8 +130,10 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
         </details>
       )}
       {colleges.length > 0 && (
-        <F action={askCollegeAdmin} back="/onboarding" className="stack tight">
-          <span className="small muted">{mine ? <>You asked the admins of <b>{mine.name}</b> to verify you. You can still use a code above.</> : "No college or work email at all? Ask your community's admins to verify you by hand:"}</span>
+        <F action={askCollegeAdmin} back="/onboarding" className="proof-way">
+          <span className="label">Or</span>
+          <b>Ask your community&rsquo;s admins</b>
+          <span className="small muted">{mine ? <>You asked the admins of <b>{mine.name}</b> to verify you. You will get an inbox note when they do.</> : "No college or work email at all? An admin of your community can verify you by hand."}</span>
           {!mine && (
             <span className="row">
               <select name="college" id="ask-college" defaultValue="" required><option value="" disabled>Your community</option>{colleges.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
