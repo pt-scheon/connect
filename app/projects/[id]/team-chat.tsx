@@ -2,34 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
-import { loadTeamChat, sendTeamMessage, type TeamMsg } from "../../team-actions";
+import { loadTeamChat, pinTeamMessage, sendTeamMessage, type Pin, type TeamMsg } from "../../team-actions";
 import { prepare } from "../../messages/chat";
-import { AVATAR } from "../../bits";
+import { Face, PersonLink, RoleTag, type Mate } from "./team-ui";
 
-type Mate = { id: number; name: string; picture: string | null; role: string; lead: boolean };
+export { RoleTag } from "./team-ui";
 type Pending = { id: string; file: File; url: string; progress: number; error?: string };
 
 const MAX_PHOTO = 8 * 1024 * 1024, AT_ONCE = 6;
-const initials = (n: string) => n.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 const time = (t: number) => new Date(t * 1000).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
 function day(t: number) {
   const d = new Date(t * 1000), today = new Date(), y = new Date(); y.setDate(today.getDate() - 1);
   if (d.toDateString() === today.toDateString()) return "Today";
   if (d.toDateString() === y.toDateString()) return "Yesterday";
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
-}
-/* Each role gets its own colour, the same everywhere, so a glance tells who is who. */
-const TAG_COLOURS = ["blue", "purple", "teal", "pink", "indigo", "green", "red"];
-const tagColour = (role: string) => TAG_COLOURS[[...role.toLowerCase()].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % TAG_COLOURS.length];
-
-export function RoleTag({ role, lead }: { role: string; lead?: boolean }) {
-  return <span className="role-tags">{lead && <span className="role-tag lead">Lead</span>}<span className={`role-tag ${tagColour(role)}`}>{role}</span></span>;
-}
-function Face({ u, size = 32 }: { u: { id: number; name: string; picture: string | null }; size?: number }) {
-  return u.picture
-    // eslint-disable-next-line @next/next/no-img-element
-    ? <img className="face" src={u.picture} alt="" width={size} height={size} referrerPolicy="no-referrer" />
-    : <span className="face" style={{ width: size, height: size, background: AVATAR[Math.abs(u.id) % AVATAR.length] }}>{initials(u.name)}</span>;
 }
 
 /* Uploads one photo to the team chat, with progress. */
@@ -47,9 +33,12 @@ function upload(project: number, p: { file: File; w?: number; h?: number }, capt
   });
 }
 
-/* The team's group chat: everyone's name with their role tag, photos, and lines when people join or leave. */
-export function TeamChat({ project, name, team, initial }: { project: number; name: string; team: Mate[]; initial: TeamMsg[] }) {
+/* The team's group chat: everyone's name with their role tag, photos, pinned messages, and lines when people join or leave. */
+export function TeamChat({ project, team, initial, initialPins }: { project: number; team: Mate[]; initial: TeamMsg[]; initialPins: Pin[] }) {
   const [msgs, setMsgs] = useState<TeamMsg[]>(initial);
+  const [pinned, setPinned] = useState<Pin[]>(initialPins);
+  const [showPins, setShowPins] = useState(false);
+  const [flash, setFlash] = useState(0);
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const [sending, start] = useTransition();
@@ -61,15 +50,17 @@ export function TeamChat({ project, name, team, initial }: { project: number; na
   const end = useRef<HTMLDivElement>(null), box = useRef<HTMLTextAreaElement>(null);
   const lastRef = useRef(0);
   lastRef.current = msgs.length ? msgs[msgs.length - 1].id : 0;
+  const pinnedIds = new Set(pinned.map((p) => p.id));
 
-  // New messages every 4 seconds while the tab is open.
+  // New messages and pins every 4 seconds while the tab is open.
   useEffect(() => {
     let alive = true;
     const tick = async () => {
       if (document.hidden) return;
       const r = await loadTeamChat(project, lastRef.current);
-      if (!alive || "error" in r || !r.messages.length) return;
-      setMsgs((m) => [...m, ...r.messages.filter((x) => !m.some((y) => y.id === x.id))]);
+      if (!alive || "error" in r) return;
+      setPinned(r.pins);
+      if (r.messages.length) setMsgs((m) => [...m, ...r.messages.filter((x) => !m.some((y) => y.id === x.id))]);
     };
     const t = setInterval(tick, 4000);
     document.addEventListener("visibilitychange", tick);
@@ -123,27 +114,63 @@ export function TeamChat({ project, name, team, initial }: { project: number; na
       setText(""); add(r.message); box.current?.focus();
     });
   };
+  const pin = (id: number, on: boolean) => start(async () => {
+    const r = await pinTeamMessage(project, id, on);
+    if ("error" in r) { setErr(r.error); return; }
+    setPinned(r.pins);
+    const fresh = await loadTeamChat(project, lastRef.current);
+    if (!("error" in fresh) && fresh.messages.length) setMsgs((m) => [...m, ...fresh.messages.filter((x) => !m.some((y) => y.id === x.id))]);
+  });
+  const jump = (id: number) => {
+    setShowPins(false);
+    const el = document.getElementById(`tm-${id}`);
+    if (!el) { setErr("That message is further back than this chat has loaded."); return; }
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setFlash(id); setTimeout(() => setFlash(0), 1800);
+  };
 
   let prevDay = "";
   return (
-    <section className={`chat team-chat ${dragging ? "dragging" : ""}`} aria-label={`${name} team chat`}
+    <section className={`chat team-chat ${dragging ? "dragging" : ""}`} aria-label="Team chat"
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
       onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); }}>
       {dragging && <div className="drop-hint">Drop photos to send</div>}
-      <header className="chat-head">
-        <Link href={`/projects/${project}`} className="chat-back" aria-label={`Back to ${name}`}>←</Link>
-        <span className="stack" style={{ gap: 0, minWidth: 0 }}><b className="ellipsis">{name}</b><span className="small muted">Team chat · {team.length} {team.length === 1 ? "person" : "people"}</span></span>
-      </header>
       <div className="team-roster" aria-label="The team">
-        {team.map((u) => <span key={u.id} className="roster-chip"><Face u={u} size={22} /><span className="ellipsis">{u.name.split(" ")[0]}</span><RoleTag role={u.role} lead={u.lead} /></span>)}
+        {team.map((u) => (
+          <Link key={u.id} href={`/u/${u.id}`} className="roster-chip" title={`Open ${u.name}'s profile`}>
+            <Face u={u} size={22} /><span className="ellipsis">{u.name.split(" ")[0]}</span><RoleTag role={u.role} lead={u.lead} />
+          </Link>
+        ))}
       </div>
+      {pinned.length > 0 && (
+        <div className="pin-bar">
+          <button type="button" className="pin-top" onClick={() => setShowPins(!showPins)} aria-expanded={showPins}>
+            <span aria-hidden="true">📌</span>
+            <span className="ellipsis"><b>{pinned[0].from}:</b> {pinned[0].text}</span>
+            <span className="small muted pin-count">{pinned.length === 1 ? "1 pinned" : `${pinned.length} pinned`}</span>
+          </button>
+          {showPins && (
+            <ul className="pin-list">
+              {pinned.map((p) => (
+                <li key={p.id}>
+                  <button type="button" className="pin-go" onClick={() => jump(p.id)}>
+                    <span className="ellipsis"><b>{p.from}</b> {p.text}</span>
+                    <span className="small muted">Pinned by {p.by.split(" ")[0]}</span>
+                  </button>
+                  <button type="button" className="linkbtn small" onClick={() => pin(p.id, false)}>Unpin</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="chat-scroll" aria-live="polite">
         {msgs.length === 0 && (
           <div className="chat-empty">
             <b>Say hello to your team</b>
-            <span className="small muted">Only the people on {name} can read this chat. Plan the next milestone, share screenshots, ask for help.</span>
+            <span className="small muted">Only the people on this project can read this chat. Plan the next milestone, share screenshots, ask for help. Pin what everyone needs to see.</span>
           </div>
         )}
         {msgs.map((m, i) => {
@@ -153,13 +180,20 @@ export function TeamChat({ project, name, team, initial }: { project: number; na
           const prev = msgs[i - 1], next = msgs[i + 1];
           const sameAs = (o?: TeamMsg) => !!o && o.kind !== "system" && o.from?.id === m.from?.id && day(o.created_at) === d && Math.abs(o.created_at - m.created_at) < 300;
           const head = !sameAs(prev) || showDay, tail = !sameAs(next);
-          const who = m.from!;
+          const who = m.from!, isPinned = pinnedIds.has(m.id);
+          const tools = (
+            <button type="button" className={`msg-pin ${isPinned ? "on" : ""}`} onClick={() => pin(m.id, !isPinned)}
+              aria-label={isPinned ? "Unpin this message" : "Pin this message"} title={isPinned ? "Unpin" : "Pin for the team"}>📌</button>
+          );
           return (
-            <div key={m.id}>
+            <div key={m.id} id={`tm-${m.id}`} className={flash === m.id ? "tm-flash" : undefined}>
               {showDay && <div className="chat-day"><span>{d}</span></div>}
-              {head && !m.mine && <div className="team-who"><b>{who.name}</b><RoleTag role={who.gone ? "Former member" : who.role} lead={who.lead && !who.gone} /></div>}
+              {head && !m.mine && (
+                <div className="team-who"><PersonLink u={{ id: who.id, name: who.name, picture: who.picture }} /><RoleTag role={who.gone ? "Former member" : who.role} lead={who.lead && !who.gone} /></div>
+              )}
               <div className={`bubble-row ${m.mine ? "mine" : ""} ${tail ? "tail" : ""}`}>
-                {!m.mine && (tail ? <Link href={`/u/${who.id}`} aria-label={who.name}><Face u={who} size={28} /></Link> : <span style={{ width: 28, flex: "none" }} />)}
+                {!m.mine && (tail ? <Link href={`/u/${who.id}`} aria-label={`Open ${who.name}'s profile`}><Face u={who} size={28} /></Link> : <span style={{ width: 28, flex: "none" }} />)}
+                {m.mine && tools}
                 {m.file ? (
                   <div className="photo-msg">
                     <button type="button" className="photo" onClick={() => setView(m)} aria-label={`Open photo from ${who.name}`}>
@@ -170,11 +204,12 @@ export function TeamChat({ project, name, team, initial }: { project: number; na
                         style={m.file.w && m.file.h ? { aspectRatio: `${m.file.w} / ${m.file.h}` } : undefined} />
                     </button>
                     {m.text && <div className="bubble caption">{m.text}</div>}
-                    <span className="bubble-time">{time(m.created_at)}</span>
+                    <span className="bubble-time">{isPinned && "📌 "}{time(m.created_at)}</span>
                   </div>
                 ) : (
-                  <div className="bubble" title={new Date(m.created_at * 1000).toLocaleString("en-IN")}>{m.text}<span className="bubble-time">{time(m.created_at)}</span></div>
+                  <div className="bubble" title={new Date(m.created_at * 1000).toLocaleString("en-IN")}>{m.text}<span className="bubble-time">{isPinned && "📌 "}{time(m.created_at)}</span></div>
                 )}
+                {!m.mine && tools}
               </div>
             </div>
           );
@@ -220,6 +255,7 @@ export function TeamChat({ project, name, team, initial }: { project: number; na
           <img src={`/api/files/${view.file.key}`} alt={view.text || "Photo"} onClick={(e) => e.stopPropagation()} />
           <div className="lightbox-bar" onClick={(e) => e.stopPropagation()}>
             <span className="small">{view.from?.name}{view.text ? `: ${view.text}` : ""}</span>
+            <button type="button" className="btn sm ghost" onClick={() => { pin(view.id, !pinnedIds.has(view.id)); setView(null); }}>{pinnedIds.has(view.id) ? "Unpin" : "Pin"}</button>
             <a className="btn sm ghost" href={`/api/files/${view.file.key}?download=1`}>Download</a>
             <button type="button" className="btn sm" onClick={() => setView(null)}>Close</button>
           </div>

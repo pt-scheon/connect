@@ -28,6 +28,13 @@ async function handle(d) {
       data: { url: `/messages/${d.from.id}` },
     });
   }
+  if (d.type === "team") {
+    if (await anyVisible()) return;
+    return reg.showNotification(d.title, {
+      body: d.text, tag: `team-${d.project}`, renotify: true, icon: "/app-icon/192", badge: "/app-icon/192",
+      data: { url: d.url },
+    });
+  }
   if (d.type === "msg") {
     if (await anyVisible()) return;
     return reg.showNotification(d.from.name, {

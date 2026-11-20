@@ -14,6 +14,12 @@ export type TeamMsg = {
 export const onTeam = (projectId: number, userId: number) =>
   !!get("SELECT 1 FROM members WHERE project_id=? AND user_id=? AND status='active'", projectId, userId);
 
+/* The project, if this person is on its current team at their own college; otherwise null. Every team space page checks this. */
+export const teamProject = (projectId: number, me: Row): Row | null => {
+  const p = get("SELECT id, name FROM projects WHERE id=? AND college_id=?", projectId, me.college_id);
+  return p && onTeam(p.id, me.id) ? p : null;
+};
+
 /* Messages after `after`, oldest first, as the chat screen shows them. */
 export function teamMessages(projectId: number, meId: number, after = 0, limit = 200): TeamMsg[] {
   return all(

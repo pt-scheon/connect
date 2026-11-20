@@ -25,13 +25,13 @@ export default function Privacy() {
 
       <h2>What is public</h2>
       <p>Verified members have a profile page anyone with the link can open: name, photo, branch, year, skills, links, projects and credit. Your email addresses are never shown to anyone, only the email domain you verified with. Reviews are shown without the reviewer&rsquo;s name.</p>
-      <p>Everything else stays inside your community: projects in progress, people lists, clubs and funding are visible only to verified members of the same community. Messages and their attachments can be opened only by the two people in the chat, and a projectMessages and their attachments can be opened only by the two people in the chat.rsquo;s team chat and its photos only by the people currently on that team. A community&rsquo;s public page shows only its counts and shipped projects.</p>
+      <p>Everything else stays inside your community: projects in progress, people lists, clubs and funding are visible only to verified members of the same community. Messages and their attachments can be opened only by the two people in the chat, and a project&rsquo;s team space (its chat and photos, pinned messages, notes, task board and team calls) only by the people currently on that team. A community&rsquo;s public page shows only its counts and shipped projects.</p>
 
       <h2>How it is used</h2>
       <ul>
         <li>To run Connect: showing projects, working out credit, sending you inbox alerts and, if you leave them on, emails about them.</li>
         <li>If you press <b>Write with AI</b> on your resume, your signed project facts are sent to Google&rsquo;s Gemini API to write it. When the <b>AI proof check</b> runs on a project (the team, its reviewers or an admin starts it, and it runs once by itself when the project goes for review), Connect reads the project&rsquo;s public GitHub repos, live site and YouTube demo titles, and sends Gemini those and the project&rsquo;s pitch, milestones, skills and each member&rsquo;s role and &ldquo;what I did&rdquo;. Members are sent as &ldquo;Member 1&rdquo;, &ldquo;Member 2&rdquo; and so on, never by name or email. Nothing else is sent to it.</li>
-        <li>Calls connect directly between the two browsers where possible, which means the other person&rsquo;s device can see your network address, as with most calling apps. When a direct connection is not possible, the encrypted call passes through a relay run by Cloudflare.</li>
+        <li>Calls, including team calls, connect directly between the browsers in the call where possible, which means the other person&rsquo;s device can see your network address, as with most calling apps. When a direct connection is not possible, the encrypted call passes through a relay run by Cloudflare.</li>
         <li>Alerts are delivered by the notification service of your browser or phone maker (Google, Apple or Mozilla).</li>
         <li>We do not sell your data, show ads, or share it with anyone except the services that run the site: hosting, email delivery, Gemini, Cloudflare&rsquo;s call relay and your browser&rsquo;s notification service.</li>
       </ul>

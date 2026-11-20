@@ -15,6 +15,7 @@ import { domainOf, isEmail, isPublicMail, slugify } from "@/lib/domains";
 import { notify, logUpdate, allow, deviceName } from "@/lib/notify";
 import { CONSENT_COOKIE, CONSENT_DAYS } from "@/lib/consent";
 import { systemLine } from "@/lib/teamchat";
+import { forgetTeamspace } from "@/lib/teamspace";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
 import { needsFromList } from "@/lib/relevance";
@@ -1317,6 +1318,7 @@ export async function deleteAccount(fd: FormData) {
     for (const f of all("SELECT file_key FROM team_messages WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
     run("DELETE FROM team_messages WHERE user_id=?", me.id);
     run("DELETE FROM team_reads WHERE user_id=?", me.id);
+    forgetTeamspace(me.id);
   })();
   await clearSession();
   revalidatePath("/", "layout");

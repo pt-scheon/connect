@@ -1,5 +1,6 @@
 import { currentUser, baseUrl } from "@/lib/auth";
-import { get, run, now } from "@/lib/db";
+import { all, get, run, now } from "@/lib/db";
+import { push } from "@/lib/push";
 import { isMember } from "@/lib/college";
 import { allow } from "@/lib/notify";
 import { LIMITS, cleanName, save, sizeText, sniff } from "@/lib/files";
@@ -42,5 +43,7 @@ export async function POST(req: Request) {
      VALUES (?,?,?,'image',?,?,?,?,?,?,?)`,
     p.id, me.id, caption, key, cleanName(file.name, t.ext), t.mime, bytes.length, dim("w"), dim("h"), now()).lastInsertRowid);
   markTeamRead(p.id, me.id);
+  for (const r of all("SELECT user_id FROM members WHERE project_id=? AND status='active' AND user_id<>?", p.id, me.id))
+    void push(r.user_id, { type: "team", project: p.id, title: String(get("SELECT name FROM projects WHERE id=?", p.id)?.name ?? "Team chat"), text: `${me.name} sent a photo${caption ? `: ${caption.slice(0, 100)}` : ""}`, url: `/projects/${p.id}/chat` });
   return Response.json({ message: teamMessages(p.id, me.id, id - 1, 1)[0] });
 }

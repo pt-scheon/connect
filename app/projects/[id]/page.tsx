@@ -11,6 +11,8 @@ import * as A from "../../actions";
 import { JoinAsk, SplitForm } from "../../client";
 import { ProofCheck } from "./proof-check";
 import { unreadTeam } from "@/lib/teamchat";
+import { callStatus } from "@/lib/teamspace";
+import "./team.css";
 import { ShareLink } from "../../messages/media";
 import { toggleFollow } from "../../follow";
 import { noteView } from "@/lib/feed";
@@ -201,15 +203,27 @@ export default async function Project({ params }: { params: Promise<{ id: string
           {onTeam && (() => {
             const fresh = unreadTeam(id, me.id);
             const lastMsg = get("SELECT t.text, t.kind, u.name FROM team_messages t LEFT JOIN users u ON u.id=t.user_id WHERE t.project_id=? ORDER BY t.id DESC LIMIT 1", id);
+            const openTasks = get("SELECT COUNT(*) n FROM team_tasks WHERE project_id=? AND status<>'done'", id)?.n ?? 0;
+            const pages = get("SELECT COUNT(*) n FROM team_notes WHERE project_id=? AND deleted_at IS NULL", id)?.n ?? 0;
+            const starred = all("SELECT id, title, icon FROM team_notes WHERE project_id=? AND deleted_at IS NULL AND important=1 ORDER BY updated_at DESC LIMIT 3", id);
+            const live = callStatus(id);
             return (
-              <Link href={`/projects/${id}/chat`} className="card lift team-chat-card">
+              <div className="card team-chat-card">
                 <span className="row between nowrap">
-                  <span className="row nowrap"><h2>Team chat</h2>{fresh > 0 && <span className="pill info">{fresh} new</span>}</span>
-                  <span className="btn sm">Open</span>
+                  <span className="row nowrap"><h2>Team space</h2>{live && <span className="pill ok">● Call on now</span>}</span>
+                  <Link className="btn sm" href={`/projects/${id}/chat`}>{live ? "Join" : "Open"}</Link>
                 </span>
                 <span className="small muted ellipsis">{lastMsg ? (lastMsg.kind === "system" ? lastMsg.text : `${lastMsg.name ?? "Someone"}: ${lastMsg.kind === "image" ? (lastMsg.text || "Photo") : lastMsg.text}`)
-                  : "A group chat for the people on this project, with everyone's role. Only the team can read it."}</span>
-              </Link>
+                  : "Only the team can see it: a group chat with everyone's role, team calls, pinned messages, notes and a task board."}</span>
+                <span className="row team-space-links">
+                  <Link href={`/projects/${id}/chat`}>Chat{fresh > 0 && <span className="pill info">{fresh} new</span>}</Link>
+                  <Link href={`/projects/${id}/notes`}>Notes <span className="muted">{pages}</span></Link>
+                  <Link href={`/projects/${id}/tasks`}>Tasks <span className="muted">{openTasks} open</span></Link>
+                </span>
+                {starred.length > 0 && (
+                  <span className="row team-space-links">{starred.map((n) => <Link key={n.id} href={`/projects/${id}/notes/${n.id}`}>★ {n.icon} {n.title || "Untitled"}</Link>)}</span>
+                )}
+              </div>
             );
           })()}
 

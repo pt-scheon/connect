@@ -120,6 +120,28 @@ CREATE TABLE IF NOT EXISTS team_messages (
 );
 CREATE INDEX IF NOT EXISTS team_messages_project ON team_messages (project_id, id);
 CREATE TABLE IF NOT EXISTS team_reads (project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, last_id INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (project_id, user_id));
+-- The rest of a project's team space (lib/teamspace.ts): pinned chat messages, Notion-style notes, the task board,
+-- and team calls (a group call where every browser connects to every other; the server only passes the details on).
+CREATE TABLE IF NOT EXISTS team_pins (project_id INTEGER NOT NULL, message_id INTEGER NOT NULL, by_id INTEGER, created_at INTEGER NOT NULL, PRIMARY KEY (project_id, message_id));
+CREATE TABLE IF NOT EXISTS team_notes (
+  id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, title TEXT NOT NULL DEFAULT '', icon TEXT NOT NULL DEFAULT '', blocks TEXT NOT NULL DEFAULT '[]',
+  important INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1, created_by INTEGER, updated_by INTEGER,
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS team_notes_project ON team_notes (project_id, updated_at);
+CREATE TABLE IF NOT EXISTS team_tasks (
+  id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'todo', assignee_id INTEGER, due INTEGER,
+  position REAL NOT NULL DEFAULT 0, created_by INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, done_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS team_tasks_project ON team_tasks (project_id, status, position);
+CREATE TABLE IF NOT EXISTS team_calls (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, started_by INTEGER, video INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, ended_at INTEGER);
+CREATE INDEX IF NOT EXISTS team_calls_project ON team_calls (project_id, ended_at);
+CREATE TABLE IF NOT EXISTS team_call_people (call_id INTEGER NOT NULL, user_id INTEGER NOT NULL, device TEXT NOT NULL, joined_at INTEGER NOT NULL, seen_at INTEGER NOT NULL, left_at INTEGER, PRIMARY KEY (call_id, user_id, device));
+CREATE TABLE IF NOT EXISTS team_signals (
+  id INTEGER PRIMARY KEY, call_id INTEGER NOT NULL, to_id INTEGER NOT NULL, to_device TEXT NOT NULL, from_id INTEGER NOT NULL, from_device TEXT NOT NULL,
+  type TEXT NOT NULL, payload TEXT, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS team_signals_to ON team_signals (to_id, to_device, id);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
 CREATE INDEX IF NOT EXISTS updates_project ON updates (project_id);

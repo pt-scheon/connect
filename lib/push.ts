@@ -19,7 +19,9 @@ function setup() {
 export type PushData =
   | { type: "call"; id: number; video: boolean; from: { id: number; name: string } }
   | { type: "call-end"; id: number; video: boolean; missed: boolean; from: { id: number; name: string } }
-  | { type: "msg"; from: { id: number; name: string }; text: string };
+  | { type: "msg"; from: { id: number; name: string }; text: string }
+  /* A project's team space: a team chat message, or a team call starting. */
+  | { type: "team"; project: number; title: string; text: string; url: string };
 
 /* Sends to every device the person turned alerts on for. Dead subscriptions are removed. Never throws. */
 export async function push(userId: number, data: PushData, opts: { ttl?: number; urgent?: boolean } = {}) {
@@ -30,7 +32,7 @@ export async function push(userId: number, data: PushData, opts: { ttl?: number;
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(data), {
         TTL: opts.ttl ?? 3600, urgency: opts.urgent ? "high" : "normal",
         // Newer pushes about the same thing replace older ones still waiting to be delivered.
-        topic: data.type === "msg" ? `chat-${data.from.id}` : `call-${data.id}`,
+        topic: data.type === "msg" ? `chat-${data.from.id}` : data.type === "team" ? `team-${data.project}` : `call-${data.id}`,
       });
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode;
