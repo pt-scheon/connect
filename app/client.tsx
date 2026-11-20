@@ -158,7 +158,7 @@ export function Board({ items, canReview, initial, forYou = [] }: { items: Board
           </span>
           {p.open.length > 0 && <span className="row">{p.open.map((r) => <span key={r} className="chip">Needs: {r}</span>)}</span>}
           <span className="row between fy-foot">
-            <span className="fy-why small">{(why.get(p.id) ?? []).join(" · ") || "On your college board"}</span>
+            <span className="fy-why small">{(why.get(p.id) ?? []).join(" · ") || "On your community board"}</span>
             <button type="button" className="fy-hide small" onClick={() => { hide(p.id, true); setUndo(p.id); }} aria-label={`Not for me: ${p.name}`}>Not for me</button>
           </span>
         </div>
@@ -334,7 +334,7 @@ export function Simulator() {
       <span className="label">Try to game it</span>
       <div className="row between">
         <div className="stat"><b className="big">{credit}</b><span className="small muted">credit · {shipped} shipped of {joined} joined</span></div>
-        <span className="small muted" style={{ maxWidth: "24ch" }}>Everyone starts at 20 once their college email is verified.</span>
+        <span className="small muted" style={{ maxWidth: "24ch" }}>Everyone starts at 20 once their college or work email is verified.</span>
       </div>
       <div className="stack tight">
         {MOVES.map((m, i) => (

@@ -24,7 +24,7 @@ export default async function FeedbackAdmin({ searchParams }: { searchParams: Pr
       <Link href="/admin">← Admin</Link>
       <div className="head"><div className="stack tight">
         <h1>Feedback</h1>
-        <p>What people sent through the feedback form, from every college. Set where each one stands and write back if you want: they see it on their Feedback page and in their inbox.</p>
+        <p>What people sent through the feedback form, from every community. Set where each one stands and write back if you want: they see it on their Feedback page and in their inbox.</p>
       </div></div>
       <div className="filters">
         <Link href="/admin/feedback" aria-current={show === "open" ? "true" : undefined}>Open <span className="mono">{count("WHERE status IN ('new','planned')")}</span></Link>
@@ -35,7 +35,7 @@ export default async function FeedbackAdmin({ searchParams }: { searchParams: Pr
         <div key={f.id} className="card stack">
           <span className="row between">
             <span className="row"><Who u={{ id: f.user_id, name: f.name, picture: f.picture }} /><span className="pill plain">{kindLabel(f.kind)}</span><span className={`pill ${STATUSES[f.status]?.[0] ?? "plain"}`}>{STATUSES[f.status]?.[1] ?? f.status}</span></span>
-            <span className="small muted">{f.college ?? "No college yet"}{f.page ? `, from ${f.page}` : ""}, {timeAgo(f.created_at)}</span>
+            <span className="small muted">{f.college ?? "No community yet"}{f.page ? `, from ${f.page}` : ""}, {timeAgo(f.created_at)}</span>
           </span>
           <p className="pre">{f.text}</p>
           <F action={replyFeedback} back={back} hidden={{ feedback: f.id }} className="stack tight">

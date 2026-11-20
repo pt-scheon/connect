@@ -33,24 +33,24 @@ export function CollegeOverview({ cid }: { cid: number }) {
   const pct = students ? Math.round((onProject / students) * 100) : 0;
 
   const figures: [value: string, label: string][] = [
-    [String(students), newStudents ? `verified students, ${newStudents} new this month` : "verified students"],
-    [`${pct}%`, `of students on an open project (${onProject})`],
+    [String(students), newStudents ? `verified members, ${newStudents} new this month` : "verified members"],
+    [`${pct}%`, `of members on an open project (${onProject})`],
     [String(open), byStatus.get("review") ? `projects open, ${byStatus.get("review")} in review` : "projects open"],
     [String(byStatus.get("shipped") ?? 0), shipped90 ? `shipped, ${shipped90} in the last 90 days` : "shipped"],
   ];
   return (
     <section className="card overview" aria-labelledby="overview-h">
       <div className="row between">
-        <h2 id="overview-h">Your college at a glance</h2>
+        <h2 id="overview-h">Your community at a glance</h2>
         <span className="small muted">{alumni} approved alumni · {openRoles} open roles</span>
       </div>
       <div className="ov-figures">
         {figures.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}
       </div>
-      {skills.length === 0 && tally.size > 0 && <span className="small muted">No skill is listed by more than one student yet.</span>}
+      {skills.length === 0 && tally.size > 0 && <span className="small muted">No skill is listed by more than one member yet.</span>}
       {skills.length > 0 && (
         <div className="stack tight">
-          <span className="small muted">Skills students list most (self-listed, not yet confirmed)</span>
+          <span className="small muted">Skills members list most (self-listed, not yet confirmed)</span>
           <ul className="ov-skills">
             {skills.map((s) => (
               <li key={s.label}>

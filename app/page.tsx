@@ -91,14 +91,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
       <div className="head">
         <div className="stack tight">
           <span className="label college-tag">{college.name}</span>
-          <h1>Projects on campus</h1>
+          <h1>Projects in your community</h1>
           <p>One board for everyone at {college.name}, and only them. Every project shows who is on it, what is built so far and what it still needs.</p>
         </div>
         {me.role === "student" && <Link className="btn" href="/projects/new">Post a project</Link>}
       </div>
       {me.role === "student" && (() => {
             const steps: [boolean, string, string][] = [
-              [!!me.verified, "Verify your college email", "/onboarding"],
+              [!!me.verified, "Verify your college or work email", "/onboarding"],
               [!!(me.skills && (me.github || me.linkedin)), "Add your skills and a GitHub or LinkedIn link", "/onboarding?edit=1"],
               [mine.joined > 0, "Join a project or post your own", items.some((p) => p.open.length) ? "/?f=open" : "/projects/new"],
               [mine.shipped > 0, "Ship it and get it reviewed", "/credit"],
@@ -125,8 +125,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
           {classmates < INVITE_UNTIL && (
             <div className="card invite">
               <span className="label">{college.name} is new on Connect</span>
-              <p className="small">{classmates <= 1 ? "You are the first one here." : `${classmates} students are here so far.`} A board works when your classmates are on it. Send them the link.</p>
-              <ShareLink path={`/c/${college.slug}`} title={`${college.name} on Connect`} text={`Join ${college.name} on Connect: find teammates and earn credit only for what ships.`} label="Invite classmates" />
+              <p className="small">{classmates <= 1 ? "You are the first one here." : `${classmates} members are here so far.`} A board works when the rest of your community is on it. Send them the link.</p>
+              <ShareLink path={`/c/${college.slug}`} title={`${college.name} on Connect`} text={`Join ${college.name} on Connect: find teammates and earn credit only for what ships.`} label="Invite your community" />
             </div>
           )}
           {me.role === "student" && (
@@ -139,7 +139,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
           )}
           {feed.length > 0 && (
             <div className="card">
-              <span className="label">Happening on campus</span>
+              <span className="label">Happening in your community</span>
               <div className="feed">
                 {feed.map((x) => (
                   <div key={x.id} className={`item ${x.kind === "post" ? "post" : x.text.startsWith("Shipped") ? "ship" : ""}`}>

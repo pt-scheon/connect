@@ -14,7 +14,7 @@ export default async function RulesPage() {
         <p>Credit, skills and credibility, and exactly how each one is worked out. Nothing you type about yourself can raise any of them.</p>
       </div></div>
       <Rules />
-      {!me && <div><Link className="btn" href="/signin">Join your college on Connect</Link></div>}
+      {!me && <div><Link className="btn" href="/signin">Join your community on Connect</Link></div>}
     </>
   );
 }

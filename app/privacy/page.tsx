@@ -8,12 +8,12 @@ export default function Privacy() {
   return (
     <article className="card narrow prose">
       <h1>Privacy</h1>
-      <p className="muted small">Last updated 13 November 2026</p>
+      <p className="muted small">Last updated 20 November 2026</p>
 
       <h2>What we collect</h2>
       <ul>
         <li><b>From Google or LinkedIn sign-in:</b> your name, email address and profile photo. Nothing else, and we never see your password.</li>
-        <li><b>From you:</b> branch, graduation year, skills, a line about you, optional GitHub, LinkedIn and website links, and your college email if you verify with a code.</li>
+        <li><b>From you:</b> branch, graduation year, skills, a line about you, optional GitHub, LinkedIn and website links, and your college or work email if you verify with a code.</li>
         <li><b>From using Connect:</b> projects you post or join, milestones, proof links, reviews, vouches, credit splits, questions, club roles and funding applications.</li>
         <li><b>For your board&rsquo;s For you order:</b> which projects you opened, how often, and which you marked &ldquo;Not for me&rdquo;. Only your own board uses it; nobody else can see it, and it never affects anyone&rsquo;s credit or scores.</li>
         <li><b>From messages and calls:</b> the messages you send, and the photos, videos, files and voice notes you attach. For calls we keep a log of who called whom, when, and for how long. Calls are not recorded.</li>
@@ -23,8 +23,8 @@ export default function Privacy() {
       </ul>
 
       <h2>What is public</h2>
-      <p>Verified students have a profile page anyone with the link can open: name, photo, branch, year, skills, links, projects and credit. Your email addresses are never shown to anyone, only the college domain you verified with. Reviews are shown without the reviewer&rsquo;s name.</p>
-      <p>Everything else stays inside your college: projects in progress, people lists, clubs and funding are visible only to verified members of the same college. Messages and their attachments can be opened only by the two people in the chat. A college&rsquo;s public page shows only its counts and shipped projects.</p>
+      <p>Verified members have a profile page anyone with the link can open: name, photo, branch, year, skills, links, projects and credit. Your email addresses are never shown to anyone, only the email domain you verified with. Reviews are shown without the reviewer&rsquo;s name.</p>
+      <p>Everything else stays inside your community: projects in progress, people lists, clubs and funding are visible only to verified members of the same community. Messages and their attachments can be opened only by the two people in the chat. A community&rsquo;s public page shows only its counts and shipped projects.</p>
 
       <h2>How it is used</h2>
       <ul>
@@ -45,7 +45,7 @@ export default function Privacy() {
       </ul>
 
       <h2>Age</h2>
-      <p>Connect is for college students and alumni. If you are under 18, use it only with the consent of a parent or guardian.</p>
+      <p>Connect is for communities, like the students of a college or the employees of a workplace, and their alumni. If you are under 18, use it only with the consent of a parent or guardian.</p>
 
       <h2>Contact</h2>
       <p>Questions or requests: {contact ? <>email <a href={`mailto:${contact}`}>{contact}</a>, or </> : null}use <b>Report</b> on the project or profile concerned. Once signed in you can also write to the team from <Link href="/feedback">Feedback</Link>; we keep what you send there, with the page you came from, until you delete your account.</p>

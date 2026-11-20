@@ -16,12 +16,12 @@ export function EmailField({ colleges, initial }: { colleges: { name: string; do
         <input type="email" name="email" id="email" placeholder="you@yourcollege.ac.in" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         <button className="btn ghost">Send code</button>
       </span>
-      {ready && (personal ? <span className="small neg">That is a personal address. Use the one your college gave you.</span>
+      {ready && (personal ? <span className="small neg">That is a personal address. Use the one your college or workplace gave you.</span>
         : known ? <span className="small ok-text">✓ {known.name}</span>
         : (
-          <label className="field"><span>Your college&rsquo;s full name</span>
+          <label className="field"><span>Your community&rsquo;s full name</span>
             <input type="text" name="college_name" id="college_name" placeholder="e.g. Nirma University" minLength={3} maxLength={80} required />
-            <small>@{d} is new on Connect. {isAcademic(d) ? "It is an academic domain, so your college opens as soon as you confirm the code." : "The Connect team checks new non-academic domains before the college opens."}</small>
+            <small>@{d} is new on Connect. {isAcademic(d) ? "It is an academic domain, so your community opens as soon as you confirm the code." : "The Connect team checks new non-academic domains before the community opens."}</small>
           </label>
         ))}
     </>

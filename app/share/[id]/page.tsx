@@ -43,7 +43,7 @@ export default async function SharePick({ params, searchParams }: { params: Prom
         {skipped > 0 && <span className="small neg">{skipped} {skipped === 1 ? "file was" : "files were"} left out: wrong type or too big.</span>}
       </div>
       {recent.length > 0 && <><span className="label">Recent chats</span><div className="people-pick">{recent.map((u) => <Pick key={u.id} u={u} />)}</div></>}
-      <span className="label">Everyone at your college</span>
+      <span className="label">Everyone in your community</span>
       <div className="people-pick">{others.map((u) => <Pick key={u.id} u={u} />)}</div>
       <Link href="/messages" className="small muted">Cancel</Link>
     </div>

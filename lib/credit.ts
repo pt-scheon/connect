@@ -53,7 +53,7 @@ export function compute(): Map<number, Standing> {
   const t = now();
   for (const u of users) {
     const s = blank();
-    if (u.verified && u.role === "student") s.ledger.push({ what: "Starter credit", why: "College email verified", n: RULES.starter });
+    if (u.verified && u.role === "student") s.ledger.push({ what: "Starter credit", why: "Community email verified", n: RULES.starter });
     S.set(u.id, s);
   }
   const projects = all("SELECT * FROM projects");
@@ -220,7 +220,7 @@ export function compute(): Map<number, Standing> {
   }
   // Gifts move spendable credit only. They never count as earned, so standing cannot be handed to a friend.
   for (const g of all("SELECT * FROM gifts")) {
-    S.get(g.from_id)?.ledger.push({ what: "Credit sent", why: "A gift to someone at your college", n: -g.amount, held: true });
+    S.get(g.from_id)?.ledger.push({ what: "Credit sent", why: "A gift to someone in your community", n: -g.amount, held: true });
     S.get(g.to_id)?.ledger.push({ what: "Credit received", why: "A gift. It can be staked or spent, and does not count as earned", n: g.amount, held: true });
   }
   for (const s of S.values()) {

@@ -33,7 +33,7 @@ export default async function Feedback({ searchParams }: { searchParams: Promise
         </label>
         {page && page !== "/feedback" && <span className="small muted">Sent with the page you came from: {page}</span>}
         <div><button className="btn">Send feedback</button></div>
-        <p className="small muted">To report a person or a project, use <b>Report</b> on their page instead: college admins handle those.</p>
+        <p className="small muted">To report a person or a project, use <b>Report</b> on their page instead: community admins handle those.</p>
       </F>
 
       <div className="stack">

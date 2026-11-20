@@ -146,7 +146,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
               <p className="muted">{reviews.length} of {RULES.reviewsNeeded} reviews in. {p.invited_at
                 ? (invites.length >= RULES.reviewsNeeded
                   ? `Connect picked ${invites.length} reviewers with ${RULES.reviewerMin}+ credit who have never been on a team with anyone here.`
-                  : "Too few people outside this team's circle can review it, so an admin of the college decides.")
+                  : "Too few people outside this team's circle can review it, so an admin of the community decides.")
                 : `Reviewers are people outside the team with ${RULES.reviewerMin}+ credit.`} Two matching verdicts settle it. If they disagree, a third decides and the middle verdict wins.</p>
               {p.live_url && (
                 <div className="row between small">
@@ -276,7 +276,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
                           })}
                         </div>
                       ))}
-                      {fits.get(r.id)!.ranked.length + fits.get(r.id)!.fresh.length === 0 && <span className="small muted">Nobody at your college has confirmed work in these skills yet.</span>}
+                      {fits.get(r.id)!.ranked.length + fits.get(r.id)!.fresh.length === 0 && <span className="small muted">Nobody in your community has confirmed work in these skills yet.</span>}
                     </div>
                   )}
                 </div>

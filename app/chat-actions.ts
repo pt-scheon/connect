@@ -99,7 +99,7 @@ export async function inviteToProject(fd: FormData) {
   const to = Number(fd.get("to")), back = String(fd.get("back") || `/u/${to}`);
   const say = (k: "ok" | "err", m: string): never => redirect(`${back.split("?")[0]}?${k}=${encodeURIComponent(m)}`);
   const them = partner(me, to);
-  if (!them || them.role !== "student") say("err", "You can only invite verified students at your college.");
+  if (!them || them.role !== "student") say("err", "You can only invite verified members in your community.");
   if (blocked(me.id, to)) say("err", "You cannot invite this person.");
   const r = get(
     `SELECT r.*, p.name, p.id pid FROM roles r JOIN projects p ON p.id=r.project_id

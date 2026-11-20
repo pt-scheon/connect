@@ -22,7 +22,7 @@ export const SECTIONS: { title: string; intro: string; rules: [string, string][]
     title: "Credit",
     intro: "Credit is a record of finished work. You stake it to join projects and set it aside to commission work. It can never be bought.",
     rules: [
-      ["You start with a little", `Verifying your college email gives you ${R.starter} credit, so you can join your first project.`],
+      ["You start with a little", `Verifying your college or work email gives you ${R.starter} credit, so you can join your first project.`],
       ["Only shipped work earns it", `A project is worth ${R.live} if reviewers confirm it is live and in use, and ${R.demo} if it works but is only a repo or a demo. Ideas, posts and certificates are worth nothing.`],
       ["Teammates set your share", "Each teammate splits 100 between the others. Your share is the middle value of what they gave you, so one friend giving you everything changes almost nothing. You never rate yourself."],
       ["Solo work earns half", `A solo project earns ${pct(R.soloFactor)} of its pot, since nobody else can sign for it.`],
@@ -49,7 +49,7 @@ export const SECTIONS: { title: string; intro: string; rules: [string, string][]
     title: "Reviews",
     intro: "Outsiders decide what a project is worth. Connect picks them so the team cannot.",
     rules: [
-      ["Reviewers have no tie to the team", `Connect picks ${R.review.invited} reviewers with ${R.reviewerMin}+ earned credit who have never been on a team with anyone on the project. People who can be trusted more are more likely to be picked. If too few people qualify, an admin of the college reviews it.`],
+      ["Reviewers have no tie to the team", `Connect picks ${R.review.invited} reviewers with ${R.reviewerMin}+ earned credit who have never been on a team with anyone on the project. People who can be trusted more are more likely to be picked. If too few people qualify, an admin of the community reviews it.`],
       ["Two matching verdicts decide", "If the first two reviewers agree, that is the outcome. If they disagree, a third reviewer or an admin decides, and the middle verdict wins. An admin's verdict always settles it."],
       ["Reviewers are checked too", `Every verdict is kept next to the final outcome. Reviewer accuracy only counts independent outcomes: admin spot checks within ${R.review.auditDays} days and tie-breaks. Reviewers who agree gain credibility; those who disagree lose it.`],
       ["Admin spot checks", `Admins can spot-check a project up to ${R.review.auditDays} days after it ships. An admin's verdict replaces the reviewers' and decides who reviewed accurately.`],
@@ -73,7 +73,7 @@ export const SECTIONS: { title: string; intro: string; rules: [string, string][]
   },
   {
     title: "Credibility",
-    intro: `Credibility is out of 100. A new verified student starts at about ${newcomer}. It is made of five parts, and every part needs a few events before it moves far.`,
+    intro: `Credibility is out of 100. A new verified member starts at about ${newcomer}. It is made of five parts, and every part needs a few events before it moves far.`,
     rules: [
       ["Finishing what you join", `Up to ${Math.round(100 * cw.finish)} points: projects shipped and commissions finished, out of projects shipped, left, dropped as lead, and assigned commissions dropped.`],
       ["Accurate reviews", `Up to ${Math.round(100 * cw.reviews)} points: reviews that matched the final outcome, out of all your reviews.`],
@@ -104,7 +104,7 @@ export const SECTIONS: { title: string; intro: string; rules: [string, string][]
       ["Sign-off checklist", `The client checks whether the work was delivered on time and matched the brief, and rates the work from 1 to 5. A private “would hire again” question is shown only as a total once the doer has worked for ${K.hireAgainMin} different clients. Above ${K.reviewerAbove} credit, an outside reviewer checks it first.`],
       ["One-sided ratings", "Ratings on commissions are strictly one-sided: only the person who posted rates the work. The doer does not rate the client back, preventing retaliatory reviews and feedback extortion."],
       ["What the doer gets", "The reward, and the rating counts towards their skills, weighted by how far your word can be trusted. Abandoning or losing an assigned commission lowers your finishing credibility."],
-      ["Disputes", `Either side can send a running job to the college's admins. They pay the reward, return it, or split it. If you never answer a delivery, after ${K.silentDays} days the doer can send it to them.`],
+      ["Disputes", `Either side can send a running job to the community's admins. They pay the reward, return it, or split it. If you never answer a delivery, after ${K.silentDays} days the doer can send it to them.`],
       ["No farming", `The same two people can do ${K.pairMaxCount} commissions together, and move ${K.pairMaxCredit} credit between them, every ${K.pairWindowMonths} months, counting both directions and jobs still running.`],
       ["Alumni", `Alumni have no credit to spend. Their commissions can award up to ${K.alumAllowance} credit every 30 days, and always get an outside check.`],
       ["Money", "Only alumni and clubs can add money to a commission. Connect records it and whether it was marked as paid; the money moves directly between the two people."],
@@ -113,7 +113,7 @@ export const SECTIONS: { title: string; intro: string; rules: [string, string][]
   },
   {
     title: "Sending credit",
-    intro: "You can send some of your credit to someone at your college, for example to cover a newcomer's stake.",
+    intro: "You can send some of your credit to someone in your community, for example to cover a newcomer's stake.",
     rules: [
       ["It is theirs to use, not to show", "Credit you send can be staked or spent by the person who gets it. It never counts as earned, so it cannot raise anyone's standing, skills or credibility."],
       ["Limits", `You need ${G.minSenderCredit} earned credit to send any. Both accounts must be ${G.minAccountDays} days old. At most ${G.pairMax} can pass between the same two people, and a person can send ${G.senderMax} and receive ${G.receiverMax}, every ${G.windowDays} days.`],

@@ -104,7 +104,7 @@ export default async function Profile({ params, searchParams }: Props) {
   const evidence = alum ? [] : all("SELECT e.*, d.name by_name FROM evidence e LEFT JOIN users d ON d.id=e.decided_by WHERE e.user_id=? ORDER BY e.created_at DESC", id)
     .filter((e) => e.status === "verified" || self || (viewer && e.status === "pending" && e.teammate_id === viewer.id));
   const collegeMates = self ? all("SELECT id, name FROM users WHERE college_id=? AND role='student' AND verified=1 AND suspended=0 AND id<>? ORDER BY name", u.college_id, id) : [];
-  const checkedBy = (e: Row) => e.method === "admin" ? "Checked by a college admin" : e.method === "teammate" ? `Confirmed by ${e.by_name ?? "a teammate"}` : `Confirmed from a ${String(e.work_email ?? "").split("@")[1] ?? "work"} email`;
+  const checkedBy = (e: Row) => e.method === "admin" ? "Checked by a community admin" : e.method === "teammate" ? `Confirmed by ${e.by_name ?? "a teammate"}` : `Confirmed from a ${String(e.work_email ?? "").split("@")[1] ?? "work"} email`;
   const proven = [...(skillScores().get(id)?.values() ?? [])].sort((a, b) => b.score * (0.5 + b.conf) - a.score * (0.5 + a.conf));
   const listedOnly = skills.filter((k) => !proven.some((x) => x.skill === canon(k)));
   const signedIn = (all("SELECT sub FROM identities WHERE user_id=?", id)).map((r) => String(r.sub).split(":")[0]);
@@ -293,7 +293,7 @@ export default async function Profile({ params, searchParams }: Props) {
             <div className="row">
               {signedIn.includes("google") && <Stamp>Google sign-in</Stamp>}
               {signedIn.includes("linkedin") && <Stamp>LinkedIn sign-in</Stamp>}
-              {u.verified ? <Stamp>{alum ? "Alum approved by college admin" : `Verified @${String(u.college_email ?? "").split("@")[1] ?? "college"} email`}</Stamp> : <Stamp kind="no">Not verified</Stamp>}
+              {u.verified ? <Stamp>{alum ? "Alum approved by community admin" : `Verified @${String(u.college_email ?? "").split("@")[1] ?? "community"} email`}</Stamp> : <Stamp kind="no">Not verified</Stamp>}
               {ha && <Stamp>{ha.yes} of {ha.total} clients would hire again</Stamp>}
             </div>
             {viewer && !self && !alum && <span className="small muted">{pathTo(T, viewer.id, id, names)}</span>}
@@ -396,7 +396,7 @@ export default async function Profile({ params, searchParams }: Props) {
               )}
             </div>
           )}
-          {!me && <div className="card"><h3>Are you a student here?</h3><p className="small muted">Join your college on Connect and build a record like this one.</p><Link className="btn" href="/signin">Sign in</Link></div>}
+          {!me && <div className="card"><h3>Are you a member here?</h3><p className="small muted">Join your community on Connect and build a record like this one.</p><Link className="btn" href="/signin">Sign in</Link></div>}
           {viewer && !self && viewer.verified ? (
             <details className="small">
               <summary className="muted" style={{ cursor: "pointer" }}>Report this profile</summary>

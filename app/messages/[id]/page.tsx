@@ -22,7 +22,7 @@ export default async function Conversation({ params }: { params: Promise<{ id: s
   const theyBlocked = !!get("SELECT 1 FROM blocks WHERE user_id=? AND blocked_id=?", id, me.id);
   const r = await loadChat(id, 0);
   const msgs = "error" in r ? [] : r.messages, seen = "error" in r ? 0 : r.seenUpTo;
-  const reason = iBlocked ? "You blocked this person." : theyBlocked || other.suspended || other.deleted ? "You cannot message this person." : !other.verified ? "They have not verified their college email yet." : "";
+  const reason = iBlocked ? "You blocked this person." : theyBlocked || other.suspended || other.deleted ? "You cannot message this person." : !other.verified ? "They have not verified their college or work email yet." : "";
   return (
     <div className="dm open">
       <ConversationList me={me} active={id} />

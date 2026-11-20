@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Connect",
     short_name: "Connect",
-    description: "Build with people from your college. Credit comes only from what ships.",
+    description: "Build with people from your community. Credit comes only from what ships.",
     start_url: "/",
     display: "standalone",
     background_color: "#0B0A09",

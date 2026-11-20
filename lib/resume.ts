@@ -31,9 +31,9 @@ export function resumeFacts(userId: number): ResumeFacts {
   };
 }
 
-const SYSTEM = `You write the body of a one-page resume for a college student, as plain text.
+const SYSTEM = `You write the body of a one-page resume for a member of a community (a college student or an employee at a workplace), as plain text.
 
-You are given JSON facts that the student's teammates and club leads have confirmed. Use only those facts.
+You are given JSON facts that the person's teammates and club leads have confirmed. Use only those facts.
 Do not add employers, awards, numbers, tools or skills that are not in the JSON. If a field is empty, leave it out.
 Do not invent metrics. Rephrase for clarity and strength, starting bullets with a past-tense verb.
 

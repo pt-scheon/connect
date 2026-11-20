@@ -22,7 +22,7 @@ export default async function People() {
     <>
       <div className="head"><div className="stack tight">
         <h1>People</h1>
-        <p>Everyone at your college on Connect. Each person shows how you are connected through projects.</p>
+        <p>Everyone in your community on Connect. Each person shows how you are connected through projects.</p>
       </div></div>
       <PeopleList people={people} />
     </>

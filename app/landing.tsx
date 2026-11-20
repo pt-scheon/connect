@@ -21,10 +21,10 @@ const PROFILES = [
 ] as const;
 
 const CAMPUS: [string, string][] = [
-  ["Students", "One project board instead of fifty group chats. See who has worked with whom before you say yes."],
+  ["Members", "One project board instead of fifty group chats. See who has worked with whom before you say yes."],
   ["Clubs", "A roster the lead confirms each semester. Tap a member to see what they have built."],
-  ["Alumni", "Fund a student project one milestone at a time. Teams need real credit to apply."],
-  ["Recruiters", "Every student has a shareable resume link where each line is signed by the people who were there."],
+  ["Alumni", "Fund a project one milestone at a time. Teams need real credit to apply."],
+  ["Recruiters", "Every member has a shareable resume link where each line is signed by the people who were there."],
 ];
 
 /* What a signed-out visitor sees. Styled in app/public.css. */
@@ -44,9 +44,9 @@ export function Landing() {
         <div className="pub-wrap pub-hero-grid">
           <div className="pub-hero-text">
             <h1>Credit only for <span className="grad">what ships.</span></h1>
-            <p className="lead">Find a team at your college. Your teammates sign what you built.</p>
+            <p className="lead">Find a team in your community, like your college or your workplace. Your teammates sign what you built.</p>
             <SignInButtons large />
-            <p className="pub-byline">Free for students. One account per college email, and each college is its own private space. <Link href="/colleges">See the colleges</Link>.</p>
+            <p className="pub-byline">Free to join. One account per college or work email, and each community is its own private space. <Link href="/colleges">See the communities</Link>.</p>
           </div>
           <div className="pub-hero-sim">
             <Simulator />
@@ -57,7 +57,7 @@ export function Landing() {
       {students >= SHOW_STATS.students && shipped >= SHOW_STATS.shipped && (
         <section className="pub-score" aria-label="Connect so far">
           <div className="pub-wrap pub-score-row">
-            <div><b><Count to={students} /></b><span>verified students</span></div>
+            <div><b><Count to={students} /></b><span>verified members</span></div>
             <div><b><Count to={shipped} /></b><span>projects shipped and reviewed</span></div>
             {money > 0 && <div><b>{inr(money)}</b><span>committed by alumni</span></div>}
           </div>
@@ -76,7 +76,7 @@ export function Landing() {
       <section className="pub-band">
         <div className="pub-wrap">
           <div className="pub-head">
-            <h2>Same college, two profiles</h2>
+            <h2>Same community, two profiles</h2>
             <p className="lead">These two are examples. On Connect a profile shows the record, so you can tell them apart in five seconds.</p>
           </div>
           <div className="pub-versus">
@@ -105,7 +105,7 @@ export function Landing() {
 
       <section className="pub-sec">
         <div className="pub-wrap">
-          <h2>One place for the whole campus</h2>
+          <h2>One place for the whole community</h2>
           <div className="pub-cols">
             {CAMPUS.map(([t, d]) => <div key={t}><h3>{t}</h3><p>{d}</p></div>)}
           </div>

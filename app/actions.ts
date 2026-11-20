@@ -44,7 +44,7 @@ async function ctx(fd: FormData, needVerified = true) {
   const back = safeBack(fd.get("back"));
   if (!allow(`act:${me.id}`, 40, 60)) bounce(back, "err", "Slow down a little. Try again in a minute.");
   if (needVerified && !isMember(me))
-    bounce(back, "err", me.role === "alum" ? "An admin of your college has to approve your alumni account first." : "Verify your college email first.");
+    bounce(back, "err", me.role === "alum" ? "An admin of your community has to approve your alumni account first." : "Verify your college or work email first.");
   return {
     me, back,
     s: (k: string, max = 300) => String(fd.get(k) ?? "").trim().slice(0, max),
@@ -128,7 +128,7 @@ export async function saveProfile(fd: FormData) {
   }
   // Alumni say which college they are from; an admin of that college approves them by hand.
   const alumCollege = !me.onboarded && role === "alum" ? get("SELECT * FROM colleges WHERE id=? AND status='active'", Number(fd.get("college"))) : null;
-  if (!me.onboarded && role === "alum" && !alumCollege) redirect(back + "?err=" + encodeURIComponent("Pick the college you graduated from."));
+  if (!me.onboarded && role === "alum" && !alumCollege) redirect(back + "?err=" + encodeURIComponent("Pick the community you used to be part of."));
   run("UPDATE users SET branch=?, grad_year=?, skills=?, about=?, role=?, github=?, linkedin=?, website=?, onboarded=1 WHERE id=?",
     s("branch", 60), year, s("skills"), s("about"), role, links.github, links.linkedin, links.website, me.id);
   if (alumCollege) {
@@ -138,7 +138,7 @@ export async function saveProfile(fd: FormData) {
   }
   const auto = !me.onboarded && autoVerify(me.id);
   revalidatePath("/", "layout");
-  if (auto) redirect("/?ok=" + encodeURIComponent(`Your college email is verified. You start with ${RULES.starter} credit.`));
+  if (auto) redirect("/?ok=" + encodeURIComponent(`Your college or work email is verified. You start with ${RULES.starter} credit.`));
   redirect(me.onboarded ? `/u/${me.id}` : "/onboarding");
 }
 /* A link a person adds to their profile: https only, and on the right site when one is expected. */
@@ -151,16 +151,16 @@ function profileLink(v: string, host: string) {
 }
 export async function sendCode(fd: FormData) {
   const { me, s, fail } = await ctx(fd, false);
-  if (me.role !== "student") fail("Alumni are approved by an admin of their college, not by email code.");
-  if (me.verified && me.college_id) fail(`You are already verified at ${collegeById(me.college_id)?.name ?? "your college"}. A verified account stays with its college.`);
+  if (me.role !== "student") fail("Alumni are approved by an admin of their community, not by email code.");
+  if (me.verified && me.college_id) fail(`You are already verified at ${collegeById(me.college_id)?.name ?? "your community"}. A verified account stays with its community.`);
   const email = s("email").toLowerCase(), domain = domainOf(email);
   if (!isEmail(email)) fail("That does not look like an email address.");
-  if (isPublicMail(domain)) fail("Use the email your college gave you, not a personal one like Gmail. That is what proves where you study.");
+  if (isPublicMail(domain)) fail("Use the email your college or workplace gave you, not a personal one like Gmail. That is what proves which community you belong to.");
   if (get("SELECT 1 FROM users WHERE college_email=? AND id<>?", email, me.id)) fail("That college email is already linked to another account.");
   const known = collegeForEmail(email), name = s("college_name", 80);
-  if (!known && name.length < 3) fail(`@${domain} is not on Connect yet. Add your college's full name and we will set it up.`);
+  if (!known && name.length < 3) fail(`@${domain} is not on Connect yet. Add your community's full name and we will set it up.`);
   // Before spending a code: can that domain receive email at all? Catches typos and invented domains.
-  if (mailReady() && !(await domainTakesMail(domain))) fail(`@${domain} cannot receive email, so it cannot be verified. Check the spelling of your college address.`);
+  if (mailReady() && !(await domainTakesMail(domain))) fail(`@${domain} cannot receive email, so it cannot be verified. Check the spelling of your college or work address.`);
   if (!allow(`code:${me.id}`, 3, 600)) fail("Too many codes requested. Wait ten minutes.");
   const code = String(crypto.randomInt(100000, 1000000));
   run("INSERT OR REPLACE INTO codes (user_id, email, code, expires, tries, college_name) VALUES (?,?,?,?,0,?)", me.id, email, code, now() + 900, known ? "" : name);
@@ -169,7 +169,7 @@ export async function sendCode(fd: FormData) {
       fail("Could not send the email. Try again in a minute.");
   } else if (process.env.NODE_ENV === "production") {
     run("DELETE FROM codes WHERE user_id=?", me.id);
-    fail("Email codes are not switched on yet. Sign out and sign in with your college Google account instead; that verifies you straight away. Or ask your college's admin below.");
+    fail("Email codes are not switched on yet. Sign out and sign in with your college or work Google account instead; that verifies you straight away. Or ask your community's admin below.");
   } else {
     console.log(`[connect] verification code for ${email}: ${code}`);
   }
@@ -203,14 +203,14 @@ export async function verifyCode(fd: FormData) {
    that college with it (adding the college, with a name they give, if it is new on Connect). */
 export async function joinWithSignInEmail(fd: FormData) {
   const { me, s, fail } = await ctx(fd, false);
-  if (me.role !== "student") fail("Alumni are approved by an admin of their college.");
+  if (me.role !== "student") fail("Alumni are approved by an admin of their community.");
   if (me.verified && me.college_id) fail("You are already verified.");
   const email = String(me.email ?? "").toLowerCase(), domain = domainOf(email);
-  if (!me.email_verified || !isEmail(email) || isPublicMail(domain)) fail("Your sign-in email is not a college email. Use a code instead.");
+  if (!me.email_verified || !isEmail(email) || isPublicMail(domain)) fail("Your sign-in email is not a college or work email. Use a code instead.");
   if (get("SELECT 1 FROM users WHERE college_email=? AND id<>?", email, me.id)) fail("That college email is already linked to another account.");
   const name = s("college_name", 80);
   const known = collegeForEmail(email);
-  if (!known && name.length < 3) fail("Add your college's full name.");
+  if (!known && name.length < 3) fail("Add your community's full name.");
   const college = db.transaction(() => {
     const col = known ?? addCollege(name, email, me.id);
     run("UPDATE users SET verified=1, college_email=?, college_id=? WHERE id=?", email, col.id, me.id);
@@ -226,19 +226,19 @@ export async function joinWithSignInEmail(fd: FormData) {
 /* No email code available: the student names their college and waits for one of its admins to vouch for them. */
 export async function askCollegeAdmin(fd: FormData) {
   const { me, n, fail } = await ctx(fd, false);
-  if (me.role !== "student" || (me.verified && me.college_id)) fail("This is only for students who have not verified yet.");
+  if (me.role !== "student" || (me.verified && me.college_id)) fail("This is only for members who have not verified yet.");
   const c = get("SELECT * FROM colleges WHERE id=? AND status='active'", n("college"));
-  if (!c) fail("Pick your college.");
+  if (!c) fail("Pick your community.");
   run("UPDATE users SET college_id=? WHERE id=? AND verified=0", c.id, me.id);
   for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", c.id))
-    notify(a.id, `${me.name} asked to be verified as a student of ${c.name}`, "/admin");
+    notify(a.id, `${me.name} asked to be verified as a member of ${c.name}`, "/admin");
   done("/onboarding", `Asked the admins of ${c.name}. You will get a note in your inbox once they verify you.`);
 }
 
 /* ---------- projects ---------- */
 export async function createProject(fd: FormData) {
   const { me, s, fail } = await ctx(fd);
-  if (me.role !== "student") fail("Only students can start projects.");
+  if (me.role !== "student") fail("Only members can start projects.");
   const name = s("name", 60), pitch = s("pitch"), ms = lines(s("milestones", 1000)), roles = lines(s("roles", 1000));
   if (!name || !pitch || !ms.length) fail("Give it a name, one line on what it does, and at least one milestone.");
   const id = db.transaction(() => {
@@ -357,7 +357,7 @@ export async function requestJoin(fd: FormData) {
   const r = get("SELECT * FROM roles WHERE id=? AND open=1", n("role"));
   const p = r && project(r.project_id, me);
   if (!p || !open(p)) fail("That role is no longer open.");
-  if (me.role !== "student") fail("Only students can join projects.");
+  if (me.role !== "student") fail("Only members can join projects.");
   if (member(p.id, me.id)) fail("You have already been on this project.");
   if (get("SELECT 1 FROM requests WHERE project_id=? AND user_id=?", p.id, me.id)) fail("You have already asked to join this project.");
   if ((compute().get(me.id)?.credit ?? 0) < RULES.stake) fail(`You need ${RULES.stake} free credit to stake. Finish what you have joined first.`);
@@ -460,7 +460,7 @@ export async function submitForReview(fd: FormData) {
       notify(u.id, picked.length < RULES.reviewsNeeded ? `${p!.name} needs an admin review: too few people outside the team can review it` : `${p!.name} is in review`, `/projects/${p!.id}`);
   })();
   if (p!.live_url) await recordLive(p!.id, p!.live_url);
-  done(back, picked.length ? `Sent for review to ${picked.length} ${picked.length === 1 ? "person" : "people"} outside your team.` : "Sent for review. An admin of your college will review it.");
+  done(back, picked.length ? `Sent for review to ${picked.length} ${picked.length === 1 ? "person" : "people"} outside your team.` : "Sent for review. An admin of your community will review it.");
 }
 async function recordLive(pid: number, url: string) {
   const r = await checkLive(url);
@@ -634,7 +634,7 @@ export async function removeClaim(fd: FormData) {
 const EVIDENCE_KINDS = ["hackathon", "internship"]; // marks and CGPA are deliberately not here
 export async function submitEvidence(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);
-  if (me.role !== "student") fail("Only students add evidence.");
+  if (me.role !== "student") fail("Only members add evidence.");
   const kind = s("kind"), title = s("title", 120), url = s("url", 400), skills = parseSkills(s("skills", 200), 5);
   if (!EVIDENCE_KINDS.includes(kind)) fail("Pick a hackathon or an internship.");
   if (title.length < 4) fail("Say what it was, for example “Smart India Hackathon 2026”.");
@@ -659,7 +659,7 @@ export async function submitEvidence(fd: FormData) {
   const work = kind === "internship" ? s("work_email", 120).toLowerCase() : "";
   if (work) {
     const d = domainOf(work);
-    if (!isEmail(work) || isPublicMail(d) || collegeForEmail(work)) fail("Use the address the company gave you, not a personal or college one.");
+    if (!isEmail(work) || isPublicMail(d) || collegeForEmail(work)) fail("Use the address the company gave you, not a personal or community one.");
   }
   const code = work ? String(crypto.randomInt(100000, 1000000)) : null;
   const id = Number(run(
@@ -703,7 +703,7 @@ export async function decideEvidence(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
   const e = get("SELECT * FROM evidence WHERE id=? AND status='pending' AND college_id=?", n("evidence"), me.college_id);
-  if (!e || e.user_id === me.id) fail("That item is not waiting at your college.");
+  if (!e || e.user_id === me.id) fail("That item is not waiting in your community.");
   const ok = s("answer") === "verify", note = s("note", 200);
   if (!ok && note.length < 5) fail("Say why, so they know what was wrong.");
   settle(e, ok ? "verified" : "rejected", "admin", me.id, note);
@@ -736,7 +736,7 @@ export async function createClub(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);
   if (!me.admin) fail("Only an admin can register a club.");
   const lead = colleague(n("lead"), me, "AND verified=1 AND role='student'");
-  if (!s("name") || !lead) fail("Give the club a name and pick a verified student as lead.");
+  if (!s("name") || !lead) fail("Give the club a name and pick a verified member as lead.");
   db.transaction(() => {
     const id = run("INSERT INTO clubs (name, about, lead_id, college_id) VALUES (?,?,?,?)", s("name", 60), s("about"), lead.id, me.college_id).lastInsertRowid;
     run("INSERT INTO club_members (club_id, user_id, role, confirmed) VALUES (?,?,'Lead',1)", id, lead.id);
@@ -874,7 +874,7 @@ export async function applyCommission(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
   const c = commission(n("id"), me);
   if (!c || c.status !== "open" || c.hidden) fail("This commission is not open.");
-  if (me.role !== "student") fail("Only students take commissions.");
+  if (me.role !== "student") fail("Only members take commissions.");
   if (c.client_id === me.id) fail("You cannot apply to your own commission.");
   if (!allow(`capply:${me.id}`, 10, 86400)) fail("You have applied to several today. Try again tomorrow.");
   const r = run("INSERT OR IGNORE INTO commission_apps (commission_id, user_id, note, created_at) VALUES (?,?,?,?)", c.id, me.id, s("note", 400), now());
@@ -986,7 +986,7 @@ export async function disputeCommission(fd: FormData) {
   run("UPDATE commissions SET status='disputed', dispute_by=?, dispute_reason=? WHERE id=?", me.id, reason, c!.id);
   notify(c!.client_id === me.id ? c!.doer_id : c!.client_id, `A dispute was opened on “${c!.title}”. An admin will decide.`, `/commissions/${c!.id}`);
   for (const a of adminsOf(me.college_id)) notify(a, `Dispute on a commission: ${c!.title}`, "/admin#commissions");
-  done(back, "Sent to the admins of your college.");
+  done(back, "Sent to the admins of your community.");
 }
 /* An admin ends a dispute: pay the doer, give the reward back, or split it. If one side was plainly in the wrong,
    that goes on their record the same way an upheld report does. */
@@ -1012,9 +1012,9 @@ export async function resolveCommission(fd: FormData) {
 /* ---------- gifts: sending spendable credit to someone ---------- */
 export async function sendGift(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  if (me.role !== "student") fail("Only students have credit to send.");
+  if (me.role !== "student") fail("Only members have credit to send.");
   const to = colleague(n("to"), me, "AND role='student' AND verified=1 AND suspended=0");
-  if (!to) fail("Pick a verified student at your college.");
+  if (!to) fail("Pick a verified member in your community.");
   const amount = n("amount"), S = compute(), mine = S.get(me.id);
   const block = giftBlock(all("SELECT * FROM gifts WHERE college_id=?", me.college_id) as GiftRow[],
     { id: me.id, created_at: me.created_at, earned: mine?.earned ?? 0, credit: mine?.credit ?? 0 },
@@ -1039,7 +1039,7 @@ export async function verifyStudent(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
   if (!run("UPDATE users SET verified=1 WHERE id=? AND role='student' AND deleted=0 AND college_id=?", n("user"), me.college_id).changes) fail("They are not waiting at your college.");
-  notify(n("user"), `An admin verified you as a student. You start with ${RULES.starter} credit and can join projects now.`, "/");
+  notify(n("user"), `An admin verified you as a member. You start with ${RULES.starter} credit and can join projects now.`, "/");
   done(back, "Verified.");
 }
 export async function setSuspended(fd: FormData) {
@@ -1244,11 +1244,11 @@ async function superCtx(fd: FormData) {
 export async function saveCollege(fd: FormData) {
   const { back, s, n, fail } = await superCtx(fd);
   const c = collegeById(n("id"));
-  if (!c) fail("No such college.");
+  if (!c) fail("No such community.");
   const name = s("name", 80);
   const domains = s("domains", 300).toLowerCase().split(/[\s,]+/).filter(Boolean);
   if (name.length < 3 || !domains.length || domains.some((d) => !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) || isPublicMail(d)))
-    fail("Give a name and at least one college email domain, like nirmauni.ac.in. Personal mail domains are not allowed.");
+    fail("Give a name and at least one college or company email domain, like nirmauni.ac.in. Personal mail domains are not allowed.");
   for (const d of domains) {
     const other = get("SELECT name FROM colleges WHERE id<>? AND (',' || domains || ',') LIKE ?", c.id, `%,${d},%`);
     if (other) fail(`${d} already belongs to ${other.name}.`);
@@ -1258,14 +1258,14 @@ export async function saveCollege(fd: FormData) {
   if (status === "active" && c.status !== "active")
     for (const u of all("SELECT id FROM users WHERE college_id=? AND verified=1", c.id))
       notify(u.id, `${name} is open on Connect. Welcome in.`, "/");
-  done(back, "College saved.");
+  done(back, "Community saved.");
 }
 export async function setCollegeAdmin(fd: FormData) {
   const { back, n, s, fail } = await superCtx(fd);
   const u = get("SELECT * FROM users WHERE id=? AND college_id=? AND verified=1 AND deleted=0", n("user"), n("college"));
-  if (!u) fail("Pick a verified person at that college.");
+  if (!u) fail("Pick a verified person in that community.");
   const on = s("on") === "1";
   run("UPDATE users SET admin=? WHERE id=?", on ? 1 : 0, u.id);
-  if (on) notify(u.id, "You are now an admin of your college on Connect.", "/admin");
+  if (on) notify(u.id, "You are now an admin of your community on Connect.", "/admin");
   done(back, on ? `${u.name} is now an admin.` : `${u.name} is no longer an admin.`);
 }

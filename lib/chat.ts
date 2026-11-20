@@ -29,9 +29,9 @@ export function unreadMessages(userId: number): number {
 /* Whether `me` may send to `to` right now. Returns the other person, or why not.
    Same college, both verified, nobody blocked, and a newcomer gets five messages before the other person replies. */
 export function canMessage(me: Row | null, to: number): { them: Row } | { error: string } {
-  if (!me?.onboarded || !isMember(me)) return { error: "Verify your college email first." };
+  if (!me?.onboarded || !isMember(me)) return { error: "Verify your college or work email first." };
   const them = to !== me.id ? get("SELECT * FROM users WHERE id=? AND college_id=? AND verified=1 AND suspended=0 AND deleted=0", to, me.college_id) : undefined;
-  if (!them) return { error: "You can only message verified people at your college." };
+  if (!them) return { error: "You can only message verified people in your community." };
   if (get("SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)", me.id, to, to, me.id)) return { error: "You cannot message this person." };
   const replied = get("SELECT 1 FROM messages WHERE from_id=? AND to_id=? LIMIT 1", to, me.id);
   // Their choice in Settings: only people they have built with (or already written to) may start a chat.

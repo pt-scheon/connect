@@ -64,11 +64,11 @@ export default async function Settings() {
         <label className="check">
           <input type="checkbox" name="calls_on" id="calls_on" defaultChecked={me.calls_on !== 0} />
           <span><b>Let people call me</b><br />
-            <small className="muted">Voice and video calls from people at your college. With this off they can still message you.</small></span>
+            <small className="muted">Voice and video calls from people in your community. With this off they can still message you.</small></span>
         </label>
         <label className="field"><span>Who can start a chat with me</span>
           <select name="dm_from" id="dm_from" defaultValue={me.dm_from === "team" ? "team" : "all"}>
-            <option value="all">Anyone verified at my college</option>
+            <option value="all">Anyone verified in my community</option>
             <option value="team">Only people I have been on a project with</option>
           </select>
           <small>You can always reply to someone you wrote to first, and a project lead can still send you a role invite.</small>
@@ -80,7 +80,7 @@ export default async function Settings() {
           <span><b>Ask for an emailed code on a new device</b><br />
             <small className="muted">{!twoStepOn() ? "Starts working once email is switched on for this site. Until then sign-in is Google or LinkedIn only."
               : codeAddress(me) ? `After Google or LinkedIn, a six-digit code goes to ${codeAddress(me)}. A device you trust is not asked again for ${TRUST_DAYS} days.`
-              : "Needs a verified college email first."}</small></span>
+              : "Needs a verified college or work email first."}</small></span>
         </label>
         <div><button className="btn">Save</button></div>
       </F>

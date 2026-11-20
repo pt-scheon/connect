@@ -26,7 +26,7 @@ export default async function Funding() {
     <>
       <div className="head"><div className="stack tight">
         <h1>Alumni funding</h1>
-        <p>Alumni put money behind student projects, one milestone at a time. Connect records what was promised and what was paid. The money itself moves directly between the alum and the team.</p>
+        <p>Alumni put money behind members&rsquo; projects, one milestone at a time. Connect records what was promised and what was paid. The money itself moves directly between the alum and the team.</p>
       </div></div>
       <div className="card"><div className="stats">
         <div className="stat"><b>{inr(total)}</b><span className="small muted">committed to projects</span></div>
@@ -75,8 +75,8 @@ export default async function Funding() {
           {isAlum && (
             <F action={A.createCall} back={back} className="card stack">
               <h2>Open a funding call</h2>
-              <label className="field"><span>Title</span><input type="text" name="title" id="call-title" placeholder="Campus utility grant" required /></label>
-              <label className="field"><span>What you want to fund</span><input type="text" name="about" id="call-about" placeholder="Anything students would use every week" /></label>
+              <label className="field"><span>Title</span><input type="text" name="title" id="call-title" placeholder="Community utility grant" required /></label>
+              <label className="field"><span>What you want to fund</span><input type="text" name="about" id="call-about" placeholder="Anything members would use every week" /></label>
               <div className="row">
                 <label className="field"><span>Up to (₹)</span><input type="number" name="amount" id="call-amount" min={1} required style={{ flex: "0 0 140px" }} /></label>
                 <label className="field"><span>Team credit needed</span><input type="number" name="min_credit" id="call-min" min={0} defaultValue={300} required style={{ flex: "0 0 140px" }} /></label>

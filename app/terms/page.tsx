@@ -6,13 +6,13 @@ export default function Terms() {
   return (
     <article className="card narrow prose">
       <h1>Terms</h1>
-      <p className="muted small">Last updated 13 November 2026</p>
-      <p>Connect is a place for students at a college to find teammates, build projects and show what shipped. By using it you agree to the following.</p>
+      <p className="muted small">Last updated 20 November 2026</p>
+      <p>Connect is a place for the people of a community, like the students of a college or the employees of a workplace, to find teammates, build projects and show what shipped. By using it you agree to the following.</p>
 
       <h2>Be who you say you are</h2>
       <ul>
-        <li>One account per person. Use your real name and your own college email.</li>
-        <li>Connect is for college students and alumni. If you are under 18, you need the consent of a parent or guardian to use it.</li>
+        <li>One account per person. Use your real name and your own college or work email.</li>
+        <li>Connect is for communities, like the students of a college or the employees of a workplace, and their alumni. If you are under 18, you need the consent of a parent or guardian to use it.</li>
         <li>Only list projects and contributions you actually worked on. Credit only counts what teammates and reviewers sign, and gaming it (fake teams, swapped reviews, vouch rings) gets accounts suspended.</li>
       </ul>
 
@@ -33,7 +33,7 @@ export default function Terms() {
         <li>A commission is one person asking another to build something, for credit. Graded coursework, assignments, lab records, reports handed in for marks, exams and anything else you submit for a grade are not allowed, whether you are asking or doing.</li>
         <li>Anyone can report a commission as coursework. One an admin finds to be coursework is removed: nobody is paid, the reward is not returned, and it goes on the record of the person who posted it.</li>
         <li>Only alumni and clubs can attach money to a commission. Connect records the amount and whether it was marked as paid. It does not handle money and is not responsible for whether it is paid.</li>
-        <li>Disputes are decided by the admins of your college.</li>
+        <li>Disputes are decided by the admins of your community.</li>
       </ul>
 
       <h2>No guarantees</h2>

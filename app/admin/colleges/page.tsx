@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { saveCollege, setCollegeAdmin } from "../../actions";
 import { F, Who } from "../../ui";
 
-export const metadata = { title: "Colleges · Admin" };
+export const metadata = { title: "Communities · Admin" };
 
 /* For site admins (ADMIN_EMAILS) only: open new colleges, fix names and domains, and pick each college's admins. */
 export default async function CollegesAdmin() {
@@ -20,8 +20,8 @@ export default async function CollegesAdmin() {
     <>
       <Link href="/admin">← Admin</Link>
       <div className="head"><div className="stack tight">
-        <h1>Colleges</h1>
-        <p>New colleges on academic domains open by themselves. Others wait here until you check the domain really belongs to a college. Each college&rsquo;s admins see only their own college.</p>
+        <h1>Communities</h1>
+        <p>New communities on academic domains open by themselves. Others wait here until you check the domain really belongs to a community. Each community&rsquo;s admins see only their own community.</p>
       </div></div>
       {colleges.map((c) => (
         <div key={c.id} className={`card stack ${c.status === "pending" ? "pending-college" : ""}`}>
@@ -30,7 +30,7 @@ export default async function CollegesAdmin() {
             <span className="small muted">{c.people} verified · <Link href={`/c/${c.slug}`}>/c/{c.slug}</Link></span>
           </span>
           <F action={saveCollege} back={back} hidden={{ id: c.id }} className="row">
-            <input type="text" name="name" id={`name-${c.id}`} defaultValue={c.name} aria-label="College name" required />
+            <input type="text" name="name" id={`name-${c.id}`} defaultValue={c.name} aria-label="Community name" required />
             <input type="text" name="domains" id={`domains-${c.id}`} defaultValue={c.domains} aria-label="Email domains, comma separated" required />
             <select name="status" id={`status-${c.id}`} defaultValue={c.status} aria-label="Status">
               <option value="active">Open</option><option value="pending">Waiting</option><option value="closed">Closed</option>

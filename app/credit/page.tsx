@@ -21,7 +21,7 @@ export default async function Credit() {
         <div className="card" style={{ maxWidth: 620 }}>
           <h2>Your ledger</h2>
           <div className="tw"><table><tbody>
-            {s.ledger.length === 0 && <tr><td className="muted">Nothing yet. Verify your college email to get your starter credit.</td></tr>}
+            {s.ledger.length === 0 && <tr><td className="muted">Nothing yet. Verify your college or work email to get your starter credit.</td></tr>}
             {s.ledger.map((l, i) => (
               <tr key={i}><td><b>{l.what}</b><br /><span className="small muted">{l.why}</span></td><td className={`n ${l.n < 0 ? "neg" : ""}`}>{l.n > 0 ? "+" : "−"}{Math.abs(l.n)}</td></tr>
             ))}

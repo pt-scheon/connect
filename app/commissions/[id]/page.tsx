@@ -155,7 +155,7 @@ export default async function Commission({ params }: { params: Promise<{ id: str
             </div>
           )}
 
-          {c.status === "disputed" && <div className="alert">In dispute: {c.dispute_reason} An admin of the college decides whether the reward is paid, returned or split.</div>}
+          {c.status === "disputed" && <div className="alert">In dispute: {c.dispute_reason} An admin of the community decides whether the reward is paid, returned or split.</div>}
           {mineAs && ["assigned", "delivered"].includes(c.status) && (
             <details className="small">
               <summary className="muted" style={{ cursor: "pointer" }}>{mineAs === "doer" && silent ? `No answer for ${C.silentDays} days? Send it to the admins` : "Something went wrong? Open a dispute"}</summary>

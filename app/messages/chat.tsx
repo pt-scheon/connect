@@ -385,7 +385,7 @@ export function NewChat({ people }: { people: (Person & { branch: string; skills
   const list = people.filter((p) => !q || `${p.name} ${p.branch} ${p.skills}`.toLowerCase().includes(q.toLowerCase())).slice(0, 30);
   return (
     <div className="stack new-chat">
-      <input type="search" id="new-chat-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people at your college by name, branch or skill" aria-label="Search people to message" autoFocus />
+      <input type="search" id="new-chat-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people in your community by name, branch or skill" aria-label="Search people to message" autoFocus />
       <div className="people-pick">
         {list.map((p) => (
           <Link key={p.id} href={`/messages/${p.id}`} className="pick">

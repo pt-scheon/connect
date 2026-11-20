@@ -13,7 +13,7 @@ export function ConversationList({ me, active }: { me: Row; active?: number }) {
         <h1>Messages</h1>
         <Link href="/messages?new=1" className="btn sm" aria-label="New message">New</Link>
       </div>
-      {list.length === 0 && <p className="small muted" style={{ padding: "0 14px" }}>No conversations yet. Start one with someone from your college.</p>}
+      {list.length === 0 && <p className="small muted" style={{ padding: "0 14px" }}>No conversations yet. Start one with someone from your community.</p>}
       {list.map(({ u, last, unread }) => (
         <Link key={u.id} href={`/messages/${u.id}`} className={`convo ${active === u.id ? "on" : ""} ${unread ? "unread" : ""}`} aria-current={active === u.id ? "page" : undefined}>
           <Av u={u} />

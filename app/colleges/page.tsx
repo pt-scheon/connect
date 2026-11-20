@@ -13,8 +13,8 @@ export default function Colleges() {
   return (
     <>
       <div className="head"><div className="stack tight">
-        <h1>Colleges on Connect</h1>
-        <p>Every college is its own space: its own board, people, clubs and alumni. You get into yours by proving an email address your college gave you, so no one can pass as a student somewhere else.</p>
+        <h1>Communities on Connect</h1>
+        <p>Every community, like the students of a college or the employees of a workplace, is its own space: its own board, people, clubs and alumni. You get into yours by proving an email address your college or workplace gave you, so no one can pass as a member somewhere else.</p>
       </div></div>
       <div className="grid">
         {rows.map((c) => (
@@ -22,14 +22,14 @@ export default function Colleges() {
             <span className="college-mark" aria-hidden="true">{c.name.slice(0, 1)}</span>
             <h2>{c.name}</h2>
             <span className="small muted mono">@{domainsOf(c).join(", @")}</span>
-            <span className="small">{c.students} {c.students === 1 ? "student" : "students"} · {c.shipped} shipped</span>
+            <span className="small">{c.students} {c.students === 1 ? "member" : "members"} · {c.shipped} shipped</span>
           </Link>
         ))}
       </div>
       <div className="card">
-        <h2>Your college is not here?</h2>
-        <p className="muted">Sign in and enter your college email. If your college uses an academic domain (.edu, .ac.in and the like), its space opens the moment you confirm the code. Other domains are checked by the Connect team first.</p>
-        <div><Link className="btn" href="/signin">Bring your college</Link></div>
+        <h2>Your community is not here?</h2>
+        <p className="muted">Sign in and enter your college or work email. If your community uses an academic domain (.edu, .ac.in and the like), its space opens the moment you confirm the code. Other domains are checked by the Connect team first.</p>
+        <div><Link className="btn" href="/signin">Bring your community</Link></div>
       </div>
     </>
   );

@@ -33,12 +33,12 @@ export default async function Admin() {
   const fresh = me.super ? (get("SELECT COUNT(*) n FROM feedback WHERE status='new'").n as number) : 0;
   return (
     <>
-      <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your college only. Verify students and alumni, register clubs, and clear the review queue.{me.super ? <> Site admin: <Link href="/admin/colleges">manage colleges</Link> or <Link href="/admin/feedback">read feedback{fresh ? ` (${fresh} new)` : ""}</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
+      <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your community only. Verify members and alumni, register clubs, and clear the review queue.{me.super ? <> Site admin: <Link href="/admin/colleges">manage communities</Link> or <Link href="/admin/feedback">read feedback{fresh ? ` (${fresh} new)` : ""}</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
       <CollegeOverview cid={cid} />
       <div className="grid">
         <div className="card">
-          <h2>Students not verified</h2>
-          <span className="small muted">Most verify themselves with a college email. Verify someone here only if you know they study at your college.</span>
+          <h2>Members not verified</h2>
+          <span className="small muted">Most verify themselves with a college or work email. Verify someone here only if you know they belong to your community.</span>
           {waiting.length === 0 && <span className="muted">No one is waiting.</span>}
           {waiting.map((u) => (
             <div key={u.id} className="row between">
@@ -64,7 +64,7 @@ export default async function Admin() {
         </div>
         <div className="card" id="evidence">
           <h2>Evidence to check</h2>
-          <span className="small muted">Hackathons and internships students did outside Connect. Open the proof. Verify it only if it shows this person, this event and this result. A rejection lowers their credibility.</span>
+          <span className="small muted">Hackathons and internships members did outside Connect. Open the proof. Verify it only if it shows this person, this event and this result. A rejection lowers their credibility.</span>
           {evidence.length === 0 && <span className="muted">Nothing is waiting.</span>}
           {evidence.map((e) => (
             <div key={e.id} className="stack tight">

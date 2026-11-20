@@ -1,7 +1,7 @@
 import { all, get } from "./db";
 import { askGemini } from "./gemini";
 
-const SYSTEM = `You write a neutral summary for an outside reviewer who needs to check proof of a student project.
+const SYSTEM = `You write a neutral summary for an outside reviewer who needs to check proof of a project.
 
 Rules:
 - Write at most five short bullet lines telling the reviewer what to check.

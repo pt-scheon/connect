@@ -18,7 +18,7 @@ import "./globals.css";
 import "./public.css";
 
 
-const about = "Build things with people from your college. Credit comes only from projects that ship, signed by your teammates.";
+const about = "Build things with people from your community, like your college or workplace. Credit comes only from projects that ship, signed by your teammates.";
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl()),
   title: { default: "Connect", template: "%s · Connect" },
@@ -53,7 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {signedIn ? (
               <>
                 <nav className="tabs" aria-label="Sections">
-                  {member ? <NavLinks admin={!!me.admin} /> : <span className="small muted">Finish verifying to see your college</span>}
+                  {member ? <NavLinks admin={!!me.admin} /> : <span className="small muted">Finish verifying to see your community</span>}
                 </nav>
                 <div className="right">
                   {member && (
@@ -74,21 +74,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </div>
               </>
             ) : (
-              <nav className="right guest-nav" aria-label="Site" style={{ marginLeft: "auto" }}>{me ? <SettingsMenu name={me.name} saved={theme} signOut={signOut} member={false} /> : <><Link href="/rules">How credit works</Link><Link href="/colleges">Colleges</Link><Link className="btn sm" href="/signin">Sign in</Link></>}</nav>
+              <nav className="right guest-nav" aria-label="Site" style={{ marginLeft: "auto" }}>{me ? <SettingsMenu name={me.name} saved={theme} signOut={signOut} member={false} /> : <><Link href="/rules">How credit works</Link><Link href="/colleges">Communities</Link><Link className="btn sm" href="/signin">Sign in</Link></>}</nav>
             )}
           </div>
         </header>
         {demoMode && <div className="strip"><div className="wrap">Test site with invented sample people. Nothing here is real. The real Connect is at <a href="https://connect-production-77ec4d79.up.railway.app">connect-production-77ec4d79.up.railway.app</a>.</div></div>}
         {signedIn && !member && (
           <div className="strip"><div className="wrap">
-            {me.role === "alum" ? "Your alumni account is waiting for an admin of your college to approve it."
-              : <>Your college&rsquo;s projects and people stay hidden until you <Link href="/onboarding">prove your college email</Link>.</>}
+            {me.role === "alum" ? "Your alumni account is waiting for an admin of your community to approve it."
+              : <>Your community&rsquo;s projects and people stay hidden until you <Link href="/onboarding">prove your college or work email</Link>.</>}
           </div></div>
         )}
         <main id="main" tabIndex={-1} className="wrap">{children}</main>
         <footer className="foot"><div className="wrap">
           <span>Connect. Credit comes only from what ships.</span>
-          <span className="row"><Link href="/rules">How credit works</Link><Link href="/colleges">Colleges</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <><Link href="/feedback">Feedback</Link><Link href="/settings">Settings</Link></> : <Link href="/signin">Sign in</Link>}</span>
+          <span className="row"><Link href="/rules">How credit works</Link><Link href="/colleges">Communities</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link>{signedIn ? <><Link href="/feedback">Feedback</Link><Link href="/settings">Settings</Link></> : <Link href="/signin">Sign in</Link>}</span>
         </div></footer>
         <Suspense><Toast /></Suspense>
         {member && <CallProvider />}

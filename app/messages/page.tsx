@@ -18,8 +18,8 @@ export default async function Messages({ searchParams }: { searchParams: Promise
       <ConversationList me={me} />
       <section className="chat chat-idle">
         <div className="stack" style={{ maxWidth: 460, width: "100%" }}>
-          <h2>{fresh ? "New message" : "Talk to anyone at your college"}</h2>
-          <p className="small muted">Messages stay inside your college. You can block anyone from their chat.</p>
+          <h2>{fresh ? "New message" : "Talk to anyone in your community"}</h2>
+          <p className="small muted">Messages stay inside your community. You can block anyone from their chat.</p>
           <PushToggle publicKey={pushPublicKey()} compact />
           <NewChat people={people} />
         </div>
