@@ -12,6 +12,8 @@ import { ThemeSeg } from "../settings-menu";
 import { deleteAccount, saveSettings, signOutEverywhere } from "../actions";
 import { setBlocked } from "../chat-actions";
 import { Av, F } from "../ui";
+import { setAnonymousMode } from "../identity-actions";
+import { PhotoUpload } from "../identity-ui";
 
 export const metadata = { title: "Settings" };
 
@@ -36,6 +38,37 @@ export default async function Settings() {
         <span className="label">Appearance</span>
         <ThemeSeg saved={theme} />
         <span className="small muted">Device follows the light or dark setting of this phone or computer. The choice is kept on this device only.</span>
+      </div>
+
+      <div className="card stack" id="identity">
+        <span className="label">Photo and name</span>
+        <span className="row">
+          <Av u={me} lg />
+          <span className="stack tight" style={{ minWidth: 0 }}>
+            <b>{me.name}</b>
+            <span className="small muted">{me.anon ? `Anonymous since ${new Date((me.anon_since ?? 0) * 1000).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}. Your real name is ${me.real_name}.`
+              : me.photo_key ? "Your own photo." : "Your photo from Google or LinkedIn."}</span>
+          </span>
+        </span>
+        <PhotoUpload hasOwn={!!me.photo_key} anon={!!me.anon} />
+
+        <span className="label set-gap" id="anonymous">Anonymous mode</span>
+        <span className="small muted">
+          Appear as a random alias like <b>flying-lion147</b> with a coloured pattern instead of your name and photo, everywhere on Connect.
+          Your links and resume are hidden, people never see when you read their messages, and in calls your camera stays off and your
+          voice is disguised on your own device. Your projects, skills and credit still count. Your college&rsquo;s admins can still see who
+          you are, so the rules apply the same.
+        </span>
+        <span className="row">
+          {me.anon ? (
+            <>
+              <F action={setAnonymousMode} back="/settings" hidden={{ on: 0 }}><button className="btn sm">Show my real name and photo</button></F>
+              <F action={setAnonymousMode} back="/settings" hidden={{ on: 1, fresh: 1 }} confirm="Get a new alias? People who knew your old alias will not recognise you."><button className="btn ghost sm">New alias</button></F>
+            </>
+          ) : (
+            <F action={setAnonymousMode} back="/settings" hidden={{ on: 1 }} confirm="Turn on anonymous mode? Everyone will see an alias and a pattern instead of your name and photo."><button className="btn sm">Go anonymous</button></F>
+          )}
+        </span>
       </div>
 
       <F action={saveSettings} back="/settings" className="card stack">

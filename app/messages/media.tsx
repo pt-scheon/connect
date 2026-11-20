@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { disguise } from "../calls/voice";
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 export const VOICE_MAX_SECONDS = 300;
 
 /* Records a voice note with the microphone. Shows a live timer and level; stops by itself at five minutes. */
-export function VoiceRecorder({ onDone, onCancel }: { onDone: (f: File, seconds: number) => void; onCancel: (why?: string) => void }) {
+/* `anon`: the person is anonymous, so the note is recorded in the disguised voice (app/calls/voice.ts). */
+export function VoiceRecorder({ onDone, onCancel, anon = false }: { onDone: (f: File, seconds: number) => void; onCancel: (why?: string) => void; anon?: boolean }) {
   const [secs, setSecs] = useState(0);
   const [level, setLevel] = useState(0);
   const rec = useRef<MediaRecorder | null>(null);
@@ -15,10 +17,11 @@ export function VoiceRecorder({ onDone, onCancel }: { onDone: (f: File, seconds:
   const cancelled = useRef(false);
 
   useEffect(() => {
-    let stream: MediaStream | null = null, raf = 0, timer = 0, ctx: AudioContext | null = null;
+    let stream: MediaStream | null = null, raf = 0, timer = 0, ctx: AudioContext | null = null, stopVoice = () => {};
     (async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        if (anon) { const d = disguise(stream); stopVoice = d.stop; stream = d.stream; }
       } catch {
         onCancel("Allow the microphone to record a voice note.");
         return;
@@ -29,7 +32,7 @@ export function VoiceRecorder({ onDone, onCancel }: { onDone: (f: File, seconds:
       rec.current = r;
       r.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
       r.onstop = () => {
-        stream?.getTracks().forEach((t) => t.stop());
+        stream?.getTracks().forEach((t) => t.stop()); stopVoice();
         if (cancelled.current) return;
         const mime = r.mimeType || type || "audio/webm";
         const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
@@ -54,7 +57,7 @@ export function VoiceRecorder({ onDone, onCancel }: { onDone: (f: File, seconds:
     return () => {
       cancelAnimationFrame(raf); clearInterval(timer); void ctx?.close();
       if (rec.current?.state === "recording") { cancelled.current = true; rec.current.stop(); }
-      stream?.getTracks().forEach((t) => t.stop());
+      stream?.getTracks().forEach((t) => t.stop()); stopVoice();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

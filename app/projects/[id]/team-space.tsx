@@ -18,8 +18,8 @@ const names = (ps: { name: string }[]) => {
 
 /* The frame of a project's team space: header with the call buttons, the Chat / Notes / Tasks tabs, a bar when a
    call is on, and the call itself, which stays up while people switch tabs. */
-export function TeamSpace({ project, team, me, chatUnread, call: first, children }: {
-  project: { id: number; name: string }; team: Mate[]; me: number; chatUnread: number; call: CallInfo; children: React.ReactNode;
+export function TeamSpace({ project, team, me, anon = false, chatUnread, call: first, children }: {
+  project: { id: number; name: string }; team: Mate[]; me: number; anon?: boolean; chatUnread: number; call: CallInfo; children: React.ReactNode;
 }) {
   const path = usePathname();
   const tab = /\/notes(\/|$)/.test(path) ? "notes" : /\/tasks$/.test(path) ? "tasks" : "chat";
@@ -79,7 +79,7 @@ export function TeamSpace({ project, team, me, chatUnread, call: first, children
       )}
       <div className="ts-body">{children}</div>
       {joined && (
-        <TeamCall project={project} me={me} team={team} video={joined.video}
+        <TeamCall project={project} me={me} team={team} video={joined.video} anon={anon}
           onClose={() => { setJoined(null); void teamCallStatus(project.id).then((r) => { if (!("error" in r)) setCall(r.call); }); }} />
       )}
     </div>

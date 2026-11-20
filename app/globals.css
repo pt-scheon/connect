@@ -971,3 +971,5 @@ body:not(.guest) .foot{background:transparent}
 .name-row{gap:12px;flex-wrap:wrap}
 .rank-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:var(--r-pill);background:var(--sunk);font-size:.85rem;text-decoration:none}
 .rank-chip:hover{text-decoration:none;filter:brightness(1.08)}
+/* Project icons are images now: the team's own, or a cover drawn from the name */
+img.picon.pimg{object-fit:cover;background:var(--sunk);padding:0}

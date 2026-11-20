@@ -36,9 +36,11 @@ function rows(me: Row, other: number, after: number, limit = 200): Msg[] {
 /* New messages after `after`, and marks what you have now seen as read. The chat calls this every few seconds. */
 export async function loadChat(other: number, after: number): Promise<{ messages: Msg[]; seenUpTo: number } | { error: string }> {
   const me = await meOrNull();
-  if (!me || !partner(me, other)) return { error: "You cannot message this person." };
+  const them = me ? partner(me, other) : undefined;
+  if (!me || !them) return { error: "You cannot message this person." };
   run("UPDATE messages SET seen=1 WHERE from_id=? AND to_id=? AND seen=0", other, me.id);
-  const seenUpTo = get("SELECT MAX(id) n FROM messages WHERE from_id=? AND to_id=? AND seen=1", me.id, other)?.n ?? 0;
+  // Someone anonymous never shows "Seen": when they read a message stays theirs to know.
+  const seenUpTo = them.anon ? 0 : get("SELECT MAX(id) n FROM messages WHERE from_id=? AND to_id=? AND seen=1", me.id, other)?.n ?? 0;
   return { messages: rows(me, other, after), seenUpTo };
 }
 

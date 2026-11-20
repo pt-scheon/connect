@@ -152,6 +152,9 @@ export default async function Profile({ params, searchParams }: Props) {
         ))}
       </div>
     ) : <div className="note">No shared projects on record yet.</div>;
+  } else if (tab === "resume" && u.anon && !self) {
+    // An anonymous person's resume would give them away (it carries their record and, if written by AI, their name).
+    body = <div className="card"><h2>{u.name}</h2><p className="muted">This person is anonymous, so their resume is hidden.</p></div>;
   } else if (tab === "resume") {
     const facts = resumeFacts(id);
     body = (
@@ -306,7 +309,9 @@ export default async function Profile({ params, searchParams }: Props) {
             {!alum && u.open_to_join ? <span><span className="pill ok">Open to projects</span></span> : null}
             <span className="muted">{u.branch}, class of {u.grad_year}{alum ? " · alum" : ""}{college ? <> · <Link href={`/c/${college.slug}`}>{college.name}</Link></> : null}</span>
             {u.about && <span>{u.about}</span>}
-            <Links u={u} />
+            {u.anon ? <span className="row nowrap"><span className="pill plain">Anonymous</span>
+              {(self || (viewer?.admin && viewer.college_id === u.college_id)) && u.real_name ? <span className="small muted">Real name: {u.real_name} (only {self ? "you and your college's admins" : "admins"} see this)</span> : null}</span> : null}
+            {(!u.anon || self) && <Links u={u} />}
             <div className="row">
               {signedIn.includes("google") && <Stamp>Google sign-in</Stamp>}
               {signedIn.includes("linkedin") && <Stamp>LinkedIn sign-in</Stamp>}

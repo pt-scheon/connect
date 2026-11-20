@@ -89,7 +89,11 @@ export function upsertUser(p: { sub: string; name: string; email?: string; email
     get("SELECT user_id FROM identities WHERE sub=?", p.sub)?.user_id ?? get("SELECT id FROM users WHERE sub=?", p.sub)?.id;
   if (!id && email && p.emailVerified) id = get("SELECT id FROM users WHERE email=? AND email_verified=1", email)?.id;
   if (id) {
-    run("UPDATE users SET picture=COALESCE(?, picture), admin=MAX(admin, ?), super=MAX(super, ?) WHERE id=?", p.picture ?? null, admin, admin, id);
+    // The sign-in provider's photo is kept fresh, unless the person uploaded their own; while anonymous it goes
+    // to the kept real photo, never to the one everyone sees.
+    const cur = get("SELECT anon, photo_key FROM users WHERE id=?", id);
+    if (p.picture && !cur?.photo_key) run(`UPDATE users SET ${cur?.anon ? "real_picture" : "picture"}=? WHERE id=?`, p.picture, id);
+    run("UPDATE users SET admin=MAX(admin, ?), super=MAX(super, ?) WHERE id=?", admin, admin, id);
   } else {
     id = Number(run("INSERT INTO users (sub, name, email, email_verified, picture, admin, super, created_at) VALUES (?,?,?,?,?,?,?,?)",
       p.sub, p.name, email, p.emailVerified ? 1 : 0, p.picture ?? null, admin, admin, now()).lastInsertRowid);

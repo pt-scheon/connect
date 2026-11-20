@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tone } from "./tones";
 import { chooseCamera, nextCamera, type Cam } from "./camera";
+import { disguise } from "./voice";
 import { useRouter } from "next/navigation";
 
 /* Voice and video calls, for any page of the app. One CallProvider lives in the layout; it listens for rings,
@@ -51,13 +52,15 @@ function Face({ u, size }: { u: Peer; size: number }) {
 }
 
 
-export function CallProvider() {
+/* `anon`: the person is in anonymous mode, so their camera never opens and their voice goes through app/calls/voice.ts. */
+export function CallProvider({ anon = false }: { anon?: boolean }) {
   const [s, setS] = useState<State>({ phase: "idle" });
   const [mic, setMic] = useState(true), [cam, setCam] = useState(true), [sharing, setSharing] = useState(false);
   const [theirs, setTheirs] = useState({ mic: true, cam: true });
   const [secs, setSecs] = useState(0), [mini, setMini] = useState(false), [net, setNet] = useState(""), [err, setErr] = useState("");
   const [camName, setCamName] = useState(""), camNameTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const sharingRef = useRef(false);
+  const voiceStop = useRef<() => void>(() => {});
   const device = useRef("");
   const state = useRef(s); state.current = s;
   const pc = useRef<RTCPeerConnection | null>(null);
@@ -84,6 +87,7 @@ export function CallProvider() {
     stopTone.current(); stopTone.current = () => {};
     pc.current?.close(); pc.current = null;
     local.current?.getTracks().forEach((t) => t.stop()); local.current = null; camTrack.current = null;
+    voiceStop.current(); voiceStop.current = () => {};
     remoteStream.current = null; queue.current = []; restarted.current = false;
     setSharing(false); sharingRef.current = false; setMic(true); setCam(true); now.current = { mic: true, cam: true }; setTheirs({ mic: true, cam: true }); setNet(""); setMini(false);
     document.title = document.title.replace(/^📞 /, "");
@@ -104,6 +108,14 @@ export function CallProvider() {
   }, []);
 
   const media = useCallback(async (video: boolean) => {
+    if (anon) {
+      // Anonymous: sound only, disguised on this device before it is sent; the camera is never opened.
+      const raw = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      const d = disguise(raw);
+      voiceStop.current = d.stop;
+      local.current = d.stream; camTrack.current = null; now.current.cam = false; setCam(false);
+      return d.stream;
+    }
     const want = video ? await pickCamera() : undefined;
     const m = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -118,7 +130,7 @@ export function CallProvider() {
       if (better && better !== camTrack.current.getSettings().deviceId) await swapCam({ deviceId: { exact: better } }).catch(() => {});
     }
     return m;
-  }, [swapCam]);
+  }, [swapCam, anon]);
 
   const connect = useCallback(() => {
     const p = new RTCPeerConnection({ iceServers: ice.current });
@@ -135,6 +147,7 @@ export function CallProvider() {
       const cs = p.connectionState;
       if (cs === "connected") {
         stopTone.current(); setNet("");
+        sig("media", { ...now.current });
         if (!startedAt.current) startedAt.current = Date.now();
         setS((x) => ({ ...x, phase: "active" }));
       } else if (cs === "disconnected") setNet("Reconnecting…");
@@ -328,9 +341,9 @@ export function CallProvider() {
       )}
       <div className="call-top">
         {s.video && live && <b>{peer.name}</b>}
-        <span className="call-status" aria-live="polite">{camName ? `Camera: ${camName}` : <>{status}{live && !theirs.mic ? " · they are muted" : ""}</>}</span>
+        <span className="call-status" aria-live="polite">{camName ? `Camera: ${camName}` : <>{status}{live && !theirs.mic ? " · they are muted" : ""}{anon && live ? " · you are anonymous: voice disguised, camera off" : ""}</>}</span>
       </div>
-      {s.video && <video ref={localV} className={`call-local ${cam ? "" : "off"}`} autoPlay playsInline muted />}
+      {s.video && !anon && <video ref={localV} className={`call-local ${cam ? "" : "off"}`} autoPlay playsInline muted />}
       {err && <div className="call-err" role="alert">{err}</div>}
 
       <div className="call-controls">
@@ -342,8 +355,8 @@ export function CallProvider() {
         ) : s.phase === "ended" ? null : (
           <>
             <button type="button" className={`cc ${mic ? "" : "off"}`} onClick={toggleMic} aria-pressed={!mic} aria-label={mic ? "Mute" : "Unmute"}><Icon d={mic ? "mic" : "micoff"} /></button>
-            {s.video && <button type="button" className={`cc ${cam ? "" : "off"}`} onClick={toggleCam} aria-pressed={!cam} aria-label={cam ? "Turn camera off" : "Turn camera on"}><Icon d={cam ? "video" : "videooff"} /></button>}
-            {s.video && live && !mini && <button type="button" className="cc" onClick={flip} aria-label="Switch camera"><Icon d="flip" /></button>}
+            {s.video && !anon && <button type="button" className={`cc ${cam ? "" : "off"}`} onClick={toggleCam} aria-pressed={!cam} aria-label={cam ? "Turn camera off" : "Turn camera on"}><Icon d={cam ? "video" : "videooff"} /></button>}
+            {s.video && live && !mini && !anon && <button type="button" className="cc" onClick={flip} aria-label="Switch camera"><Icon d="flip" /></button>}
             {s.video && live && !mini && "getDisplayMedia" in (navigator.mediaDevices ?? {}) && <button type="button" className={`cc hide-sm ${sharing ? "off" : ""}`} onClick={share} aria-pressed={sharing} aria-label={sharing ? "Stop sharing screen" : "Share screen"}><Icon d="screen" /></button>}
             {live && <button type="button" className="cc" onClick={() => setMini(!mini)} aria-label={mini ? "Expand call" : "Minimise call"}><Icon d={mini ? "expand" : "shrink"} /></button>}
             <button type="button" className="cc end" onClick={hangup} aria-label="End call"><Icon d="hang" /></button>

@@ -97,7 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </div></footer>
         <Suspense><Toast /></Suspense>
         {!consent && <ConsentBanner action={setConsent} />}
-        {member && <CallProvider />}
+        {member && <CallProvider anon={!!me?.anon} />}
         {member && <BottomNav me={me.id} dms={dms} unread={unread} />}
         {member && <Shortcuts />}
         {signedIn && <UnreadBadge count={unread + dms} />}

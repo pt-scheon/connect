@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { chooseCamera, nextCamera, type Cam } from "../../calls/camera";
+import { disguise } from "../../calls/voice";
 import { Face, RoleTag, type Mate } from "./team-ui";
 
 /* A team call. Every browser in the call connects straight to every other one (a "mesh"); the server only passes
@@ -50,12 +51,13 @@ function Voice({ stream }: { stream: MediaStream | null }) {
   return <audio ref={a} autoPlay />;
 }
 
-export function TeamCall({ project, me, team, video, onClose }: { project: { id: number; name: string }; me: number; team: Mate[]; video: boolean; onClose: () => void }) {
+/* `anon`: this person is in anonymous mode. They join with sound only, disguised on their device, and still see everyone else. */
+export function TeamCall({ project, me, team, video, anon = false, onClose }: { project: { id: number; name: string }; me: number; team: Mate[]; video: boolean; anon?: boolean; onClose: () => void }) {
   const self = team.find((t) => t.id === me) ?? { id: me, name: "You", picture: null, role: "Member", lead: false };
   const [peers, setPeers] = useState<Peer[]>([]);
   const [phase, setPhase] = useState<"joining" | "live" | "ended">("joining");
   const [note, setNote] = useState("");
-  const [mic, setMic] = useState(true), [cam, setCam] = useState(video);
+  const [mic, setMic] = useState(true), [cam, setCam] = useState(video && !anon);
   const [mini, setMini] = useState(false);
   const [secs, setSecs] = useState(0);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -63,7 +65,8 @@ export function TeamCall({ project, me, team, video, onClose }: { project: { id:
   const local = useRef<MediaStream | null>(null);
   const pcs = useRef(new Map<string, Entry>());
   const es = useRef<EventSource | null>(null);
-  const media = useRef({ mic: true, cam: video });
+  const media = useRef({ mic: true, cam: video && !anon });
+  const voiceStop = useRef<() => void>(() => {});
   const closed = useRef(false);
   const closeRef = useRef(onClose); closeRef.current = onClose;
   const cleanupRef = useRef<() => void>(() => {});
@@ -119,6 +122,7 @@ export function TeamCall({ project, me, team, video, onClose }: { project: { id:
       es.current?.close(); es.current = null;
       pcs.current.forEach((e) => e.pc.close()); pcs.current.clear();
       local.current?.getTracks().forEach((t) => t.stop()); local.current = null;
+      voiceStop.current(); voiceStop.current = () => {};
       if (callId.current) void post({ action: "leave", call: callId.current });
     };
     const finish = (why: string) => { cleanup(); setPhase("ended"); setNote(why); setTimeout(() => closeRef.current(), 2500); };
@@ -148,7 +152,13 @@ export function TeamCall({ project, me, team, video, onClose }: { project: { id:
 
     (async () => {
       // Sound always; the camera too in a video call, the computer's own one first (see app/calls/camera.ts).
-      try {
+      if (anon) {
+        try {
+          const raw = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+          const d = disguise(raw); voiceStop.current = d.stop; local.current = d.stream;
+          setNote("You are anonymous: your voice is disguised and your camera stays off.");
+        } catch { return finish("Allow the microphone to join the call."); }
+      } else try {
         let want: string | undefined;
         if (video) { let saved: string | null = null; try { saved = localStorage.getItem(CAM_KEY); } catch { /* private window */ } want = chooseCamera(await cameras(), saved, touch()); }
         local.current = await navigator.mediaDevices.getUserMedia({
@@ -190,7 +200,7 @@ export function TeamCall({ project, me, team, video, onClose }: { project: { id:
     window.addEventListener("pagehide", bye);
     cleanupRef.current = cleanup;
     return () => { alive = false; window.removeEventListener("pagehide", bye); cleanup(); };
-  }, [project.id, video]);
+  }, [project.id, video, anon]);
 
   const tellAll = () => {
     for (const k of pcs.current.keys()) {
@@ -252,10 +262,10 @@ export function TeamCall({ project, me, team, video, onClose }: { project: { id:
         <button type="button" className={`cc ${mic ? "" : "off"}`} onClick={toggleMic} aria-pressed={!mic} aria-label={mic ? "Mute" : "Unmute"}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d={mic ? "M5 10a7 7 0 0 0 14 0M12 17v5" : "M5 10a7 7 0 0 0 14 0M12 17v5M2 2l20 20"} /></svg>
         </button>
-        {video && <button type="button" className={`cc ${cam ? "" : "off"}`} onClick={toggleCam} aria-pressed={!cam} aria-label={cam ? "Turn camera off" : "Turn camera on"}>
+        {video && !anon && <button type="button" className={`cc ${cam ? "" : "off"}`} onClick={toggleCam} aria-pressed={!cam} aria-label={cam ? "Turn camera off" : "Turn camera on"}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m22 8-6 4 6 4V8z" /><rect x="2" y="6" width="14" height="12" rx="2" />{!cam && <path d="M2 2l20 20" />}</svg>
         </button>}
-        {video && <button type="button" className="cc" onClick={switchCam} aria-label="Switch camera">
+        {video && !anon && <button type="button" className="cc" onClick={switchCam} aria-label="Switch camera">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 7h-3l-2-3H9L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" /><path d="M9 13a3 3 0 0 0 5.2 2M15 13a3 3 0 0 0-5.2-2" /></svg>
         </button>}
         <button type="button" className="cc" onClick={() => setMini(true)} aria-label="Shrink the call to a bar">

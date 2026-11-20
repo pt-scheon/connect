@@ -211,6 +211,18 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // Whether this person's visit days count in the admin statistics (the cookie notice and Settings), and when they agreed to the terms.
   ["users", "stats_on", "INTEGER DEFAULT 1"],
   ["users", "terms_at", "INTEGER"],
+  // Anonymous mode (lib/identity.ts): the alias shown instead of the name, and the real name and photo kept aside.
+  ["users", "anon", "INTEGER DEFAULT 0"],
+  ["users", "alias", "TEXT"],
+  ["users", "real_name", "TEXT"],
+  ["users", "real_picture", "TEXT"],
+  ["users", "anon_since", "INTEGER"],
+  // A photo the person uploaded themselves (its file key), and a project's own image.
+  ["users", "photo_key", "TEXT"],
+  ["users", "photo_mime", "TEXT"],
+  ["projects", "image_mime", "TEXT"],
+  ["projects", "image", "TEXT"],
+  ["projects", "image_key", "TEXT"],
   // When someone left a project or was voted gone, for the credit history on profiles.
   ["members", "left_at", "INTEGER"],
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule

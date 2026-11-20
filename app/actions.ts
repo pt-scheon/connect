@@ -1305,6 +1305,9 @@ export async function deleteAccount(fd: FormData) {
     run(`UPDATE users SET name='Deleted user', email=NULL, college_email=NULL, picture=NULL, about='', skills='', resume=NULL,
          github='', linkedin='', website='', sub=?, admin=0, super=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
     for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
+    // Their uploaded photo, and the real name and photo anonymous mode kept aside, go too.
+    if (me.photo_key) removeFile(me.photo_key);
+    run("UPDATE users SET photo_key=NULL, photo_mime=NULL, real_name=NULL, real_picture=NULL, alias=NULL, anon=0 WHERE id=?", me.id);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
       "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM commission_apps WHERE user_id=? AND status='pending'",
       "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?", "DELETE FROM feedback WHERE user_id=?", "DELETE FROM trusted_devices WHERE user_id=?", "DELETE FROM login_codes WHERE user_id=?", "DELETE FROM project_seen WHERE user_id=?", "DELETE FROM activity WHERE user_id=?",

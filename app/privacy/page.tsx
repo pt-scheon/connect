@@ -20,6 +20,8 @@ export default function Privacy() {
         <li><b>When you sign in:</b> the time and the kind of device (for example &ldquo;Chrome on Windows&rdquo;) of your latest sign-in, so we can show it to you and tell you about a sign-in you did not make. We do not keep your network address.</li>
         <li><b>Which days you use Connect:</b> for each day you open it, a count of how many pages you loaded, not which ones. Admins see these only added up across everyone, as charts, never per person. Deleting your account deletes them.</li>
         <li><b>Sign-in codes:</b> when a code is emailed to you we keep only a scrambled copy of it until it is used or expires, and a scrambled marker for each device you chose to trust.</li>
+        <li><b>Photos you upload:</b> a profile photo replaces the one from your sign-in provider until you remove it, and a project&rsquo;s image is seen by whoever can see the project.</li>
+        <li><b>Anonymous mode:</b> if you turn it on, everyone sees an alias and a pattern instead of your name and photo, and your links, resume and read receipts are hidden. We keep your real name and photo so your college&rsquo;s admins can still see who you are; nobody else can. In calls and voice notes your voice is changed on your own device before it is sent, so your real voice never reaches us or the other person, and your camera stays off.</li>
         <li><b>If you turn on alerts:</b> an address your browser gives us for that device, so we can send it notifications. Turning alerts off removes it.</li>
       </ul>
 
@@ -30,6 +32,7 @@ export default function Privacy() {
       <h2>How it is used</h2>
       <ul>
         <li>To run Connect: showing projects, working out credit, sending you inbox alerts and, if you leave them on, emails about them.</li>
+        <li>If someone on a project&rsquo;s team asks AI to make the project&rsquo;s image, its name and one-line pitch are sent to Gemini to draw it.</li>
         <li>If you press <b>Write with AI</b> on your resume, your signed project facts are sent to Google&rsquo;s Gemini API to write it. When the <b>AI proof check</b> runs on a project (the team, its reviewers or an admin starts it, and it runs once by itself when the project goes for review), Connect reads the project&rsquo;s public GitHub repos, live site and YouTube demo titles, and sends Gemini those and the project&rsquo;s pitch, milestones, skills and each member&rsquo;s role and &ldquo;what I did&rdquo;. Members are sent as &ldquo;Member 1&rdquo;, &ldquo;Member 2&rdquo; and so on, never by name or email. Nothing else is sent to it.</li>
         <li>Calls, including team calls, connect directly between the browsers in the call where possible, which means the other person&rsquo;s device can see your network address, as with most calling apps. When a direct connection is not possible, the encrypted call passes through a relay run by Cloudflare.</li>
         <li>Alerts are delivered by the notification service of your browser or phone maker (Google, Apple or Mozilla).</li>

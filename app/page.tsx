@@ -42,7 +42,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
       const t = Math.max(last.get(p.id) ?? 0, p.created_at ?? 0);
       const live = p.status === "recruiting" || p.status === "building";
       return {
-        id: p.id, name: p.name, pitch: p.pitch, status: p.status, hidden: p.hidden,
+        id: p.id, name: p.name, pitch: p.pitch, status: p.status, hidden: p.hidden, image: p.image ?? null,
         done: ms.get(p.id)?.done ?? 0, total: ms.get(p.id)?.total ?? 0, team,
         open, funded: funded.has(p.id), mine: team.some((u) => u.id === me.id), followed: followed.has(p.id),
         fit: [...new Set(openRoles.flatMap((r) => fitsMe(needsFor(r.title, needs.get(r.id) ?? []), r.title, mySkills)))],

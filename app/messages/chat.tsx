@@ -89,9 +89,9 @@ function day(t: number) {
 }
 
 /* One conversation: bubbles grouped by day, new messages every few seconds, Enter to send. */
-export function Chat({ other, initial, initialSeen, canSend, reason, projects = [], callButtons }: {
+export function Chat({ other, initial, initialSeen, canSend, reason, projects = [], callButtons, anon = false }: {
   other: Person & { branch?: string }; initial: Msg[]; initialSeen: number; canSend: boolean; reason?: string;
-  projects?: ShareableProject[]; callButtons?: React.ReactNode;
+  projects?: ShareableProject[]; callButtons?: React.ReactNode; anon?: boolean;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>(initial);
   const [seenUpTo, setSeen] = useState(initialSeen);
@@ -338,7 +338,7 @@ export function Chat({ other, initial, initialSeen, canSend, reason, projects = 
               <button type="button" className="small" onClick={() => setMenu("attach")}>← Back</button>
             </div>
           )}
-          {recording && <VoiceRecorder onDone={sendVoice} onCancel={(why) => { setRecording(false); if (why) setErr(why); }} />}
+          {recording && <VoiceRecorder anon={anon} onDone={sendVoice} onCancel={(why) => { setRecording(false); if (why) setErr(why); }} />}
           <button type="button" className={`attach ${menu ? "on" : ""}`} onClick={() => setMenu(menu ? "" : "attach")} disabled={uploading || files.length >= AT_ONCE || recording} aria-label="Attach" aria-expanded={!!menu} title="Camera, photos, videos, documents or a project">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
           </button>

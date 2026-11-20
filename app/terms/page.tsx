@@ -13,6 +13,7 @@ export default function Terms() {
       <h2>1. Your account</h2>
       <ul>
         <li>One account per person. Use your real name and your own college or work email. Do not sign in as someone else or let anyone use your account.</li>
+        <li>You can choose to appear under an alias in anonymous mode. Your college&rsquo;s admins can still see who you are, and everything in these terms applies to you the same. Using an alias to harass people, dodge a block or fake reviews gets the account suspended.</li>
         <li>Connect is for communities, like the students of a college or the employees of a workplace, and their alumni. If you are under 18, you need the consent of a parent or guardian to use it.</li>
         <li>You sign in with Google or LinkedIn, so keep that account safe. If you think someone else got in, use <b>Sign out of all other devices</b> in <Link href="/settings">Settings</Link> and change that account&rsquo;s password.</li>
       </ul>

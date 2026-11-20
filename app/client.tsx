@@ -110,7 +110,7 @@ export function CopyLink({ path, label = "Copy profile link" }: { path: string; 
 export type BoardItem = {
   id: number; name: string; pitch: string; status: string; done: number; total: number;
   team: { id: number; name: string; picture: string | null }[]; open: string[]; funded: boolean; mine: boolean; followed?: boolean; hidden?: number;
-  fit: string[]; active: string; quiet: boolean;
+  fit: string[]; active: string; quiet: boolean; image?: string | null;
 };
 export function Board({ items, canReview, initial, forYou = [] }: { items: BoardItem[]; canReview: boolean; initial: string; forYou?: { id: number; why: string[] }[] }) {
   const [f, setF] = useState(initial);
@@ -149,7 +149,7 @@ export function Board({ items, canReview, initial, forYou = [] }: { items: Board
       {list.length === 0 && <div className="note">{f === "foryou" ? "Nothing new for you right now. See All for every project." : items.length ? "Nothing matches. Try another filter." : "No projects yet. Post the first one."}</div>}
       {f === "foryou" && list.map((p) => (
         <div key={p.id} className="card lift fy">
-          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} /><h2><Link className="fy-link" href={`/projects/${p.id}`}>{p.name}</Link></h2></span><Pill status={p.status} /></span>
+          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} image={p.image} /><h2><Link className="fy-link" href={`/projects/${p.id}`}>{p.name}</Link></h2></span><Pill status={p.status} /></span>
           <span className="muted">{p.pitch}</span>
           <span className="row">
             <span className="avs">{p.team.map((u) => <Av key={u.id} u={u} />)}</span>
@@ -165,7 +165,7 @@ export function Board({ items, canReview, initial, forYou = [] }: { items: Board
       ))}
       {f !== "foryou" && list.map((p) => (
         <Link key={p.id} className="card lift" href={`/projects/${p.id}`}>
-          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} /><h2>{p.name}</h2></span>
+          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} image={p.image} /><h2>{p.name}</h2></span>
             <span className="row nowrap">{p.hidden === 2 ? <span className="pill plain">Private</span> : p.hidden === 1 ? <span className="pill bad">Hidden</span> : null}<Pill status={p.status} /></span></span>
           <span className="muted">{p.pitch}</span>
           <span className="row">

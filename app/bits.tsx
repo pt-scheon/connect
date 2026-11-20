@@ -17,9 +17,11 @@ export function Av({ u, lg }: { u: Row; lg?: boolean }) {
 }
 /* Apple's system colours, deepened a little so white initials stay readable (4.5:1 or better). */
 export const AVATAR = ["#0071e3", "#1f7a35", "#c93400", "#8944ab", "#d30f45", "#5856d6", "#0071a4", "#b25000"];
-/* A project's icon: its first letter on one of eight Apple colours, like an app icon. Decorative only. */
-export function PIcon({ id, name, lg }: { id: number; name: string; lg?: boolean }) {
-  return <span className={`picon c${Math.abs(Number(id) || 0) % 8}${lg ? " lg" : ""}`} aria-hidden="true">{(name.trim()[0] || "?").toUpperCase()}</span>;
+/* A project's icon, like an app icon: the image its team uploaded (or had AI make), else a cover drawn from its
+   name (app/api/cover). Decorative only. */
+export function PIcon({ id, name, lg, image }: { id: number; name: string; lg?: boolean; image?: string | null }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className={`picon pimg c${Math.abs(Number(id) || 0) % 8}${lg ? " lg" : ""}`} src={image || `/api/cover?n=${encodeURIComponent(name.slice(0, 80))}`} alt="" aria-hidden="true" loading="lazy" />;
 }
 export const UserLink = ({ u }: { u: Row }) => <Link href={`/u/${u.id}`}>{u.name}</Link>;
 export function Who({ u }: { u: Row }) {

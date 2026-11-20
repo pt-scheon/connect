@@ -15,7 +15,7 @@ export default async function TeamSpaceLayout({ children, params }: { children: 
   if (!p || !onTeam(p.id, me.id)) notFound();
   const team = teamOf(p.id).map((u) => ({ id: u.id as number, name: String(u.name), picture: u.picture ?? null, role: String(u.role || "Member"), lead: !!u.lead }));
   return (
-    <TeamSpace project={{ id: p.id, name: String(p.name) }} team={team} me={me.id} chatUnread={unreadTeam(p.id, me.id)} call={callStatus(p.id)}>
+    <TeamSpace project={{ id: p.id, name: String(p.name) }} team={team} me={me.id} anon={!!me.anon} chatUnread={unreadTeam(p.id, me.id)} call={callStatus(p.id)}>
       {children}
     </TeamSpace>
   );

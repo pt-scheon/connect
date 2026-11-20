@@ -12,6 +12,9 @@ import { JoinAsk, SplitForm } from "../../client";
 import { ProofCheck } from "./proof-check";
 import { unreadTeam } from "@/lib/teamchat";
 import { callStatus } from "@/lib/teamspace";
+import { imageAiOn } from "@/lib/aiimage";
+import { aiProjectImage } from "../../identity-actions";
+import { ProjectImageUpload } from "../../identity-ui";
 import "./team.css";
 import { ShareLink } from "../../messages/media";
 import { toggleFollow } from "../../follow";
@@ -120,7 +123,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
       )}
       <div className="head">
         <div className="stack tight">
-          <div className="row"><PIcon id={p.id} name={p.name} lg /><h1>{p.name}</h1><Pill status={p.status} />
+          <div className="row"><PIcon id={p.id} name={p.name} image={p.image} lg /><h1>{p.name}</h1><Pill status={p.status} />
             <ShareLink path={`/projects/${id}`} title={`${p.name} on Connect`} text={p.status === "shipped" ? `${p.name}: shipped and reviewed on Connect` : `${p.name} is looking for people on Connect`} />
             {!onTeam && !p.hidden && (
               <form action={toggleFollow}>
@@ -138,6 +141,18 @@ export default async function Project({ params }: { params: Promise<{ id: string
                 <input type="text" name="pitch" id="edit-pitch" defaultValue={p.pitch} maxLength={300} required aria-label="What it does" />
                 <div><button className="btn ghost sm">Save</button></div>
               </F>
+            </details>
+          )}
+          {onTeam && p.status !== "dropped" && (
+            <details className="small">
+              <summary className="muted" style={{ cursor: "pointer" }}>Project image</summary>
+              <div className="stack tight pimg-edit">
+                <span className="muted">{p.image ? "Your team's own image." : "Right now a cover drawn from the project's name. Upload your own image, or let AI make one from the name and pitch."}</span>
+                <ProjectImageUpload id={id} hasOwn={!!p.image} />
+                {imageAiOn() ? (
+                  <F action={aiProjectImage} back={back} hidden={{ id }}><button className="btn ghost sm">Make one with AI</button></F>
+                ) : <span className="muted">AI-made images are not switched on for this site yet.</span>}
+              </div>
             </details>
           )}
           <span className="small muted mono">{shipped ? `Shipped ${monthYear(p.shipped_at)}` : `Started ${monthYear(p.created_at)}`}</span>
