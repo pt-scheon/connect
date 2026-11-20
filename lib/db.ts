@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS vouches (from_id INTEGER, to_id INTEGER, created_at I
 CREATE TABLE IF NOT EXISTS claims (id INTEGER PRIMARY KEY, user_id INTEGER, text TEXT);
 CREATE TABLE IF NOT EXISTS clubs (id INTEGER PRIMARY KEY, name TEXT, about TEXT, lead_id INTEGER);
 CREATE TABLE IF NOT EXISTS club_members (club_id INTEGER, user_id INTEGER, role TEXT DEFAULT 'Member', confirmed INTEGER DEFAULT 0, PRIMARY KEY (club_id, user_id));
+-- What a club is doing next: a title, a day and a place. Added by the lead or a co-lead.
+CREATE TABLE IF NOT EXISTS club_plans (id INTEGER PRIMARY KEY, club_id INTEGER NOT NULL, title TEXT NOT NULL, about TEXT DEFAULT '', day INTEGER NOT NULL, place TEXT DEFAULT '', created_by INTEGER, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS calls (id INTEGER PRIMARY KEY, alum_id INTEGER, title TEXT, about TEXT, amount INTEGER, min_credit INTEGER, open INTEGER DEFAULT 1);
 CREATE TABLE IF NOT EXISTS applications (id INTEGER PRIMARY KEY, call_id INTEGER, project_id INTEGER, status TEXT DEFAULT 'pending', UNIQUE (call_id, project_id));
 CREATE TABLE IF NOT EXISTS grants (id INTEGER PRIMARY KEY, project_id INTEGER, alum_id INTEGER, amount INTEGER);
@@ -129,6 +131,16 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   ["users", "super", "INTEGER DEFAULT 0"],
   ["projects", "college_id", "INTEGER"],
   ["clubs", "college_id", "INTEGER"],
+  // Clubs wait for an admin ('pending'), then are 'active' or 'declined'. Clubs from before this are active.
+  ["clubs", "status", "TEXT DEFAULT 'active'"],
+  ["clubs", "created_by", "INTEGER"],
+  ["clubs", "created_at", "INTEGER"],
+  ["clubs", "decided_by", "INTEGER"],
+  ["clubs", "decided_at", "INTEGER"],
+  ["clubs", "decline_reason", "TEXT DEFAULT ''"],
+  // manage = 1: a co-lead who can edit the club, its members and plans. invited_by: added by a lead, waiting for a yes.
+  ["club_members", "manage", "INTEGER DEFAULT 0"],
+  ["club_members", "invited_by", "INTEGER"],
   ["calls", "college_id", "INTEGER"],
   ["reports", "college_id", "INTEGER"],
   ["codes", "college_name", "TEXT DEFAULT ''"],

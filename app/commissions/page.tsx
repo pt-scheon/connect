@@ -17,7 +17,7 @@ export default async function Commissions() {
   const users = new Map(all("SELECT id, name, picture FROM users WHERE college_id=?", cid).map((u) => [u.id, u]));
   const list = all("SELECT * FROM commissions WHERE college_id=? AND hidden=0 ORDER BY created_at DESC LIMIT 200", cid);
   const skills = all("SELECT cs.* FROM commission_skills cs JOIN commissions c ON c.id=cs.commission_id WHERE c.college_id=? ORDER BY cs.importance DESC", cid);
-  const myClubs = all("SELECT id, name FROM clubs WHERE lead_id=? AND college_id=?", me.id, cid);
+  const myClubs = all("SELECT id, name FROM clubs WHERE lead_id=? AND college_id=? AND status='active'", me.id, cid);
   const alum = me.role === "alum";
   const open = list.filter((c) => c.status === "open" && c.client_id !== me.id);
   const involved = list.filter((c) => c.client_id === me.id || c.doer_id === me.id);

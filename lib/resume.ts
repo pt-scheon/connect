@@ -25,7 +25,7 @@ export function resumeFacts(userId: number): ResumeFacts {
       proof: all("SELECT label FROM proofs WHERE project_id=?", p.id).map((r) => r.label),
       shipped: new Date(p.shipped_at * 1000).toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
     })),
-    clubs: all("SELECT c.name, cm.role FROM club_members cm JOIN clubs c ON c.id=cm.club_id WHERE cm.user_id=? AND cm.confirmed=1", userId),
+    clubs: all("SELECT c.name, cm.role FROM club_members cm JOIN clubs c ON c.id=cm.club_id WHERE cm.user_id=? AND cm.confirmed=1 AND c.status='active'", userId),
     // Only skills someone else confirmed. The list a person types on their profile is never sent.
     skills: [...(competency(compute()).get(userId)?.values() ?? [])].sort((a, b) => b.score - a.score).map((k) => k.label),
   };

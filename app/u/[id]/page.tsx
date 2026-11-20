@@ -95,7 +95,7 @@ export default async function Profile({ params, searchParams }: Props) {
   const names = new Map([...users].map(([k, v]) => [k, v.name]));
   const mates = [...(T.get(id) ?? [])].map(([oid, list]) => ({ u: users.get(oid), list }));
   const claims = all("SELECT * FROM claims WHERE user_id=?", id);
-  const clubs = all("SELECT c.id, c.name, cm.role FROM club_members cm JOIN clubs c ON c.id=cm.club_id WHERE cm.user_id=? AND cm.confirmed=1", id);
+  const clubs = all("SELECT c.id, c.name, cm.role FROM club_members cm JOIN clubs c ON c.id=cm.club_id WHERE cm.user_id=? AND cm.confirmed=1 AND c.status='active'", id);
   const projects = all("SELECT p.*, m.role mrole, m.did, m.status mstatus FROM members m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND p.hidden=0 ORDER BY p.created_at DESC", id);
   const shippedWithMe = viewer && T.get(viewer.id)?.get(id)?.some((t) => t.shipped);
   const vouched = viewer && !!get("SELECT 1 FROM vouches WHERE from_id=? AND to_id=?", viewer.id, id);

@@ -17,6 +17,7 @@ import { parseSkills } from "@/lib/skills";
 import { needsFromList } from "@/lib/relevance";
 import { alumUsed, giftBlock, pairBlock, type CommRow, type GiftRow } from "@/lib/commissions";
 import { auditable } from "@/lib/audits";
+import * as Club from "@/lib/clubs";
 import { mailReady, sendMail } from "@/lib/mail";
 import { remove as removeFile, save as saveFile, sniff, cleanName } from "@/lib/files";
 import { checkLive, liveUrl } from "@/lib/live";
@@ -749,30 +750,60 @@ export async function createClub(fd: FormData) {
   })();
   done(back, "Club registered.");
 }
+/* Everything below goes through lib/clubs.ts, which holds the rules for who may do what. */
+const clubOr = (id: number, me: Row, fail: (m: string) => never) => { const c = Club.clubFor(id, me); if (!c || !Club.seesClub(c, me)) fail("No such club."); return c!; };
+const sayClub = (back: string, err: string | null, ok: string, fail: (m: string) => never) => { if (err) fail(err); done(back, ok); };
+export async function requestClub(fd: FormData) {
+  const { me, s, fail } = await ctx(fd);
+  if (!allow(`club-ask:${me.id}`, 5, 3600)) fail("Slow down a little. Try again later.");
+  const r = Club.requestClub(me, s("name", 80), s("about", 400));
+  if (typeof r === "string") fail(r);
+  done(`/clubs/${r}`, me.admin ? "Club started." : "Sent to your community's admins. Your club opens once one of them approves it.");
+}
+export async function decideClub(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  const c = clubOr(n("club"), me, fail);
+  sayClub(back, Club.decideClub(me, c, s("do") === "approve", s("reason")), s("do") === "approve" ? `${c.name} approved.` : `${c.name} declined.`, fail);
+}
+export async function updateClub(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  sayClub(back, Club.updateClub(me, clubOr(n("club"), me, fail), s("name", 80), s("about", 400)), "Club saved.", fail);
+}
 export async function joinClub(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
-  const c = get("SELECT * FROM clubs WHERE id=? AND college_id=?", n("club"), me.college_id);
-  if (!c) fail("No such club.");
-  const r = run("INSERT OR IGNORE INTO club_members (club_id, user_id) VALUES (?,?)", c.id, me.id);
-  if (r.changes) notify(c.lead_id, `${me.name} asked to join ${c.name}`, `/clubs/${c.id}`);
-  done(back, "Asked to join. The club lead confirms members.");
+  sayClub(back, Club.askToJoin(me, clubOr(n("club"), me, fail)), "Asked to join. The club's lead confirms members.", fail);
+}
+export async function inviteToClub(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  sayClub(back, Club.inviteMember(me, clubOr(n("club"), me, fail), n("user")), "Invited. They join once they say yes.", fail);
+}
+export async function answerClubInvite(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  const yes = s("do") === "accept";
+  sayClub(back, Club.answerInvite(me, clubOr(n("club"), me, fail), yes), yes ? "You joined the club." : "Invitation declined.", fail);
 }
 export async function setClubMember(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
-  const c = get("SELECT * FROM clubs WHERE id=? AND college_id=?", n("club"), me.college_id), user = n("user");
-  if (!c) fail("No such club.");
-  const boss = c.lead_id === me.id || me.admin;
-  if (s("do") === "remove") {
-    if (!boss && user !== me.id) fail("Only the club lead can remove members.");
-    if (user === c.lead_id) fail("The lead cannot be removed. An admin can change the lead.");
-    run("DELETE FROM club_members WHERE club_id=? AND user_id=?", c.id, user);
-    done(back);
-  }
-  if (!boss) fail("Only the club lead can confirm members.");
-  const was = get("SELECT confirmed FROM club_members WHERE club_id=? AND user_id=?", c.id, user);
-  run("UPDATE club_members SET confirmed=1, role=? WHERE club_id=? AND user_id=?", user === c.lead_id ? "Lead" : s("role", 40) || "Member", c.id, user);
-  if (was && !was.confirmed) notify(user, `You are now a member of ${c.name}`, `/clubs/${c.id}`);
-  done(back, "Saved.");
+  const c = clubOr(n("club"), me, fail);
+  if (s("do") === "remove") sayClub(n("user") === me.id ? "/clubs" : back, Club.removeMember(me, c, n("user")), n("user") === me.id ? `You left ${c.name}.` : "Removed.", fail);
+  sayClub(back, Club.setMember(me, c, n("user"), s("role", 60), fd.get("manage") === "on" || s("manage") === "1"), "Saved.", fail);
+}
+export async function transferClubLead(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  sayClub(back, Club.transferLead(me, clubOr(n("club"), me, fail), n("user")), "The lead is handed over. You stay in as a co-lead.", fail);
+}
+export async function deleteClub(fd: FormData) {
+  const { me, s, n, fail } = await ctx(fd);
+  const c = clubOr(n("club"), me, fail);
+  sayClub("/clubs", Club.deleteClub(me, c, s("confirm", 80)), `${c.name} is deleted.`, fail);
+}
+export async function addClubPlan(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  sayClub(back, Club.addPlan(me, clubOr(n("club"), me, fail), s("title", 100), s("about", 400), s("day", 10), s("place", 100)), "Plan added. Members were told.", fail);
+}
+export async function removeClubPlan(fd: FormData) {
+  const { me, back, n, fail } = await ctx(fd);
+  sayClub(back, Club.removePlan(me, clubOr(n("club"), me, fail), n("plan")), "Plan removed.", fail);
 }
 
 /* ---------- alumni funding ---------- */
@@ -854,7 +885,7 @@ export async function postCommission(fd: FormData) {
   if (reward < C.minReward || reward > C.maxReward) fail(`The reward has to be between ${C.minReward} and ${C.maxReward} credit.`);
   if (get("SELECT COUNT(*) n FROM commissions WHERE client_id=? AND status IN ('open','assigned','delivered','disputed')", me.id).n >= C.openMax) fail(`You can have ${C.openMax} commissions running at once.`);
   if (!allow(`commission:${me.id}`, 5, 86400)) fail("You have posted several today. Try again tomorrow.");
-  const club = n("club") ? get("SELECT * FROM clubs WHERE id=? AND lead_id=? AND college_id=?", n("club"), me.id, me.college_id) : undefined;
+  const club = n("club") ? get("SELECT * FROM clubs WHERE id=? AND lead_id=? AND college_id=? AND status='active'", n("club"), me.id, me.college_id) : undefined;
   if (n("club") && !club) fail("Only a club's lead can post for the club.");
   if (alum) {
     const used = alumUsed(commRows(me.college_id), me.id, now());

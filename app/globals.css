@@ -831,3 +831,12 @@ h1,h2,h3{overflow-wrap:anywhere}
 .fy-hide{position:relative;z-index:1;background:none;border:0;padding:6px 2px;color:var(--muted);cursor:pointer;min-height:32px}
 .fy-hide:hover{color:var(--ink);text-decoration:underline}
 @media (pointer:coarse){.fy-hide{min-height:40px}}
+
+/* Clubs: plans, the role editor and admin approvals */
+.plan{padding:12px 0;border-top:1px solid var(--line)}
+.plan:first-of-type{border-top:0}
+.plan-form{background:var(--sunk);border-radius:var(--r-md);padding:14px 16px;margin-top:4px}
+.plan-form input,.plan-form textarea{background:var(--surface)}
+.club-role input[type=text]{flex:0 1 150px;width:auto;padding:7px 10px}
+.club-role label{gap:6px;align-items:center;color:var(--muted);white-space:nowrap;flex:none}
+.club-ask{padding:12px 0;border-top:1px solid var(--line)}

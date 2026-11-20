@@ -30,6 +30,7 @@ export default async function Admin() {
   const flags = splitFlags(cid);
   const nameOf = (id: number) => all("SELECT name FROM users WHERE id=?", id)[0]?.name ?? "Someone";
   const suspended = all("SELECT * FROM users WHERE suspended=1 AND deleted=0 AND college_id=?", cid);
+  const clubAsks = all("SELECT c.*, u.name asker FROM clubs c LEFT JOIN users u ON u.id=c.created_by WHERE c.status='pending' AND c.college_id=? ORDER BY c.created_at", cid);
   const fresh = me.super ? (get("SELECT COUNT(*) n FROM feedback WHERE status='new'").n as number) : 0;
   return (
     <>
@@ -154,6 +155,22 @@ export default async function Admin() {
           {suspended.length > 0 && <span className="label">Suspended</span>}
           {suspended.map((u) => (
             <div key={u.id} className="row between"><span>{u.name}</span><F action={A.setSuspended} back="/admin" hidden={{ user: u.id, on: 0 }}><button className="btn ghost sm">Restore</button></F></div>
+          ))}
+        </div>
+        <div className="card stack" id="clubs">
+          <h2>Clubs waiting for approval</h2>
+          <span className="small muted">Every new club needs an admin&rsquo;s yes, even one with a single member. Approve it to put it on the Clubs page; decline it with a reason the person will see.</span>
+          {clubAsks.length === 0 && <span className="muted">No clubs waiting.</span>}
+          {clubAsks.map((c) => (
+            <div key={c.id} className="stack tight club-ask">
+              <span className="row between"><span><Link href={`/clubs/${c.id}`}><b>{c.name}</b></Link> <span className="small muted">asked by {c.asker ?? "someone"}</span></span>
+                <F action={A.decideClub} back="/admin#clubs" hidden={{ club: c.id, do: "approve" }}><button className="btn sm">Approve</button></F></span>
+              {c.about && <span className="small">{c.about}</span>}
+              <F action={A.decideClub} back="/admin#clubs" hidden={{ club: c.id, do: "decline" }} className="row">
+                <input type="text" name="reason" id={`club-decline-${c.id}`} placeholder="Why it is declined" aria-label={`Why ${c.name} is declined`} minLength={5} maxLength={300} required />
+                <button className="btn ghost sm">Decline</button>
+              </F>
+            </div>
           ))}
         </div>
         <F action={A.createClub} back="/admin" className="card stack">
