@@ -15,8 +15,11 @@ import { ShareLink } from "../../messages/media";
 import * as A from "../../actions";
 import { CopyLink, Count } from "../../client";
 import { Av, F, Pill, Stamp, Who, initials, inr, skillsOf, statusLabel } from "../../ui";
+import { tierFor } from "@/lib/tiers";
+import { TierBadge } from "../../tier-badge";
+import { ProgressTab } from "./progress";
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; g?: string }> };
 const find = (id: number) => get("SELECT * FROM users WHERE id=? AND onboarded=1 AND suspended=0", id);
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -86,7 +89,8 @@ export default async function Profile({ params, searchParams }: Props) {
      WHERE r.open=1 AND p.lead_id=? AND p.college_id=? AND p.status IN ('recruiting','building')
        AND p.id NOT IN (SELECT project_id FROM members WHERE user_id=?) ORDER BY p.name, r.title`, me!.id, me!.college_id, id) : [];
   const viewer = me?.onboarded ? me : null;
-  const tab = (await searchParams).tab ?? (viewer ? "work" : "resume");
+  const sp = await searchParams;
+  const tab = sp.tab ?? (viewer ? "work" : "resume");
   const back = `/u/${id}?tab=${tab}`;
   const self = viewer?.id === id, alum = u.role === "alum";
   const s = standings().get(id) ?? EMPTY;
@@ -109,6 +113,14 @@ export default async function Profile({ params, searchParams }: Props) {
   const listedOnly = skills.filter((k) => !proven.some((x) => x.skill === canon(k)));
   const signedIn = (all("SELECT sub FROM identities WHERE user_id=?", id)).map((r) => String(r.sub).split(":")[0]);
   const ha = !alum ? hireAgain(id) : null;
+  const rank = tierFor(s.earned, s.shipped);
+  // A private (or admin-hidden) project's name stays inside it: ledger lines about it read "A private project"
+  // for anyone who is not on its team or an admin of its community.
+  const secret = new Map<number, string>();
+  for (const p of all("SELECT p.id, p.name, p.college_id FROM members m JOIN projects p ON p.id=m.project_id WHERE m.user_id=? AND p.hidden<>0", id))
+    if (!(viewer && ((viewer.admin && viewer.college_id === p.college_id) || get("SELECT 1 FROM members WHERE project_id=? AND user_id=? AND status='active'", p.id, viewer.id))))
+      secret.set(p.id, p.name);
+  const label = (what: string, pid?: number) => (pid && secret.has(pid) ? what.replace(secret.get(pid)!, "A private project") : what);
 
   let body;
   if (alum) {
@@ -125,6 +137,8 @@ export default async function Profile({ params, searchParams }: Props) {
         {calls.map((c) => <div key={c.id} className="row between"><span>{c.title} <span className="pill info">Open call</span></span><span className="mono">up to {inr(c.amount)}</span></div>)}
       </div>
     );
+  } else if (tab === "progress") {
+    body = <ProgressTab s={s} first={u.name.split(" ")[0]} self={self} graph={sp.g === "projects" ? "projects" : "credit"} base={`/u/${id}?tab=progress`} label={label} today={now()} />;
   } else if (tab === "people") {
     body = mates.length ? (
       <div className="card">
@@ -196,7 +210,7 @@ export default async function Profile({ params, searchParams }: Props) {
           <div className="tw"><table><tbody>
             {s.ledger.length === 0 && <tr><td className="muted">Nothing yet.</td></tr>}
             {s.ledger.map((l, i) => (
-              <tr key={i}><td><b>{l.what}</b><br /><span className="small muted">{l.why}</span></td><td className={`n ${l.n < 0 ? "neg" : ""}`}>{l.n > 0 ? "+" : "−"}{Math.abs(l.n)}</td></tr>
+              <tr key={i}><td><b>{label(l.what, l.pid)}</b><br /><span className="small muted">{l.why}</span></td><td className={`n ${l.n < 0 ? "neg" : ""}`}>{l.n > 0 ? "+" : "−"}{Math.abs(l.n)}</td></tr>
             ))}
           </tbody></table></div>
         </div>
@@ -285,7 +299,10 @@ export default async function Profile({ params, searchParams }: Props) {
         <div className="row" style={{ alignItems: "start" }}>
           <Av u={u} lg />
           <div className="stack tight" style={{ flex: "1 1 240px" }}>
-            <h1>{u.name}</h1>
+            <span className="row nowrap name-row"><h1>{u.name}</h1>{!alum && u.verified ? (
+              <Link href={`/u/${id}?tab=progress`} className={`rank-chip tier-name tier-${rank.tier.id}`} title={`${rank.tier.name}: ${rank.tier.note}`}>
+                <TierBadge tier={rank.tier} size={24} /><span>{rank.tier.name}</span>
+              </Link>) : null}</span>
             {!alum && u.open_to_join ? <span><span className="pill ok">Open to projects</span></span> : null}
             <span className="muted">{u.branch}, class of {u.grad_year}{alum ? " · alum" : ""}{college ? <> · <Link href={`/c/${college.slug}`}>{college.name}</Link></> : null}</span>
             {u.about && <span>{u.about}</span>}
@@ -379,8 +396,8 @@ export default async function Profile({ params, searchParams }: Props) {
       )}
       {!alum && (
         <div className="filters">
-          {[["work", "Work"], ["people", "Worked with"], ["resume", "Resume"]].map(([k, label]) => (
-            <Link key={k} href={`/u/${id}?tab=${k}`} aria-current={tab === k ? "true" : undefined}>{label}</Link>
+          {[["work", "Work"], ["progress", "Progress"], ["people", "Worked with"], ["resume", "Resume"]].map(([k, name]) => (
+            <Link key={k} href={`/u/${id}?tab=${k}`} aria-current={tab === k ? "true" : undefined}>{name}</Link>
           ))}
         </div>
       )}

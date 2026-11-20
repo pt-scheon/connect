@@ -189,6 +189,8 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // Whether this person's visit days count in the admin statistics (the cookie notice and Settings), and when they agreed to the terms.
   ["users", "stats_on", "INTEGER DEFAULT 1"],
   ["users", "terms_at", "INTEGER"],
+  // When someone left a project or was voted gone, for the credit history on profiles.
+  ["members", "left_at", "INTEGER"],
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
 ];
 

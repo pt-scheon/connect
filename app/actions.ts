@@ -606,7 +606,7 @@ export async function voteGone(fd: FormData) {
     const voters = get("SELECT COUNT(*) n FROM members WHERE project_id=? AND status='active' AND user_id<>?", p!.id, target).n;
     const votes = get("SELECT COUNT(*) n FROM gone_votes WHERE project_id=? AND target_id=?", p!.id, target).n;
     if (votes >= Math.max(2, Math.ceil((voters * 2) / 3))) {
-      run("UPDATE members SET status='left' WHERE project_id=? AND user_id=?", p!.id, target);
+      run("UPDATE members SET status='left', left_at=? WHERE project_id=? AND user_id=?", now(), p!.id, target);
       run("DELETE FROM gone_votes WHERE project_id=? AND (target_id=? OR voter_id=?)", p!.id, target, target);
       notify(target, `Your team removed you from ${p!.name}. Your stake is lost.`, `/projects/${p!.id}`);
       systemLine(p!.id, `${get("SELECT name FROM users WHERE id=?", target)?.name ?? "A teammate"} was removed by the team`);
@@ -620,7 +620,7 @@ export async function leaveProject(fd: FormData) {
   const p = project(n("id"), me);
   if (!p || p.status === "shipped" || p.status === "dropped" || !isActive(p.id, me.id)) fail("You are not on an open project here.");
   if (p!.lead_id === me.id) fail("You are the lead. Drop the project instead.");
-  run("UPDATE members SET status='left' WHERE project_id=? AND user_id=?", p!.id, me.id);
+  run("UPDATE members SET status='left', left_at=? WHERE project_id=? AND user_id=?", now(), p!.id, me.id);
   systemLine(p!.id, `${me.name} left the team`);
   done(back, "You left. This shows on your profile.");
 }

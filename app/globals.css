@@ -946,3 +946,28 @@ body:not(.guest) .foot{background:transparent}
 .team-chat-card h2{margin:0}
 .team-chat .chat-back{display:inline-flex;align-items:center;justify-content:center;min-width:36px;min-height:36px}
 @media (max-width:40rem){body:has(.bottom-nav) .team-chat-wrap{height:calc(100dvh - 150px - 64px - env(safe-area-inset-bottom));min-height:360px}}
+
+/* Tier badges (app/tier-badge.tsx, lib/tiers.ts): a darker rim, a lighter face and a white mark, per tier */
+.tier-badge{flex:none;display:inline-block;vertical-align:middle;filter:drop-shadow(0 1px 2px rgb(0 0 0 / .25))}
+.tier-badge .tb-back{fill:var(--tb1)}
+.tier-badge .tb-face{fill:var(--tb2)}
+.tier-badge .tb-mark{color:#fff;fill:#fff}
+.tier-badge.dim{opacity:.32;filter:grayscale(.6)}
+.tier-rookie{--tb1:#6e6e73;--tb2:#a1a1a6}
+.tier-bronze{--tb1:#8a4f22;--tb2:#c27c43}
+.tier-silver{--tb1:#5f6b7a;--tb2:#a3afbd}
+.tier-gold{--tb1:#a87700;--tb2:#e0a800}
+.tier-platinum{--tb1:#1d7f79;--tb2:#38b2a9}
+.tier-diamond{--tb1:#1f55c9;--tb2:#4f8cff}
+.tier-legend{--tb1:#7a22b8;--tb2:#c44ae0}
+.tier-name.tier-rookie{color:var(--muted)}
+.tier-name.tier-bronze{color:#b5703a}
+.tier-name.tier-silver{color:#8794a5}
+.tier-name.tier-gold{color:#c99200}
+.tier-name.tier-platinum{color:#2a9d95}
+.tier-name.tier-diamond{color:#3d7bfa}
+.tier-name.tier-legend{color:#b03fd6}
+.tier-name{font-weight:600}
+.name-row{gap:12px;flex-wrap:wrap}
+.rank-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:var(--r-pill);background:var(--sunk);font-size:.85rem;text-decoration:none}
+.rank-chip:hover{text-decoration:none;filter:brightness(1.08)}
