@@ -14,6 +14,7 @@ import { addCollege, collegeById, collegeForEmail, isMember } from "@/lib/colleg
 import { domainOf, isEmail, isPublicMail, slugify } from "@/lib/domains";
 import { notify, logUpdate, allow, deviceName } from "@/lib/notify";
 import { CONSENT_COOKIE, CONSENT_DAYS } from "@/lib/consent";
+import { systemLine } from "@/lib/teamchat";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
 import { needsFromList } from "@/lib/relevance";
@@ -413,6 +414,7 @@ export async function answerRequest(fd: FormData) {
     if (!get("SELECT 1 FROM roles WHERE project_id=? AND open=1", p.id)) run("UPDATE projects SET status='building' WHERE id=? AND status='recruiting'", p.id);
     const who = get("SELECT name FROM users WHERE id=?", q.user_id);
     logUpdate(p.id, q.user_id, `${who.name} joined as ${q.title}`);
+    systemLine(p.id, `${who.name} joined the team as ${q.title}`);
     notify(q.user_id, `You are on the ${p.name} team as ${q.title}`, `/projects/${p.id}`);
   })();
   done(back, "Added to the team.");
@@ -607,6 +609,7 @@ export async function voteGone(fd: FormData) {
       run("UPDATE members SET status='left' WHERE project_id=? AND user_id=?", p!.id, target);
       run("DELETE FROM gone_votes WHERE project_id=? AND (target_id=? OR voter_id=?)", p!.id, target, target);
       notify(target, `Your team removed you from ${p!.name}. Your stake is lost.`, `/projects/${p!.id}`);
+      systemLine(p!.id, `${get("SELECT name FROM users WHERE id=?", target)?.name ?? "A teammate"} was removed by the team`);
       msg = "Removed from the team. Their stake is lost.";
     }
   })();
@@ -618,6 +621,7 @@ export async function leaveProject(fd: FormData) {
   if (!p || p.status === "shipped" || p.status === "dropped" || !isActive(p.id, me.id)) fail("You are not on an open project here.");
   if (p!.lead_id === me.id) fail("You are the lead. Drop the project instead.");
   run("UPDATE members SET status='left' WHERE project_id=? AND user_id=?", p!.id, me.id);
+  systemLine(p!.id, `${me.name} left the team`);
   done(back, "You left. This shows on your profile.");
 }
 export async function dropProject(fd: FormData) {
@@ -1309,6 +1313,10 @@ export async function deleteAccount(fd: FormData) {
     // Their conversations go too, attachments included.
     for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);
     run("DELETE FROM messages WHERE from_id=? OR to_id=?", me.id, me.id);
+    // And what they wrote in team chats, photos included.
+    for (const f of all("SELECT file_key FROM team_messages WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
+    run("DELETE FROM team_messages WHERE user_id=?", me.id);
+    run("DELETE FROM team_reads WHERE user_id=?", me.id);
   })();
   await clearSession();
   revalidatePath("/", "layout");

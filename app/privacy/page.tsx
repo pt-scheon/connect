@@ -25,7 +25,7 @@ export default function Privacy() {
 
       <h2>What is public</h2>
       <p>Verified members have a profile page anyone with the link can open: name, photo, branch, year, skills, links, projects and credit. Your email addresses are never shown to anyone, only the email domain you verified with. Reviews are shown without the reviewer&rsquo;s name.</p>
-      <p>Everything else stays inside your community: projects in progress, people lists, clubs and funding are visible only to verified members of the same community. Messages and their attachments can be opened only by the two people in the chat. A community&rsquo;s public page shows only its counts and shipped projects.</p>
+      <p>Everything else stays inside your community: projects in progress, people lists, clubs and funding are visible only to verified members of the same community. Messages and their attachments can be opened only by the two people in the chat, and a projectMessages and their attachments can be opened only by the two people in the chat.rsquo;s team chat and its photos only by the people currently on that team. A community&rsquo;s public page shows only its counts and shipped projects.</p>
 
       <h2>How it is used</h2>
       <ul>

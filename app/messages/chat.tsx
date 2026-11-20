@@ -21,7 +21,7 @@ export type ShareableProject = { id: number; name: string; status: string };
 
 /* Photos are shrunk to 2000px and re-saved before upload. That keeps them small and drops hidden data such as
    the GPS location phones write into photos. GIFs are left alone so they keep moving. */
-async function prepare(file: File): Promise<{ file: File; w?: number; h?: number }> {
+export async function prepare(file: File): Promise<{ file: File; w?: number; h?: number }> {
   if (kindOf(file) === "video") {
     const v = document.createElement("video"); v.preload = "metadata"; v.src = URL.createObjectURL(file);
     await new Promise((r) => { v.onloadedmetadata = r; v.onerror = r; setTimeout(r, 3000); });

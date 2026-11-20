@@ -919,3 +919,30 @@ body:not(.guest) .foot{background:transparent}
 .cookie-table code{font:500 .85rem var(--mono);white-space:nowrap}
 @media (max-width:40rem){.cookie-table thead{display:none}.cookie-table tr{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
   .cookie-table th,.cookie-table td{border:0;padding:0}.cookie-table td:nth-child(3){grid-column:1 / -1}.cookie-table td:nth-child(4){grid-column:1 / -1;color:var(--muted)}}
+
+/* Team chat (app/projects/[id]/team-chat.tsx): a project's group chat with role tags */
+.team-chat-wrap{display:flex;height:calc(100dvh - 190px);min-height:480px;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:var(--surface)}
+.team-roster{display:flex;gap:6px;overflow-x:auto;padding:8px 16px;border-bottom:1px solid var(--line);scrollbar-width:none}
+.team-roster::-webkit-scrollbar{display:none}
+.roster-chip{display:inline-flex;align-items:center;gap:6px;flex:none;background:var(--sunk);border-radius:var(--r-pill);padding:3px 8px 3px 3px;font-size:.82rem;max-width:260px}
+.roster-chip .face{font-size:.6rem}
+.role-tags{display:inline-flex;gap:4px;flex:none}
+.role-tag{font:600 .68rem/1 var(--body);padding:3px 7px;border-radius:var(--r-pill);white-space:nowrap;background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--blue-t)}
+.role-tag.purple{background:color-mix(in srgb,var(--purple) 18%,transparent);color:var(--purple-t)}
+.role-tag.teal{background:color-mix(in srgb,var(--teal) 18%,transparent);color:var(--teal-t)}
+.role-tag.pink{background:color-mix(in srgb,var(--pink) 18%,transparent);color:var(--pink-t)}
+.role-tag.indigo{background:color-mix(in srgb,var(--indigo) 18%,transparent);color:var(--indigo-t)}
+.role-tag.green{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green-t)}
+.role-tag.red{background:color-mix(in srgb,var(--red) 18%,transparent);color:var(--red-t)}
+.role-tag.lead{background:color-mix(in srgb,var(--orange) 22%,transparent);color:var(--orange-t)}
+.team-who{display:flex;align-items:center;gap:6px;margin:10px 0 3px 36px;font-size:.8rem;min-width:0}
+.team-who b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team-system{display:flex;justify-content:center;margin:10px 0}
+.team-system span{font-size:.78rem;color:var(--muted);background:var(--sunk);padding:4px 12px;border-radius:var(--r-pill);text-align:center}
+.team-chat .chat-input .attach.cam-only{display:none}
+@media (max-width:40rem){.team-chat-wrap{height:calc(100dvh - 150px);border-radius:16px}.team-chat .chat-input .attach.cam-only{display:inline-grid}}
+.team-chat-card{gap:6px;text-decoration:none;color:var(--ink)}
+.team-chat-card:hover{text-decoration:none}
+.team-chat-card h2{margin:0}
+.team-chat .chat-back{display:inline-flex;align-items:center;justify-content:center;min-width:36px;min-height:36px}
+@media (max-width:40rem){body:has(.bottom-nav) .team-chat-wrap{height:calc(100dvh - 150px - 64px - env(safe-area-inset-bottom));min-height:360px}}

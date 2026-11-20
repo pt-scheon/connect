@@ -10,7 +10,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ key: str
   const key = (await params).key;
   // Proof files on evidence: the owner, the teammate asked to confirm it, and admins of that college.
   const ev = me ? get("SELECT file_name, file_type, 'file' kind FROM evidence WHERE file_key=? AND (user_id=? OR teammate_id=? OR (college_id=? AND ?=1))", key, me.id, me.id, me.college_id, me.admin ? 1 : 0) : null;
-  const m = ev ?? (me ? get("SELECT * FROM messages WHERE file_key=? AND (from_id=? OR to_id=?)", key, me.id, me.id) : null);
+  // Team chat photos: only the project's current team.
+  const team = ev ?? (me ? get(`SELECT t.* FROM team_messages t JOIN members m ON m.project_id=t.project_id AND m.user_id=? AND m.status='active'
+    WHERE t.file_key=?`, me.id, key) : null);
+  const m = team ?? (me ? get("SELECT * FROM messages WHERE file_key=? AND (from_id=? OR to_id=?)", key, me.id, me.id) : null);
   const bytes = m ? read(key) : null;
   if (!m || !bytes) return new Response("Not found", { status: 404 });
   const inline = ["image", "video", "voice"].includes(m.kind) || m.file_type === "application/pdf" || String(m.file_type).startsWith("image/");

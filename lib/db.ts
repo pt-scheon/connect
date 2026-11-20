@@ -113,6 +113,13 @@ CREATE TABLE IF NOT EXISTS activity (day INTEGER NOT NULL, user_id INTEGER NOT N
 -- AI proof check reports (lib/proofcheck.ts), as JSON. The last five per project are kept.
 CREATE TABLE IF NOT EXISTS proof_checks (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, by_id INTEGER, report TEXT NOT NULL, created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS proof_checks_project ON proof_checks (project_id, id);
+-- Team chat: one group conversation per project, for its current team (lib/teamchat.ts). kind is text, image or system.
+CREATE TABLE IF NOT EXISTS team_messages (
+  id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, user_id INTEGER, text TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT 'text',
+  file_key TEXT, file_name TEXT, file_type TEXT, file_size INTEGER, file_w INTEGER, file_h INTEGER, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS team_messages_project ON team_messages (project_id, id);
+CREATE TABLE IF NOT EXISTS team_reads (project_id INTEGER NOT NULL, user_id INTEGER NOT NULL, last_id INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (project_id, user_id));
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
 CREATE INDEX IF NOT EXISTS updates_project ON updates (project_id);

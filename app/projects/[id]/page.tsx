@@ -10,6 +10,7 @@ import { skillsOf } from "../../ui";
 import * as A from "../../actions";
 import { JoinAsk, SplitForm } from "../../client";
 import { ProofCheck } from "./proof-check";
+import { unreadTeam } from "@/lib/teamchat";
 import { ShareLink } from "../../messages/media";
 import { toggleFollow } from "../../follow";
 import { noteView } from "@/lib/feed";
@@ -196,6 +197,21 @@ export default async function Project({ params }: { params: Promise<{ id: string
             </div>
           )}
           {p.status === "review" && proofCheck && <ProofCheck projectId={id} canRun />}
+
+          {onTeam && (() => {
+            const fresh = unreadTeam(id, me.id);
+            const lastMsg = get("SELECT t.text, t.kind, u.name FROM team_messages t LEFT JOIN users u ON u.id=t.user_id WHERE t.project_id=? ORDER BY t.id DESC LIMIT 1", id);
+            return (
+              <Link href={`/projects/${id}/chat`} className="card lift team-chat-card">
+                <span className="row between nowrap">
+                  <span className="row nowrap"><h2>Team chat</h2>{fresh > 0 && <span className="pill info">{fresh} new</span>}</span>
+                  <span className="btn sm">Open</span>
+                </span>
+                <span className="small muted ellipsis">{lastMsg ? (lastMsg.kind === "system" ? lastMsg.text : `${lastMsg.name ?? "Someone"}: ${lastMsg.kind === "image" ? (lastMsg.text || "Photo") : lastMsg.text}`)
+                  : "A group chat for the people on this project, with everyone's role. Only the team can read it."}</span>
+              </Link>
+            );
+          })()}
 
           <div className="card">
             <h2>Team</h2>
