@@ -861,3 +861,45 @@ dialog.sheet input[type=text]{background:var(--sunk)}
   .sheet-actions .btn{width:100%;min-height:48px}
 }
 @keyframes sheet-up{from{transform:translateY(100%)}to{transform:none}}
+
+/* Profile scores (layout from the Stitch study): three cards side by side, each a big number with its reason */
+.score-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.score-card{display:flex;flex-direction:column;gap:8px}
+.score-big{font:600 2.6rem/1 var(--display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.score-of{font-size:1rem;font-weight:500;color:var(--muted);letter-spacing:0}
+.score-card .meter{display:block;height:6px;width:100%;flex:none;margin:2px 0}
+.score-skill{display:flex;flex-direction:column;gap:4px}
+@media (max-width:860px){.score-row{grid-template-columns:minmax(0,1fr)}}
+
+/* Club page (layout from the Stitch study): a header card with facts, three stat cards, plans as date cards */
+.club-hero{display:flex;flex-direction:column;gap:12px}
+.club-hero h1{font-size:clamp(1.9rem,1.2rem + 2vw,2.6rem)}
+.club-hero-main{align-items:flex-end;gap:16px}
+.club-hero-main p{max-width:60ch;margin:0}
+.club-facts{gap:8px}
+.club-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.club-stats .card{display:flex;flex-direction:column;gap:6px}
+.club-next{font:600 1.15rem/1.25 var(--display);letter-spacing:-.01em}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.plan-card{position:relative;display:flex;gap:14px;align-items:flex-start;background:var(--sunk);border-radius:var(--r-md);padding:14px 16px}
+.plan-date{flex:none;width:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;background:var(--surface);padding:6px 0;line-height:1.1}
+.plan-date b{font:600 1.35rem/1 var(--display);color:var(--blue-t);font-variant-numeric:tabular-nums}
+.plan-date span{font-size:.75rem;color:var(--muted)}
+.plan-body{min-width:0}
+.plan-remove{align-self:flex-start;margin-top:2px;min-height:auto;color:var(--muted)}
+.plan-remove:hover{color:var(--bad)}
+@media (max-width:860px){.club-stats{grid-template-columns:minmax(0,1fr)}}
+
+/* Mesh background (chosen over Sunset and Aurora, side by side): soft glows of the system colours in the corners
+   of the app's canvas. Cards stay solid, so the text on them keeps its contrast. */
+:root{--mix-a:18%;--mix-b:14%}
+:root[data-theme="dark"],:root:not([data-theme]){--mix-a:24%;--mix-b:18%}
+@media (prefers-color-scheme: light){:root:not([data-theme]){--mix-a:18%;--mix-b:14%}}
+body:not(.guest)::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(55% 45% at 0% 0%,color-mix(in srgb,var(--blue) var(--mix-a),transparent),transparent 70%),
+  radial-gradient(45% 40% at 100% 8%,color-mix(in srgb,var(--purple) var(--mix-b),transparent),transparent 70%),
+  radial-gradient(55% 45% at 85% 100%,color-mix(in srgb,var(--teal) var(--mix-b),transparent),transparent 70%),
+  radial-gradient(45% 40% at 8% 92%,color-mix(in srgb,var(--pink) var(--mix-b),transparent),transparent 70%)}
+body:not(.guest) .foot{background:transparent}
+@media (prefers-contrast: more){body:not(.guest)::before{display:none}}
+@media print{body::before{display:none}}

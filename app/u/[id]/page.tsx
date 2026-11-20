@@ -344,19 +344,39 @@ export default async function Profile({ params, searchParams }: Props) {
         </div>
         {!alum && (
           <>
-            <div className="stats">
-              <div className="stat"><b><Count to={s.earned} /></b><span className="small muted">credit earned</span></div>
-              <div className="stat"><b>{s.shipped}<span className="muted" style={{ fontSize: "1rem" }}> / {s.joined}</span></b><span className="small muted">shipped of joined</span></div>
-              <div className="stat"><b>{s.cred.score}<span className="muted" style={{ fontSize: "1rem" }}> / 100</span></b><span className="small muted">credibility</span></div>
-              <div className="stat"><b>{mates.length}</b><span className="small muted">people worked with</span></div>
-              <div className="stat"><b>{claims.length}</b><span className="small muted">claims with no proof</span></div>
-            </div>
             {s.left > 0 && <div className="alert">Left or dropped {s.left} of {s.joined} projects. Teams see this before accepting a join request.</div>}
             {s.circle && <div className="alert">Closed circle: all of this credit comes from projects with the same {s.mates.size} {s.mates.size === 1 ? "person" : "people"}.</div>}
             {s.ring && <div className="alert">Vouch ring: a small group that only vouches for each other. Their vouches for one another count a quarter.</div>}
           </>
         )}
       </div>
+      {!alum && (
+        <div className="score-row">
+          <div className="card score-card">
+            <span className="label">Credit</span>
+            <b className="score-big"><Count to={s.earned} /></b>
+            <span className="small muted">From {s.shipped} shipped of {s.joined} joined{mates.length ? `, with ${mates.length} ${mates.length === 1 ? "person" : "people"}` : ""}.</span>
+            {claims.length > 0 && <span className="small muted">{claims.length} claim{claims.length === 1 ? "" : "s"} with no proof count for nothing.</span>}
+          </div>
+          <div className="card score-card">
+            <span className="label">Credibility</span>
+            <b className="score-big">{s.cred.score}<span className="score-of"> / 100</span></b>
+            <span className="meter" aria-hidden="true"><b style={{ width: `${s.cred.score}%` }} /></span>
+            <span className="small muted">How far their word can be trusted: finishing what they join, reviewing accurately, no upheld reports.</span>
+          </div>
+          <div className="card score-card">
+            <span className="label">Skills, confirmed by others</span>
+            {proven.length === 0 && <span className="small muted">No skill confirmed yet. Skills count only when teammates or reviewers confirm them.</span>}
+            {proven.slice(0, 3).map((k) => (
+              <div key={k.skill} className="score-skill">
+                <span className="row between"><span>{k.label}</span><span className="mono small">{k.score}</span></span>
+                <span className="meter skillbar" aria-hidden="true"><b style={{ width: `${k.score}%` }} /></span>
+              </div>
+            ))}
+            {proven.length > 3 && <span className="small muted">and {proven.length - 3} more below</span>}
+          </div>
+        </div>
+      )}
       {!alum && (
         <div className="filters">
           {[["work", "Work"], ["people", "Worked with"], ["resume", "Resume"]].map(([k, label]) => (

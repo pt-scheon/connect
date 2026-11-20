@@ -15,6 +15,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 const dayLabel = (t: number) => new Date(t * 1000).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+const ist = (t: number) => new Date((t + 19800) * 1000);
+const dayNum = (t: number) => ist(t).getUTCDate();
+const monthShort = (t: number) => ist(t).toLocaleDateString("en-IN", { month: "short", timeZone: "UTC" });
+const weekday = (t: number) => ist(t).toLocaleDateString("en-IN", { weekday: "long", timeZone: "UTC" });
 const today = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
 
 export default async function Club({ params }: { params: Promise<{ id: string }> }) {
@@ -30,12 +34,15 @@ export default async function Club({ params }: { params: Promise<{ id: string }>
   const mine = rows.find((r) => r.id === me.id);
   const plans = all("SELECT * FROM club_plans WHERE club_id=? ORDER BY day, id", id);
   const upcoming = plans.filter((p) => p.day >= now() - 86400), past = plans.filter((p) => p.day < now() - 86400).reverse().slice(0, 5);
+  const S2 = S;
+  const earned = members.reduce((n, u) => n + ((S2.get(u.id) ?? EMPTY).earned || 0), 0);
   const canAdd = boss && active ? all("SELECT id, name FROM users WHERE college_id=? AND verified=1 AND deleted=0 AND suspended=0 AND role='student' AND id NOT IN (SELECT user_id FROM club_members WHERE club_id=?) ORDER BY name", me.college_id, id) : [];
   // Projects where at least two confirmed members are on the team.
   const projects = all(
     `SELECT p.id, p.name, p.status FROM projects p JOIN members m ON m.project_id=p.id AND m.status='active'
      JOIN club_members cm ON cm.user_id=m.user_id AND cm.club_id=? AND cm.confirmed=1
      WHERE p.status<>'dropped' GROUP BY p.id HAVING COUNT(*)>=2 ORDER BY p.created_at DESC`, id);
+  const shipped = projects.filter((p) => p.status === "shipped").length;
 
   return (
     <>
@@ -55,11 +62,26 @@ export default async function Club({ params }: { params: Promise<{ id: string }>
         </div>
       )}
 
-      <div className="head">
-        <div className="stack tight"><h1>{c.name}</h1>{c.about && <p>{c.about}</p>}</div>
-        {active && !mine && me.role === "student" && <F action={A.joinClub} back={back} hidden={{ club: id }}><button className="btn">Ask to join</button></F>}
-        {mine && !mine.confirmed && !mine.invited_by && <span className="pill warn">Waiting for the lead</span>}
+      <div className="card club-hero">
+        <span className="row club-facts">
+          {active ? <span className="pill ok">Approved club</span> : c.status === "pending" ? <span className="pill warn">Waiting for approval</span> : <span className="pill bad">Not approved</span>}
+          <span className="chip">{members.length} member{members.length === 1 ? "" : "s"}</span>
+          {shipped > 0 && <span className="chip">{shipped} shipped project{shipped === 1 ? "" : "s"}</span>}
+        </span>
+        <div className="row between club-hero-main">
+          <div className="stack tight"><h1>{c.name}</h1>{c.about && <p className="muted">{c.about}</p>}</div>
+          {active && !mine && me.role === "student" && <F action={A.joinClub} back={back} hidden={{ club: id }}><button className="btn">Ask to join</button></F>}
+          {mine && !mine.confirmed && !mine.invited_by && <span className="pill warn">Waiting for the lead</span>}
+        </div>
       </div>
+
+      {active && (
+        <div className="club-stats">
+          <div className="card"><span className="label">Members</span><b className="score-big">{members.length}</b><span className="small muted">{members.filter((u) => u.manage || u.id === c.lead_id).length} running it</span></div>
+          <div className="card"><span className="label">Credit earned by members</span><b className="score-big">{earned}</b><span className="small muted">From projects that shipped. Membership itself gives none.</span></div>
+          <div className="card"><span className="label">Next plan</span>{upcoming[0] ? <><b className="club-next">{upcoming[0].title}</b><span className="small muted">{dayLabel(upcoming[0].day)}{upcoming[0].place ? `, ${upcoming[0].place}` : ""}</span></> : <span className="small muted">Nothing planned yet.</span>}</div>
+        </div>
+      )}
 
       {mine && !mine.confirmed && mine.invited_by && (
         <div className="card row between">
@@ -74,16 +96,21 @@ export default async function Club({ params }: { params: Promise<{ id: string }>
       <div className="card stack" id="plans">
         <h2>Plans</h2>
         {upcoming.length === 0 && <span className="small muted">{boss && active ? "Nothing planned yet. Add the next meet-up, workshop or build night below." : "Nothing planned yet."}</span>}
-        {upcoming.map((p) => (
-          <div key={p.id} className="plan row between">
-            <span className="stack tight">
-              <b>{p.title}</b>
-              <span className="small muted">{dayLabel(p.day)}{p.place ? `, ${p.place}` : ""}</span>
-              {p.about && <span className="small">{p.about}</span>}
-            </span>
-            {boss && <F action={A.removeClubPlan} back={back} hidden={{ club: id, plan: p.id }} confirm={`Remove "${p.title}"?`}><button className="btn ghost sm">Remove</button></F>}
+        {upcoming.length > 0 && (
+          <div className="plan-grid">
+            {upcoming.map((p) => (
+              <div key={p.id} className="plan-card">
+                <span className="plan-date"><b>{dayNum(p.day)}</b><span>{monthShort(p.day)}</span></span>
+                <span className="stack tight plan-body">
+                  <b>{p.title}</b>
+                  <span className="small muted">{weekday(p.day)}{p.place ? ` · ${p.place}` : ""}</span>
+                  {p.about && <span className="small">{p.about}</span>}
+                  {boss && <F action={A.removeClubPlan} back={back} hidden={{ club: id, plan: p.id }} confirm={`Remove "${p.title}"?`}><button className="linkbtn small plan-remove">Remove</button></F>}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
         {past.length > 0 && (
           <details className="small"><summary className="muted">Earlier plans ({past.length})</summary>
             {past.map((p) => <div key={p.id} className="muted">{dayLabel(p.day)}: {p.title}</div>)}
