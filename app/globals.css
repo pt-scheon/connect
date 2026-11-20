@@ -817,3 +817,15 @@ h1,h2,h3{overflow-wrap:anywhere}
 .invite-pop:not([open])>.invite-form{display:none}
 @media (max-width:600px){.invite-pop{align-items:stretch;flex-basis:100%}.invite-form{width:100%}}
 .tw td:first-child{overflow-wrap:anywhere}
+
+/* For you cards: the title link covers the whole card; "Not for me" sits above it */
+.fy{position:relative}
+.fy-link{color:inherit;text-decoration:none}
+.fy-link::after{content:"";position:absolute;inset:0;border-radius:inherit}
+.fy-link:focus-visible{outline:none}
+.fy:has(.fy-link:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.fy-foot{border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+.fy-why{color:var(--accent);font-weight:500}
+.fy-hide{position:relative;z-index:1;background:none;border:0;padding:6px 2px;color:var(--muted);cursor:pointer;min-height:32px}
+.fy-hide:hover{color:var(--ink);text-decoration:underline}
+@media (pointer:coarse){.fy-hide{min-height:40px}}

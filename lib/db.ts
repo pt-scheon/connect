@@ -77,6 +77,8 @@ CREATE INDEX IF NOT EXISTS feedback_user ON feedback (user_id);
 CREATE TABLE IF NOT EXISTS login_codes (user_id INTEGER PRIMARY KEY, code_hash TEXT NOT NULL, expires INTEGER NOT NULL, tries INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS trusted_devices (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, label TEXT DEFAULT '', created_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS trusted_devices_user ON trusted_devices (user_id);
+-- For you: which projects someone opened or hid. Private to them; it orders their own board and nothing else.
+CREATE TABLE IF NOT EXISTS project_seen (user_id INTEGER NOT NULL, project_id INTEGER NOT NULL, views INTEGER DEFAULT 0, last_at INTEGER NOT NULL, hidden INTEGER DEFAULT 0, PRIMARY KEY (user_id, project_id));
 CREATE TABLE IF NOT EXISTS review_log (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, reviewer_id INTEGER NOT NULL, verdict INTEGER, outcome INTEGER, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS project_skills (project_id INTEGER, skill TEXT, PRIMARY KEY (project_id, skill));
 CREATE TABLE IF NOT EXISTS member_skills (project_id INTEGER, user_id INTEGER, skill TEXT, by_id INTEGER, PRIMARY KEY (project_id, user_id, skill, by_id));

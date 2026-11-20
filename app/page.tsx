@@ -7,6 +7,7 @@ import { EMPTY, RULES } from "@/lib/credit";
 import { ties, pathTo } from "@/lib/graph";
 import { timeAgo } from "@/lib/notify";
 import { needsFor, fitsMe, type Need } from "@/lib/relevance";
+import { rankBoard, viewerSignals, type FeedProject } from "@/lib/feed";
 import { Board, Count, type BoardItem } from "./client";
 import { Landing } from "./landing";
 
@@ -53,6 +54,28 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
   // People two steps away: shipped with someone you shipped with.
   const T = ties();
   const names = new Map(all("SELECT id, name FROM users WHERE college_id=?", cid).map((u) => [u.id, u.name]));
+
+  // For you: this person's own order of the board, with the reason for each card (lib/feed.ts).
+  const raw = new Map(all("SELECT id, lead_id, created_at FROM projects WHERE college_id=?", cid).map((p) => [p.id as number, p]));
+  const skillsOfProject = new Map<number, string[]>();
+  for (const r of all("SELECT ps.project_id, ps.skill FROM project_skills ps JOIN projects p ON p.id=ps.project_id WHERE p.college_id=?", cid))
+    skillsOfProject.set(r.project_id, [...(skillsOfProject.get(r.project_id) ?? []), r.skill]);
+  for (const r of roles) for (const n of needs.get(r.id) ?? [])
+    if (!skillsOfProject.get(r.project_id)?.includes(n.skill)) skillsOfProject.set(r.project_id, [...(skillsOfProject.get(r.project_id) ?? []), n.skill]);
+  const second = new Map<number, string>();
+  for (const [mid, tiesWith] of T.get(me.id) ?? []) {
+    if (!tiesWith.some((x) => x.shipped)) continue;
+    for (const [other, t2] of T.get(mid) ?? []) if (other !== me.id && t2.some((x) => x.shipped) && !second.has(other)) second.set(other, names.get(mid) ?? "");
+  }
+  const feedProjects: FeedProject[] = items.filter((p) => !p.hidden).map((p) => ({
+    id: p.id, lead: raw.get(p.id)?.lead_id ?? 0, status: p.status, created: raw.get(p.id)?.created_at ?? 0,
+    lastActive: Math.max(last.get(p.id) ?? 0, raw.get(p.id)?.created_at ?? 0), team: p.team.map((u) => u.id),
+    openRoles: p.open.length, fit: p.fit, skills: skillsOfProject.get(p.id) ?? [], followed: !!p.followed, mine: p.mine,
+  }));
+  const ranked = me.role === "student"
+    ? rankBoard(feedProjects, { id: me.id, direct: new Set(T.get(me.id)?.keys() ?? []), second, names, ...viewerSignals(me.id, skillsOfProject) })
+    : [];
+  const forYou = ranked.map((r) => ({ id: r.id, why: r.why }));
   const near = all("SELECT * FROM users WHERE role='student' AND verified=1 AND suspended=0 AND college_id=? AND id<>?", cid, me.id)
     .filter((u) => !T.get(me.id)?.has(u.id))
     .map((u) => ({ u, path: pathTo(T, me.id, u.id, names) }))
@@ -97,7 +120,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
             );
           })()}
       <div className="cols">
-        <Board items={items} canReview={canReview} initial={(await searchParams).f ?? "all"} />
+        <Board items={items} canReview={canReview} forYou={forYou} initial={(await searchParams).f ?? (forYou.length ? "foryou" : "all")} />
         <aside className="stack">
           {classmates < INVITE_UNTIL && (
             <div className="card invite">

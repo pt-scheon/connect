@@ -15,6 +15,7 @@ export default function Privacy() {
         <li><b>From Google or LinkedIn sign-in:</b> your name, email address and profile photo. Nothing else, and we never see your password.</li>
         <li><b>From you:</b> branch, graduation year, skills, a line about you, optional GitHub, LinkedIn and website links, and your college email if you verify with a code.</li>
         <li><b>From using Connect:</b> projects you post or join, milestones, proof links, reviews, vouches, credit splits, questions, club roles and funding applications.</li>
+        <li><b>For your board&rsquo;s For you order:</b> which projects you opened, how often, and which you marked &ldquo;Not for me&rdquo;. Only your own board uses it; nobody else can see it, and it never affects anyone&rsquo;s credit or scores.</li>
         <li><b>From messages and calls:</b> the messages you send, and the photos, videos, files and voice notes you attach. For calls we keep a log of who called whom, when, and for how long. Calls are not recorded.</li>
         <li><b>When you sign in:</b> the time and the kind of device (for example &ldquo;Chrome on Windows&rdquo;) of your latest sign-in, so we can show it to you and tell you about a sign-in you did not make. We do not keep your network address.</li>
         <li><b>Sign-in codes:</b> when a code is emailed to you we keep only a scrambled copy of it until it is used or expires, and a scrambled marker for each device you chose to trust.</li>

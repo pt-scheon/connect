@@ -11,6 +11,7 @@ import * as A from "../../actions";
 import { JoinAsk, ProofHelp, SplitForm } from "../../client";
 import { ShareLink } from "../../messages/media";
 import { toggleFollow } from "../../follow";
+import { noteView } from "@/lib/feed";
 import { F, Meter, PIcon, Pill, Stamp, UserLink, Who, inr, monthYear } from "../../ui";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +33,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const active = team.filter((t) => t.mstatus === "active");
   const mine = team.find((t) => t.id === me.id);
   if (p.hidden && !mine && !me.admin) notFound();
+  if (!mine) noteView(me.id, id); // teaches this person's For you order; private to them
   const comments = all("SELECT c.*, u.name, u.picture, u.id uid FROM comments c JOIN users u ON u.id=c.user_id WHERE c.project_id=? ORDER BY c.created_at, c.id", id);
   const updates = all("SELECT up.*, u.name uname FROM updates up LEFT JOIN users u ON u.id=up.user_id WHERE up.project_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 30", id);
   const onTeam = mine?.mstatus === "active";

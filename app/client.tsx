@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { Av, Meter, PIcon, Pill } from "./bits";
+import { hideFromFeed } from "./feed-actions";
 
 type Action = (fd: FormData) => Promise<void>;
 
@@ -111,14 +112,24 @@ export type BoardItem = {
   team: { id: number; name: string; picture: string | null }[]; open: string[]; funded: boolean; mine: boolean; followed?: boolean; hidden?: number;
   fit: string[]; active: string; quiet: boolean;
 };
-export function Board({ items, canReview, initial }: { items: BoardItem[]; canReview: boolean; initial: string }) {
+export function Board({ items, canReview, initial, forYou = [] }: { items: BoardItem[]; canReview: boolean; initial: string; forYou?: { id: number; why: string[] }[] }) {
   const [f, setF] = useState(initial);
   const [q, setQ] = useState("");
-  const filters: [string, string][] = [["all", "All"], ...(items.some((p) => p.fit.length) ? [["fit", "Fits you"] as [string, string]] : []), ["open", "Needs people"], ["building", "Building"], ["shipped", "Shipped"], ["mine", "Mine"]];
+  const [gone, setGone] = useState<Set<number>>(new Set());
+  const [, start] = useTransition();
+  const why = useMemo(() => new Map(forYou.map((r) => [r.id, r.why])), [forYou]);
+  const filters: [string, string][] = [...(forYou.length ? [["foryou", "For you"] as [string, string]] : []), ["all", "All"], ...(items.some((p) => p.fit.length) ? [["fit", "Fits you"] as [string, string]] : []), ["open", "Needs people"], ["building", "Building"], ["shipped", "Shipped"], ["mine", "Mine"]];
   if (items.some((p) => p.followed && !p.mine)) filters.push(["following", "Following"]);
   if (canReview) filters.push(["review", "To review"]);
-  const count = (k: string) => items.filter((p) => match(p, k)).length;
-  const list = items.filter((p) => match(p, f) && (!q || `${p.name} ${p.pitch} ${p.open.join(" ")}`.toLowerCase().includes(q.toLowerCase())));
+  const byId = new Map(items.map((p) => [p.id, p]));
+  const pool = (k: string) => k === "foryou" ? forYou.map((r) => byId.get(r.id)).filter((p): p is BoardItem => !!p && !gone.has(p.id)) : items.filter((p) => match(p, k));
+  const count = (k: string) => pool(k).length;
+  const list = pool(f).filter((p) => !q || `${p.name} ${p.pitch} ${p.open.join(" ")}`.toLowerCase().includes(q.toLowerCase()));
+  const hide = (id: number, on: boolean) => {
+    setGone((g) => { const n = new Set(g); if (on) n.add(id); else n.delete(id); return n; });
+    start(async () => { if (!(await hideFromFeed(id, on))) setGone((g) => { const n = new Set(g); if (on) n.delete(id); else n.add(id); return n; }); });
+  };
+  const [undo, setUndo] = useState<number | null>(null);
   return (
     <div className="stack">
       <div className="row">
@@ -129,8 +140,30 @@ export function Board({ items, canReview, initial }: { items: BoardItem[]; canRe
           <button key={k} type="button" aria-pressed={f === k} onClick={() => setF(k)}>{label} <span className="mono">{count(k)}</span></button>
         ))}
       </div>
-      {list.length === 0 && <div className="note">{items.length ? "Nothing matches. Try another filter." : "No projects yet. Post the first one."}</div>}
-      {list.map((p) => (
+      {f === "foryou" && undo !== null && byId.get(undo) && (
+        <div className="note row between" role="status">
+          <span>{byId.get(undo)!.name} is out of For you. Projects like it will show up less.</span>
+          <button type="button" className="linkbtn" onClick={() => { hide(undo, false); setUndo(null); }}>Undo</button>
+        </div>
+      )}
+      {list.length === 0 && <div className="note">{f === "foryou" ? "Nothing new for you right now. See All for every project." : items.length ? "Nothing matches. Try another filter." : "No projects yet. Post the first one."}</div>}
+      {f === "foryou" && list.map((p) => (
+        <div key={p.id} className="card lift fy">
+          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} /><h2><Link className="fy-link" href={`/projects/${p.id}`}>{p.name}</Link></h2></span><Pill status={p.status} /></span>
+          <span className="muted">{p.pitch}</span>
+          <span className="row">
+            <span className="avs">{p.team.map((u) => <Av key={u.id} u={u} />)}</span>
+            <Meter done={p.done} total={p.total} />
+            <span className="small muted mono">{p.done}/{p.total} milestones</span>
+          </span>
+          {p.open.length > 0 && <span className="row">{p.open.map((r) => <span key={r} className="chip">Needs: {r}</span>)}</span>}
+          <span className="row between fy-foot">
+            <span className="fy-why small">{(why.get(p.id) ?? []).join(" · ") || "On your college board"}</span>
+            <button type="button" className="fy-hide small" onClick={() => { hide(p.id, true); setUndo(p.id); }} aria-label={`Not for me: ${p.name}`}>Not for me</button>
+          </span>
+        </div>
+      ))}
+      {f !== "foryou" && list.map((p) => (
         <Link key={p.id} className="card lift" href={`/projects/${p.id}`}>
           <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} /><h2>{p.name}</h2></span><Pill status={p.status} /></span>
           <span className="muted">{p.pitch}</span>
