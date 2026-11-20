@@ -15,15 +15,27 @@ function overloaded(e: unknown) {
   return e instanceof ApiError && (e.status === 503 || e.status === 500 || e.status === 429 || e.status === 404);
 }
 
-export async function askGemini(system: string, user: string): Promise<Result> {
+/* `schema`: a JSON Schema the answer must follow; the text that comes back is then JSON.
+   `thinking`: how hard the model reasons first. Short writing needs little; comparing evidence needs more.
+   `timeoutMs`: the whole wait, across every model tried. */
+export type AskOptions = { schema?: object; thinking?: ThinkingLevel; timeoutMs?: number };
+
+/* Each model but the last gets at most this long. A busy model can take half a minute just to say it is busy, or never
+   answer at all; without a cap it would use up the whole wait before the next model got a turn. */
+const SLICE_MS = 20_000;
+
+export async function askGemini(system: string, user: string, opts: AskOptions = {}): Promise<Result> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return { error: "Gemini API key is not set. Add GEMINI_API_KEY to .env.local." };
 
-  const ai = new GoogleGenAI({ apiKey });
-  const signal = AbortSignal.timeout(TIMEOUT_MS);
+  // No hidden retries inside the SDK (by default 5, with growing pauses): moving to the next model is faster.
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 1 } } });
+  const signal = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
   let last: unknown;
 
-  for (const model of MODELS) {
+  for (const [i, model] of MODELS.entries()) {
+    const lastModel = i === MODELS.length - 1;
+    const slice = lastModel ? signal : AbortSignal.any([signal, AbortSignal.timeout(SLICE_MS)]);
     try {
       const response = await ai.models.generateContent({
         model,
@@ -31,16 +43,19 @@ export async function askGemini(system: string, user: string): Promise<Result> {
         config: {
           ...(system ? { systemInstruction: system } : {}),
           // Short writing tasks: little reasoning needed, and it keeps the wait short.
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          abortSignal: signal,
+          thinkingConfig: { thinkingLevel: opts.thinking ?? ThinkingLevel.LOW },
+          ...(opts.schema ? { responseMimeType: "application/json", responseJsonSchema: opts.schema } : {}),
+          abortSignal: slice,
         },
       });
       const text = response.text?.trim();
       return text ? { text } : { error: "The AI returned nothing. Try again." };
     } catch (e) {
       last = e;
-      if (overloaded(e) && !signal.aborted) {
-        console.warn(`[gemini] ${model} unavailable (${(e as ApiError).status}), trying the next model`);
+      // Worth the next model: Google says busy, this model ran out of its slice, or the network blinked.
+      const why = overloaded(e) ? `unavailable (${(e as ApiError).status})` : slice.aborted ? "too slow" : e instanceof TypeError ? "network error" : "";
+      if (why && !signal.aborted && !lastModel) {
+        console.warn(`[gemini] ${model} ${why}, trying the next model`);
         continue;
       }
       break;

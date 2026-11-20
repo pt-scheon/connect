@@ -8,7 +8,8 @@ import { needsFor, rank, type Person } from "@/lib/relevance";
 import { confirmedSkills, label as skillLabel } from "@/lib/skills";
 import { skillsOf } from "../../ui";
 import * as A from "../../actions";
-import { JoinAsk, ProofHelp, SplitForm } from "../../client";
+import { JoinAsk, SplitForm } from "../../client";
+import { ProofCheck } from "./proof-check";
 import { ShareLink } from "../../messages/media";
 import { toggleFollow } from "../../follow";
 import { noteView } from "@/lib/feed";
@@ -81,6 +82,8 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const canReview = p.status === "review" && !mine && me.verified
     && (me.admin || (p.invited_at ? invites.includes(me.id) : (S.get(me.id)?.earned ?? 0) >= RULES.reviewerMin));
   const live = p.live_url ? get("SELECT * FROM live_checks WHERE project_id=? AND url=? ORDER BY id DESC LIMIT 1", id, p.live_url) : null;
+  // The AI proof check: the team (before review), its reviewers and admins. Same rule as runProofCheck.
+  const proofCheck = p.status !== "dropped" && (onTeam || canReview || !!me.admin);
   const iReviewed = reviews.some((r) => r.reviewer_id === me.id);
   const lastMove = get("SELECT MAX(created_at) t FROM updates WHERE project_id=?", id)?.t ?? p.created_at;
   const quietDays = Math.floor((now() - lastMove) / 86400);
@@ -155,7 +158,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
                 </div>
               )}
               {p.status === "review" && !canReview && !mine && <span className="small muted">You were not picked to review this one. Reviewers are chosen by Connect, not by the team.</span>}
-              {canReview && <ProofHelp id={id} action={A.summariseProof} />}
+              {canReview && <span className="small"><a href="#proof-check">Read the AI proof check</a> before you decide.</span>}
               {canReview && (
                 <F action={A.reviewProject} back={back} hidden={{ id }} className="stack tight">
                   <textarea name="note" id="review-note" maxLength={400} placeholder="A note for the team: what you checked, and what is missing if it is not ready. Shown without your name." style={{ minHeight: 70 }} />
@@ -175,6 +178,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
               {iReviewed && <span className="small muted">You have reviewed this. Picking again replaces your verdict.</span>}
             </div>
           )}
+          {p.status === "review" && proofCheck && <ProofCheck projectId={id} canRun />}
 
           <div className="card">
             <h2>Team</h2>
@@ -329,6 +333,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
           {onTeam && !lead && open && (
             <F action={A.leaveProject} back={back} hidden={{ id }} confirm="Leave this project?"><button className="btn danger sm">Leave project{mine.stake ? ` · lose your ${mine.stake} stake` : ""}</button></F>
           )}
+          {p.status !== "review" && proofCheck && <ProofCheck projectId={id} canRun />}
 
           <div className="card" id="questions">
             <h2>Questions</h2>

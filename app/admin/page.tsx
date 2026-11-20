@@ -34,7 +34,7 @@ export default async function Admin() {
   const fresh = me.super ? (get("SELECT COUNT(*) n FROM feedback WHERE status='new'").n as number) : 0;
   return (
     <>
-      <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your community only. Verify members and alumni, register clubs, and clear the review queue.{me.super ? <> Site admin: <Link href="/admin/colleges">manage communities</Link> or <Link href="/admin/feedback">read feedback{fresh ? ` (${fresh} new)` : ""}</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
+      <div className="head"><div className="stack tight"><h1>Admin</h1><p>For your community only. Verify members and alumni, register clubs, and clear the review queue. <Link href="/admin/analytics">See analytics</Link>.{me.super ? <> Site admin: <Link href="/admin/colleges">manage communities</Link> or <Link href="/admin/feedback">read feedback{fresh ? ` (${fresh} new)` : ""}</Link>.</> : null} One admin review is enough to ship a project.</p></div></div>
       <CollegeOverview cid={cid} />
       <div className="grid">
         <div className="card">

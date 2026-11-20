@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { all, get, run, db, now, type Row } from "@/lib/db";
 import { compute, RULES } from "@/lib/credit";
 import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify, recordLogin } from "@/lib/auth";
@@ -467,6 +468,11 @@ export async function submitForReview(fd: FormData) {
       notify(u.id, picked.length < RULES.reviewsNeeded ? `${p!.name} needs an admin review: too few people outside the team can review it` : `${p!.name} is in review`, `/projects/${p!.id}`);
   })();
   if (p!.live_url) await recordLive(p!.id, p!.live_url);
+  // Reviewers find the AI proof check ready when they open the project. It runs after the page answers, so nobody waits.
+  after(async () => {
+    try { const { checkProof } = await import("@/lib/proofcheck"); await checkProof(p!.id, me.id); }
+    catch (e) { console.error("[proofcheck] after review:", (e as Error).message); }
+  });
   done(back, picked.length ? `Sent for review to ${picked.length} ${picked.length === 1 ? "person" : "people"} outside your team.` : "Sent for review. An admin of your community will review it.");
 }
 async function recordLive(pid: number, url: string) {
@@ -1197,17 +1203,26 @@ export async function deleteComment(fd: FormData) {
   done(back + "#questions");
 }
 
-/* ---------- AI help for reviewers ---------- */
-export async function summariseProof(projectId: number): Promise<{ text?: string; error?: string }> {
+/* ---------- AI proof check ---------- */
+/* Who may run it and see it: the team (to check their proof before review), the people picked to review it, and admins. */
+function mayProofCheck(p: Row, me: Row): boolean {
+  if (p.status === "dropped" || p.college_id !== me.college_id) return false;
+  if (isActive(p.id, me.id)) return true;
+  if (me.admin) return true;
+  return p.status === "review" && !mayReview(p, me);
+}
+export async function runProofCheck(projectId: number): Promise<{ error?: string }> {
   const me = await currentUser();
-  if (!me?.onboarded || !me.verified) return { error: "Sign in and verify first." };
-  const p = project(projectId, me);
-  if (!p || p.status !== "review") return { error: "This project is not up for review." };
-  const why = mayReview(p, me);
-  if (why) return { error: why };
-  if (!allow(`ai:${me.id}`, 10, 3600)) return { error: "You have asked for several summaries. Try again in an hour." };
-  const { proofSummary } = await import("@/lib/review-help");
-  return proofSummary(p.id);
+  if (!me?.onboarded || !isMember(me)) return { error: "Sign in and verify first." };
+  const p = project(Math.trunc(Number(projectId)) || 0, me);
+  if (!p || !mayProofCheck(p, me)) return { error: "Only the team, its reviewers and admins can run the proof check." };
+  const last = get("SELECT created_at FROM proof_checks WHERE project_id=? ORDER BY id DESC LIMIT 1", p.id)?.created_at ?? 0;
+  if (now() - last < 60) return { error: "This project was checked a moment ago. Try again in a minute." };
+  if (!allow(`proof:${me.id}`, 8, 3600) || !allow(`proof-p:${p.id}`, 12, 3600)) return { error: "The proof check has run several times this hour. Try again later." };
+  const { checkProof } = await import("@/lib/proofcheck");
+  const r = await checkProof(p.id, me.id);
+  if (!r.error) revalidatePath(`/projects/${p.id}`);
+  return r.error ? { error: r.error } : {};
 }
 
 /* ---------- settings and your data ---------- */
@@ -1261,7 +1276,9 @@ export async function deleteAccount(fd: FormData) {
     for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",
       "DELETE FROM claims WHERE user_id=?", "DELETE FROM evidence WHERE user_id=?", "DELETE FROM commission_apps WHERE user_id=? AND status='pending'",
-      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?", "DELETE FROM feedback WHERE user_id=?", "DELETE FROM trusted_devices WHERE user_id=?", "DELETE FROM login_codes WHERE user_id=?", "DELETE FROM project_seen WHERE user_id=?",
+      "UPDATE commissions SET status='cancelled' WHERE client_id=? AND status='open'", "DELETE FROM review_invites WHERE reviewer_id=?", "DELETE FROM club_members WHERE user_id=?", "DELETE FROM comments WHERE user_id=?", "DELETE FROM follows WHERE user_id=?", "DELETE FROM feedback WHERE user_id=?", "DELETE FROM trusted_devices WHERE user_id=?", "DELETE FROM login_codes WHERE user_id=?", "DELETE FROM project_seen WHERE user_id=?", "DELETE FROM activity WHERE user_id=?",
+      // Proof check reports list the team's GitHub accounts and commit counts; reports on their projects go (anyone allowed can run a new one).
+      "DELETE FROM proof_checks WHERE project_id IN (SELECT project_id FROM members WHERE user_id=?)",
       "DELETE FROM requests WHERE user_id=? AND status='pending'", "DELETE FROM blocks WHERE user_id=? OR blocked_id=?", "DELETE FROM push_subs WHERE user_id=?"]) run(q, ...(q.includes("OR") ? [me.id, me.id] : [me.id]));
     // Their conversations go too, attachments included.
     for (const f of all("SELECT file_key FROM messages WHERE (from_id=? OR to_id=?) AND file_key IS NOT NULL", me.id, me.id)) removeFile(f.file_key);

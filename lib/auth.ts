@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { get, run, now, type Row } from "./db";
@@ -50,7 +50,17 @@ export const currentUser = cache(async (): Promise<Row | null> => {
   const id = Number(c.split(".")[0]);
   if (!Number.isInteger(id) || id <= 0) return null;
   const u = get("SELECT * FROM users WHERE id=? AND suspended=0", id);
-  return u && tokenOk(c, id, u.session_v ?? 0) ? u : null;
+  if (!u || !tokenOk(c, id, u.session_v ?? 0)) return null;
+  // Counts the visit for the admin analytics: which day, not which page. Only opening Connect counts (a full page load:
+  // a new tab, the installed app, a link from elsewhere, a reload), not what a page does in the background (the call
+  // stream, prefetches, form actions). Next.js hides its own navigation headers from page code, so a click from one
+  // page to another inside Connect looks like a prefetch and is not counted either.
+  try {
+    const h = await headers(), dest = h.get("sec-fetch-dest");
+    if (dest ? dest === "document" : (h.get("accept") ?? "").includes("text/html"))
+      run("INSERT INTO activity (day, user_id) VALUES (?,?) ON CONFLICT (day, user_id) DO UPDATE SET hits=hits+1", Math.floor((now() + 19800) / 86400), id);
+  } catch { /* never block a page over a count */ }
+  return u;
 });
 
 /* Signed in and finished onboarding, or sent to the right page. */

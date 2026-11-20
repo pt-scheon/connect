@@ -370,21 +370,3 @@ export function ThemeToggle({ theme }: { theme?: "light" | "dark" }) {
     </button>
   );
 }
-
-/* ---------- reviewer help: Gemini reads the project record and lists what to check ---------- */
-export function ProofHelp({ id, action }: { id: number; action: (id: number) => Promise<{ text?: string; error?: string }> }) {
-  const [out, setOut] = useState<{ text?: string; error?: string } | null>(null);
-  const [pending, start] = useTransition();
-  return (
-    <div className="stack tight">
-      <div className="row">
-        <button type="button" className="btn ghost sm" disabled={pending} onClick={() => start(async () => setOut(await action(id)))}>
-          {pending ? "Reading the project…" : out?.text ? "Summarise again" : "What should I check? (Gemini)"}
-        </button>
-        <span className="small muted">Suggests what to verify. It does not open links or give a verdict.</span>
-      </div>
-      {out?.error && <span className="small neg">{out.error}</span>}
-      {out?.text && <div className="note pre" style={{ color: "var(--ink)" }}>{out.text}</div>}
-    </div>
-  );
-}

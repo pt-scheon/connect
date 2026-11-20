@@ -108,6 +108,11 @@ CREATE TABLE IF NOT EXISTS commission_skills (commission_id INTEGER, skill TEXT,
 CREATE TABLE IF NOT EXISTS commission_apps (id INTEGER PRIMARY KEY, commission_id INTEGER NOT NULL, user_id INTEGER NOT NULL, note TEXT DEFAULT '', status TEXT DEFAULT 'pending', created_at INTEGER, UNIQUE (commission_id, user_id));
 CREATE TABLE IF NOT EXISTS commission_milestones (id INTEGER PRIMARY KEY, commission_id INTEGER NOT NULL, title TEXT, done INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS gifts (id INTEGER PRIMARY KEY, college_id INTEGER, from_id INTEGER NOT NULL, to_id INTEGER NOT NULL, amount INTEGER NOT NULL, note TEXT DEFAULT '', created_at INTEGER NOT NULL);
+-- One row per person per day they opened Connect (day = days since 1970 in India time), with how many pages they loaded. For the admin analytics.
+CREATE TABLE IF NOT EXISTS activity (day INTEGER NOT NULL, user_id INTEGER NOT NULL, hits INTEGER DEFAULT 1, PRIMARY KEY (day, user_id));
+-- AI proof check reports (lib/proofcheck.ts), as JSON. The last five per project are kept.
+CREATE TABLE IF NOT EXISTS proof_checks (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, by_id INTEGER, report TEXT NOT NULL, created_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS proof_checks_project ON proof_checks (project_id, id);
 CREATE INDEX IF NOT EXISTS comments_project ON comments (project_id);
 CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, seen);
 CREATE INDEX IF NOT EXISTS updates_project ON updates (project_id);
