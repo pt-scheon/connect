@@ -14,8 +14,9 @@ export const RULES = {
   reviewsNeeded: 2, // or one admin review
   cutover: 1794528000, // 13 Nov 2026. Vouches made before this keep their old weight, so no one's credit dropped that day.
   vouchesCounted: 5, // only your 5 strongest vouches count
-  ringMin: 3, // a closed group of 3 or 4 people who only vouch for each other is a ring
-  ringMax: 4,
+  ringMin: 3, // a closed group of 3 to 6 people who only vouch for each other is a ring...
+  ringMax: 6,
+  ringMinProjects: 3, // ...once it has shipped this many team projects with nobody from outside on them
   ringFactor: 0.25, // vouches inside a ring count a quarter
   reviewReward: 3, // credit for a review that matched the final outcome
   reviewRewardCap: 15, // per 30 days
@@ -39,7 +40,10 @@ export const RULES = {
   skill: {
     prior: 30, // score for a skill with no evidence
     k: 2, // one full-weight project moves you about a third of the way
-    halfLifeMonths: 18,
+    halfLifeMonths: 18, // how fast old work stops making us sure (confidence)
+    scoreHalfLifeMonths: 36, // how fast old work stops counting towards the score itself
+    repeatTick: 0.5, // a tick from someone who already ticked you for this skill on an earlier project
+    pairFactor: 0.5, // two-person team, until someone outside the pair also confirms the skill
     tier: { A: 1, B: 0.5, C: 0 },
     qLive: 0.9,
     qDemo: 0.65,
@@ -54,7 +58,7 @@ export const RULES = {
 
   // ---- relevance: how well a person fits a role or commission ----
   fit: {
-    confFloor: 0.5, // a skill with little evidence counts half, never zero
+    missing: 0.5, // a needed skill with no proof counts as half the starting score
     notOpen: 0.6, // not marked "open to projects"
     freeLoad: 2, // active projects before the load penalty starts
     loadStep: 0.2, // lost per extra active project
@@ -67,6 +71,7 @@ export const RULES = {
     minDistance: 2, // 1 = has been on a team with someone on the project
     invited: 4,
     splitFlagAt: 2, // a share this many times an equal share gets checked
+    auditDays: 60, // an admin can spot-check a shipped project for this long
   },
 
   // ---- commissions ----
@@ -80,6 +85,7 @@ export const RULES = {
     pairMaxCredit: 60, // and total credit between them per window
     openMax: 3, // commissions one person can have open at once
     alumAllowance: 40, // credit an alum's commissions can award per 30 days
+    hireAgainMin: 3, // "would hire again" is shown once this many different people have answered
     silentDays: 14, // a client who does not answer a delivery for this long can be sent to the admins
   },
 

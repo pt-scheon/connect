@@ -61,6 +61,15 @@ export function compute(): Map<number, Standing> {
   const allocs = all("SELECT * FROM allocations");
   const fadeBefore = now() - RULES.fadeMonths * 30 * 86400;
   const shippedWith = new Map<number, Set<number>>();
+  const teams: number[][] = []; // the active team of every shipped project, for ring detection
+  // What admins took back after upholding a report: every vouch to or from a person, or a project's split.
+  const revoked = all("SELECT kind, target_id FROM revoked");
+  const noVouches = new Set<number>(revoked.filter((r) => r.kind === "vouches").map((r) => r.target_id));
+  const evenSplit = new Set<number>(revoked.filter((r) => r.kind === "split").map((r) => r.target_id));
+  // Spot checks: an admin's verdict on a shipped project replaces the reviewers'. The pot on the project is already
+  // the admin's; the old one is kept so the ledger can say what changed.
+  const audits = new Map<number, Row>();
+  for (const a of all("SELECT * FROM audits ORDER BY created_at")) audits.set(a.project_id, a);
 
   for (const p of projects) {
     const team = members.filter((m) => m.project_id === p.id);
@@ -85,16 +94,20 @@ export function compute(): Map<number, Standing> {
       }
     }
     if (p.status !== "shipped") continue;
-    const sh = shares(active, allocs.filter((a) => a.project_id === p.id));
+    const sh = shares(active, evenSplit.has(p.id) ? [] : allocs.filter((a) => a.project_id === p.id));
     const solo = active.length === 1;
     const faded = (p.shipped_at ?? 0) < fadeBefore;
+    teams.push(active);
+    const audit = audits.get(p.id);
+    const notes = (faded ? ", faded by age" : "") + (evenSplit.has(p.id) ? ", split reset to equal by an admin" : "")
+      + (audit && audit.old_pot !== audit.verdict ? `, pot changed by an admin spot check from ${audit.old_pot}` : "");
     for (const id of active) {
       const s = S.get(id);
       if (!s) continue;
       const pct = sh.get(id)!;
       const n = Math.round(p.pot * (pct / 100) * (solo ? RULES.soloFactor : 1) * (faded ? 0.5 : 1));
       const why = solo ? `Solo project, half of a ${p.pot} pot` : `${Math.round(pct)}% of a ${p.pot} pot, set by teammates`;
-      s.ledger.push({ what: `${p.name} shipped`, why: why + (faded ? ", faded by age" : ""), n });
+      s.ledger.push({ what: `${p.name} shipped`, why: why + notes, n });
       if (!shippedWith.has(id)) shippedWith.set(id, new Set());
       for (const o of active) if (o !== id) { s.mates.add(o); shippedWith.get(id)!.add(o); }
     }
@@ -109,16 +122,26 @@ export function compute(): Map<number, Standing> {
     j.total++; if (ok) j.matched++;
     judged.set(id, j);
   };
+  // Accuracy only means something when the outcome did not come from the reviewer themselves. Two reviewers who
+  // agree decide the round, so neither is judged by it. A round counts when it went to a tie-break (for everyone
+  // except whoever broke the tie) or when an admin spot-checked the project (for every reviewer, against the admin).
+  // Rounds logged before this rule have no `decider` and are judged as they were.
   const log = all("SELECT * FROM review_log ORDER BY created_at");
   const logged = new Set(log.map((r) => r.project_id));
-  for (const r of log) judge(r.reviewer_id, r.verdict === r.outcome);
+  const truth = (r: Row) => (r.outcome > 0 && audits.has(r.project_id) ? audits.get(r.project_id)!.verdict : r.outcome);
+  const rounds = new Map<string, Row[]>();
+  for (const r of log) rounds.set(`${r.project_id}:${r.created_at}`, [...(rounds.get(`${r.project_id}:${r.created_at}`) ?? []), r]);
+  for (const rs of rounds.values()) {
+    const checked = rs[0].outcome > 0 && audits.has(rs[0].project_id), old = rs.every((r) => r.decider == null);
+    for (const r of rs) if (checked || old || (rs.length > RULES.reviewsNeeded && !r.decider)) judge(r.reviewer_id, r.verdict === truth(r));
+  }
   const pots = new Map(projects.filter((p) => p.status === "shipped").map((p) => [p.id, p.pot]));
   for (const r of all("SELECT * FROM reviews")) if (pots.has(r.project_id) && !logged.has(r.project_id)) judge(r.reviewer_id, r.verdict === pots.get(r.project_id));
 
   // A review that matched the outcome earns a little, up to a cap every 30 days.
   const rewards = new Map<number, Map<number, number>>();
   for (const r of log) {
-    if (r.verdict !== r.outcome) continue;
+    if (r.verdict !== truth(r)) continue;
     const m = rewards.get(r.reviewer_id) ?? new Map<number, number>(), w = Math.floor(r.created_at / MONTH);
     rewards.set(r.reviewer_id, m.set(w, Math.min(RULES.reviewRewardCap, (m.get(w) ?? 0) + RULES.reviewReward)));
   }
@@ -129,8 +152,17 @@ export function compute(): Map<number, Standing> {
   for (const s of S.values()) s.base = Math.max(0, s.ledger.reduce((a, l) => a + l.n, 0));
 
   // Credibility comes before vouches, because a vouch weighs as much as the person giving it can be trusted.
-  const vouches = all("SELECT * FROM vouches").filter((v) => shippedWith.get(v.to_id)?.has(v.from_id));
-  const inRing = rings(vouches, shippedWith);
+  const vouches = all("SELECT * FROM vouches").filter((v) => shippedWith.get(v.to_id)?.has(v.from_id) && !noVouches.has(v.from_id) && !noVouches.has(v.to_id));
+  for (const id of noVouches) S.get(id)?.ledger.push({ what: "Vouches removed", why: "An admin upheld a report, so vouches to and from this person no longer count", n: 0 });
+  const inRing = rings(vouches, shippedWith, teams);
+  // Commissions count towards finishing what you take on: signed off is finished, and one an admin found the
+  // doer let down counts like leaving a project.
+  const comm = new Map<number, { done: number; dropped: number }>();
+  for (const c of all("SELECT doer_id, status, paid_credit, fault FROM commissions WHERE doer_id IS NOT NULL AND hidden=0")) {
+    const x = comm.get(c.doer_id) ?? { done: 0, dropped: 0 };
+    if (c.fault === "doer") x.dropped++; else if (c.status === "done" && c.paid_credit > 0) x.done++;
+    comm.set(c.doer_id, x);
+  }
   const upheld = new Map<number, number[]>();
   for (const r of all("SELECT target_id, created_at FROM reports WHERE kind='user' AND result='upheld'"))
     upheld.set(r.target_id, [...(upheld.get(r.target_id) ?? []), r.created_at ?? t]);
@@ -147,7 +179,7 @@ export function compute(): Map<number, Standing> {
     s.ring = inRing.has(u.id);
     const j = judged.get(u.id);
     s.cred = credibility({
-      shipped: s.shipped, left: s.left, mates: s.mates.size, circle: s.circle, ring: s.ring,
+      shipped: s.shipped, left: s.left, commDone: comm.get(u.id)?.done ?? 0, commDropped: comm.get(u.id)?.dropped ?? 0, mates: s.mates.size, circle: s.circle, ring: s.ring,
       reviewsMatched: j?.matched ?? 0, reviewsTotal: j?.total ?? 0, evidenceOk: sent.get(u.id)?.ok ?? 0, evidenceBad: sent.get(u.id)?.bad ?? 0,
       createdAt: u.created_at, upheld: upheld.get(u.id) ?? [],
     }, t);

@@ -30,9 +30,12 @@ export function needsFor(title: string, listed: Need[]): Needs {
   return { mode: "any", list: [...new Set([...roleSkills(title)].map(canon))].map((skill) => ({ skill, importance: 2 })) };
 }
 
+/* Ranked by how much of a score is backed by evidence: the starting score, plus the distance above it times how
+   sure we are. A 90 from one old project ranks below a 50 with recent work behind it. A needed skill with no
+   proof at all counts as half the starting score. */
 const worth = (s: SkillScore | undefined) => {
-  const F = RULES.fit, score = s?.score ?? RULES.skill.prior, conf = s?.conf ?? 0;
-  return (score / 100) * (F.confFloor + (1 - F.confFloor) * conf);
+  const P = RULES.skill.prior;
+  return s ? (P + (s.score - P) * s.conf) / 100 : (P / 100) * RULES.fit.missing;
 };
 export function availability(open: boolean, load: number): number {
   const F = RULES.fit;

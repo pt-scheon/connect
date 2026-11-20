@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { all, get, type Row } from "@/lib/db";
+import { all, get, now, type Row } from "@/lib/db";
 import { currentUser, standings, skillScores } from "@/lib/auth";
 import { canon } from "@/lib/skills";
 import { EMPTY } from "@/lib/credit";
+import { hireAgain } from "@/lib/commissions";
 import { ties, pathTo, type Tie } from "@/lib/graph";
 import { resumeFacts } from "@/lib/resume";
 import { collegeById, isMember } from "@/lib/college";
@@ -107,6 +108,7 @@ export default async function Profile({ params, searchParams }: Props) {
   const proven = [...(skillScores().get(id)?.values() ?? [])].sort((a, b) => b.score * (0.5 + b.conf) - a.score * (0.5 + a.conf));
   const listedOnly = skills.filter((k) => !proven.some((x) => x.skill === canon(k)));
   const signedIn = (all("SELECT sub FROM identities WHERE user_id=?", id)).map((r) => String(r.sub).split(":")[0]);
+  const ha = !alum ? hireAgain(id) : null;
 
   let body;
   if (alum) {
@@ -292,6 +294,7 @@ export default async function Profile({ params, searchParams }: Props) {
               {signedIn.includes("google") && <Stamp>Google sign-in</Stamp>}
               {signedIn.includes("linkedin") && <Stamp>LinkedIn sign-in</Stamp>}
               {u.verified ? <Stamp>{alum ? "Alum approved by college admin" : `Verified @${String(u.college_email ?? "").split("@")[1] ?? "college"} email`}</Stamp> : <Stamp kind="no">Not verified</Stamp>}
+              {ha && <Stamp>{ha.yes} of {ha.total} clients would hire again</Stamp>}
             </div>
             {viewer && !self && !alum && <span className="small muted">{pathTo(T, viewer.id, id, names)}</span>}
           </div>
@@ -373,13 +376,17 @@ export default async function Profile({ params, searchParams }: Props) {
           {!alum && (proven.length > 0 || skills.length > 0) && (
             <div className="card">
               <span className="label">Skills</span>
-              {proven.map((k) => (
-                <div key={k.skill} className="stack" style={{ gap: 2 }}>
-                  <div className="row between"><b>{k.label}</b><span className="mono"><b>{k.score}</b><span className="muted small"> / 100</span></span></div>
-                  <span className="meter skillbar" aria-hidden="true"><b style={{ width: `${k.score}%` }} /></span>
-                  <span className="small muted">{k.band} confidence · {k.why}</span>
-                </div>
-              ))}
+              {proven.map((k) => {
+                const m = k.last ? Math.floor(Math.max(0, now() - k.last) / (30 * 86400)) : null;
+                const recency = m !== null ? (m <= 0 ? "this month" : `last confirmed ${m} ${m === 1 ? "month" : "months"} ago`) : null;
+                return (
+                  <div key={k.skill} className="stack" style={{ gap: 2 }}>
+                    <div className="row between"><b>{k.label}</b><span className="mono"><b>{k.score}</b><span className="muted small"> / 100</span></span></div>
+                    <span className="meter skillbar" aria-hidden="true"><b style={{ width: `${k.score}%` }} /></span>
+                    <span className="small muted">{k.band} confidence · {k.why}{recency ? ` · ${recency}` : ""}</span>
+                  </div>
+                );
+              })}
               {proven.length > 0 && <span className="small muted">Scores come only from work other people confirmed. <Link href="/rules">How they are worked out</Link></span>}
               {listedOnly.length > 0 && (
                 <>

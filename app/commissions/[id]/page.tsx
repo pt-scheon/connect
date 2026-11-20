@@ -134,8 +134,20 @@ export default async function Commission({ params }: { params: Promise<{ id: str
                       <option value="3">3 · Fine, needed some fixing</option><option value="2">2 · Weak</option><option value="1">1 · Poor</option>
                     </select></label>
                   <input type="text" name="note" id="rating-note" maxLength={300} placeholder="A line on the work (optional, shown here)" />
+                  <label className="check small">
+                    <input type="checkbox" name="on_time" id="on_time" value="1" />
+                    <span>Delivered by the deadline</span>
+                  </label>
+                  <label className="check small">
+                    <input type="checkbox" name="matched_brief" id="matched_brief" value="1" />
+                    <span>Matched the brief</span>
+                  </label>
+                  <label className="check small">
+                    <input type="checkbox" name="hire_again" id="hire_again" value="1" />
+                    <span>I would hire them again (private: only a total is shown, once they have worked for 3 different people)</span>
+                  </label>
                   <div><button className="btn" disabled={needsCheck && c.review_ok !== 1}>Sign off and pay {c.reward} credit</button></div>
-                  <span className="small muted">Your rating feeds their skill score, weighted by how far your own word can be trusted.</span>
+                  <span className="small muted">Only the person who posted rates; the doer does not rate back. Your rating feeds their skill score, weighted by how far your own word can be trusted.</span>
                 </F>
               )}
               {c.status === "done" && <span><Stamp>Signed off · {c.paid_credit} credit paid{c.rating ? ` · rated ${c.rating} of 5` : ""}</Stamp>{c.rating_note ? <span className="small muted"> “{c.rating_note}”</span> : null}</span>}

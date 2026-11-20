@@ -39,16 +39,21 @@ export type Evidence = {
   skill: string; q: number; w: number; tier: "A" | "B";
   kind: "project" | "solo" | "commission" | "hackathon" | "internship";
   label: string; at: number;
+  ws?: number; // the weight towards the score, which fades more slowly than `w` (the weight towards confidence)
 };
-export type SkillScore = { skill: string; label: string; score: number; conf: number; band: "low" | "medium" | "high"; why: string; items: Evidence[] };
+export type SkillScore = { skill: string; label: string; score: number; conf: number; band: "low" | "medium" | "high"; why: string; items: Evidence[]; last: number };
 
 /* A weighted average that starts at the prior and needs real weight behind it to move:
-   score = (k·prior + Σ w·q) / (k + Σ w). One lucky project cannot make an expert. */
-export function rate(items: { q: number; w: number }[]): { score: number; conf: number } {
-  const K = RULES.skill, sw = items.reduce((a, i) => a + i.w, 0), swq = items.reduce((a, i) => a + i.w * i.q, 0);
-  return { score: (100 * (K.k * K.prior / 100 + swq)) / (K.k + sw), conf: sw / (sw + K.k) };
+   score = (k·prior + Σ ws·q) / (k + Σ ws), confidence = Σ w / (Σ w + k). One lucky project cannot make an expert.
+   Old work stops making us sure faster than it stops counting: being busy for a year does not make you worse. */
+export function rate(items: { q: number; w: number; ws?: number }[]): { score: number; conf: number } {
+  const K = RULES.skill, ws = (i: { w: number; ws?: number }) => i.ws ?? i.w;
+  const sw = items.reduce((a, i) => a + i.w, 0), sws = items.reduce((a, i) => a + ws(i), 0), swq = items.reduce((a, i) => a + ws(i) * i.q, 0);
+  return { score: (100 * (K.k * K.prior / 100 + swq)) / (K.k + sws), conf: sw / (sw + K.k) };
 }
-export const recency = (at: number, t: number) => Math.pow(0.5, Math.max(0, t - at) / (RULES.skill.halfLifeMonths * MONTH));
+const half = (at: number, t: number, months: number) => Math.pow(0.5, Math.max(0, t - at) / (months * MONTH));
+export const recency = (at: number, t: number) => half(at, t, RULES.skill.halfLifeMonths);
+export const recencyScore = (at: number, t: number) => half(at, t, RULES.skill.scoreHalfLifeMonths);
 export const band = (conf: number): SkillScore["band"] => (conf < RULES.skill.confLow ? "low" : conf < RULES.skill.confHigh ? "medium" : "high");
 
 const NOUN: Record<Evidence["kind"], [string, string]> = {
@@ -67,7 +72,7 @@ export function summarise(items: Evidence[]): Map<string, SkillScore> {
   const out = new Map<string, SkillScore>();
   for (const [skill, list] of by) {
     const r = rate(list);
-    out.set(skill, { skill, label: label(skill), score: Math.round(r.score), conf: r.conf, band: band(r.conf), why: reason(list), items: list });
+    out.set(skill, { skill, label: label(skill), score: Math.round(r.score), conf: r.conf, band: band(r.conf), why: reason(list), items: list, last: Math.max(...list.map((i) => i.at)) });
   }
   return out;
 }
@@ -78,6 +83,13 @@ export function projectQuality(pot: number, share: number, equal: number): numbe
   const K = RULES.skill, base = pot >= RULES.live ? K.qLive : K.qDemo;
   const nudge = Math.max(0.6, Math.min(1.1, 1 - K.shareBoost + K.shareBoost * (share / equal)));
   return Math.min(1, base * nudge);
+}
+
+/* A signed-off commission: half from the 1 to 5 rating, a quarter each from "on time" and "matched the brief".
+   Commissions signed off before the two questions existed use the rating alone. */
+export function commissionQuality(rating: number, onTime?: number | null, matched?: number | null): number {
+  const stars = Math.max(1, Math.min(5, rating)) / 5;
+  return onTime == null && matched == null ? stars : 0.5 * stars + 0.25 * (onTime ? 1 : 0) + 0.25 * (matched ? 1 : 0);
 }
 
 /* Which skills count for whom on a project, and who signed for them. A teammate's skill needs ticks from at least
@@ -102,7 +114,9 @@ export function confirmedSkills(team: number[], ticks: Row[], reviewers: Set<num
 export function competency(S: Map<number, Standing>): Map<number, Map<string, SkillScore>> {
   const t = now(), K = RULES.skill;
   const items = new Map<number, Evidence[]>();
-  const add = (id: number, e: Evidence) => { if (e.w > 0) items.set(id, [...(items.get(id) ?? []), e]); };
+  const add = (id: number, e: Evidence) => { if (e.w > 0) items.set(id, [...(items.get(id) ?? []), e]); return e; };
+  // Weight from age, for both confidence and score.
+  const aged = (base: number, at: number) => ({ w: base * recency(at, t), ws: base * recencyScore(at, t) });
   const trust = (ids: number[], admins: Set<number>) =>
     ids.length ? ids.reduce((a, id) => a + (admins.has(id) ? 1 : credWeight(S.get(id)?.cred.score)), 0) / ids.length : 0;
 
@@ -113,21 +127,28 @@ export function competency(S: Map<number, Standing>): Map<number, Map<string, Sk
   for (const r of [...all("SELECT project_id, reviewer_id FROM reviews"), ...all("SELECT project_id, reviewer_id FROM review_log")])
     reviewers.set(r.project_id, (reviewers.get(r.project_id) ?? new Set()).add(r.reviewer_id));
 
-  for (const p of all("SELECT * FROM projects WHERE status='shipped'")) {
+  const evenSplit = new Set<number>(all("SELECT target_id FROM revoked WHERE kind='split'").map((r) => r.target_id));
+  // Oldest first, so we know whether a tick repeats one the same person gave on an earlier project.
+  const ticked = new Set<string>(), key = (by: number, to: number, skill: string) => `${by}>${to}>${skill}`;
+  const pairs: { id: number; partner: number; e: Evidence }[] = [];
+  for (const p of all("SELECT * FROM projects WHERE status='shipped' AND pot>0 ORDER BY shipped_at, id")) {
     const team = members.filter((m) => m.project_id === p.id).map((m) => m.user_id as number);
     if (!team.length) continue;
-    const sh = shares(team, allocs.filter((a) => a.project_id === p.id)), equal = 100 / team.length, solo = team.length === 1;
+    const sh = shares(team, evenSplit.has(p.id) ? [] : allocs.filter((a) => a.project_id === p.id)), equal = 100 / team.length, solo = team.length === 1;
     const ok = confirmedSkills(team, ticks.filter((x) => x.project_id === p.id), reviewers.get(p.id) ?? new Set(), admins);
+    const seen: string[] = [];
     for (const id of team) {
       const pct = sh.get(id) ?? 0;
       for (const [skill, who] of ok.get(id) ?? []) {
-        add(id, {
-          skill, tier: "A", kind: solo ? "solo" : "project", label: p.name, at: p.shipped_at ?? t,
-          q: projectQuality(p.pot, pct, equal),
-          w: K.tier.A * recency(p.shipped_at ?? t, t) * (solo ? RULES.soloFactor : Math.min(1, pct / equal)) * trust(who, admins),
-        });
+        // The same people saying the same thing again is weaker news than someone new saying it.
+        const repeat = !solo && who.every((b) => ticked.has(key(b, id, skill))) ? K.repeatTick : 1;
+        seen.push(...who.map((b) => key(b, id, skill)));
+        const base = K.tier.A * (solo ? RULES.soloFactor : Math.min(1, pct / equal)) * trust(who, admins) * repeat;
+        const e = add(id, { skill, tier: "A", kind: solo ? "solo" : "project", label: p.name, at: p.shipped_at ?? t, q: projectQuality(p.pot, pct, equal), ...aged(base, p.shipped_at ?? t) });
+        if (team.length === 2) pairs.push({ id, partner: team.find((x) => x !== id)!, e });
       }
     }
+    for (const k of seen) ticked.add(k);
   }
   // Outside evidence (tier B): checked by an admin, a teammate on Connect, or a code sent to a work email.
   // It can lift a skill, at half the weight of work Connect saw happen.
@@ -135,15 +156,21 @@ export function competency(S: Map<number, Standing>): Map<number, Map<string, Sk
     const q = e.kind === "hackathon" ? (e.value === "won" ? K.qHackWin : e.value === "finalist" ? K.qHackFinal : K.qHackTookPart) : K.qInternship;
     const by = e.method === "work_email" ? WORK_EMAIL_TRUST : e.method === "admin" ? 1 : credWeight(S.get(e.decided_by)?.cred.score);
     for (const skill of parseSkills(e.skills))
-      add(e.user_id, { skill, tier: "B", kind: e.kind === "hackathon" ? "hackathon" : "internship", label: e.title, at: e.created_at, q, w: K.tier.B * recency(e.created_at, t) * by });
+      add(e.user_id, { skill, tier: "B", kind: e.kind === "hackathon" ? "hackathon" : "internship", label: e.title, at: e.created_at, q, ...aged(K.tier.B * by, e.created_at) });
   }
-  // Commissions the client signed off (tier A). The client's rating is the quality, and it weighs as much as
-  // the client's word can be trusted.
+  // Commissions the client signed off (tier A). The quality is the client's rating and their two yes/no answers,
+  // and it weighs as much as the client's word can be trusted.
   const cskills = all("SELECT * FROM commission_skills");
   for (const c of all("SELECT * FROM commissions WHERE status='done' AND paid_credit>0 AND rating IS NOT NULL AND doer_id IS NOT NULL")) {
-    const w = K.tier.A * recency(c.closed_at ?? t, t) * credWeight(S.get(c.client_id)?.cred.score);
+    const w = aged(K.tier.A * credWeight(S.get(c.client_id)?.cred.score), c.closed_at ?? t);
     for (const k of cskills.filter((x) => x.commission_id === c.id))
-      add(c.doer_id, { skill: k.skill, tier: "A", kind: "commission", label: c.title, at: c.closed_at ?? t, q: Math.max(1, Math.min(5, c.rating)) / 5, w });
+      add(c.doer_id, { skill: k.skill, tier: "A", kind: "commission", label: c.title, at: c.closed_at ?? t, q: commissionQuality(c.rating, c.on_time, c.matched_brief), ...w });
+  }
+  // Two people on their own can confirm each other's skills, so a pair's ticks count part until someone outside
+  // the pair confirms the same skill: a bigger team, a reviewer, a client or checked outside evidence.
+  for (const { id, partner, e } of pairs) {
+    const backed = (items.get(id) ?? []).some((x) => x.skill === e.skill && !pairs.some((y) => y.e === x && y.partner === partner));
+    if (!backed) { e.w *= K.pairFactor; e.ws = (e.ws ?? e.w) * K.pairFactor; }
   }
   return new Map([...items].map(([id, list]) => [id, summarise(list)]));
 }

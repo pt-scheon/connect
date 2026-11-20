@@ -347,10 +347,9 @@ test("a vouch weighs as much as the voucher can be trusted, and only the five st
 });
 
 test("a closed vouch ring is flagged and its vouches count a quarter", async () => {
-  const { compute, user, project, vouch } = await setup();
+  const { compute, user, project, vouch, RULES } = await setup();
   const ring = [user(1, 12), user(1, 12), user(1, 12)], open = [user(1, 12), user(1, 12), user(1, 12)], outsider = user(1, 12);
-  project("shipped", 100, ring);
-  project("shipped", 100, open);
+  for (let i = 0; i < RULES.ringMinProjects; i++) { project("shipped", 100, ring); project("shipped", 100, open); }
   project("shipped", 60, [open[0], outsider]); // one of the open group has shipped with someone else
   for (const g of [ring, open]) for (const a of g) for (const b of g) if (a !== b) vouch(a, b);
   const S = compute();
@@ -514,7 +513,8 @@ test("outside evidence counts only once verified, and for less than work Connect
   assert.equal(tierB.why, "based on 1 hackathon");
   assert.ok(cred(a) > base, "evidence that checked out builds credibility");
   // The same skill from a live shipped project, signed by teammates, moves the score more.
-  shipWith([b, c], "python");
+  const d = user(1, 12);
+  shipWith([b, c, d], "python");
   assert.ok(skill(b, "python")!.score > tierB.score && skill(b, "python")!.conf > tierB.conf);
   ev(c, "rejected", "internship", "", "rust");
   assert.equal(skill(c, "rust"), undefined);
@@ -932,4 +932,166 @@ test("a college domain that cannot receive email is caught before a code is sent
   assert.equal(await domainTakesMail("college.example", async () => [{ exchange: "mx.college.example" }]), true);
   // If the lookup itself breaks, the student is not blocked: the emailed code is still the real proof.
   assert.equal(await domainTakesMail("college.example", fails("ETIMEOUT")), true);
+});
+
+/* ---------- rating lab: P0 to P8 (docs/rating-lab/COLLAB.md) ---------- */
+
+test("P0: an honest team that ships and vouches for each other is not a ring; the same closed group shipping again and again is", async () => {
+  const { compute, user, project, vouch, RULES } = await setup();
+  const team = [user(1, 12), user(1, 12), user(1, 12)];
+  for (const a of team) for (const b of team) if (a !== b) vouch(a, b);
+  const ringed = () => team.map((id) => compute().get(id)!.ring);
+  project("shipped", 100, team);
+  assert.deepEqual(ringed(), [false, false, false], "first project together");
+  project("shipped", 100, team);
+  assert.deepEqual(ringed(), [false, false, false], "two projects is still a normal team");
+  for (let i = 2; i < RULES.ringMinProjects; i++) project("shipped", 100, team);
+  assert.deepEqual(ringed(), [true, true, true]);
+});
+
+test("P0: a newcomer cannot shield a ring, and solo projects do not count towards one", async () => {
+  const { compute, user, project, vouch } = await setup();
+  const [a, b, rookie] = [user(1, 12), user(1, 12), user(1, 12)];
+  for (let i = 0; i < 2; i++) project("shipped", 100, [a, b]);
+  project("shipped", 100, [a, b, rookie]);
+  for (const x of [a, b, rookie]) for (const y of [a, b, rookie]) if (x !== y) vouch(x, y);
+  assert.equal(compute().get(rookie)!.ring, true, "three team projects inside the group, even though the rookie joined one");
+  const [c, d, e] = [user(1, 12), user(1, 12), user(1, 12)];
+  project("shipped", 100, [c, d, e]);
+  for (const x of [c, d, e]) project("shipped", 60, [x]);
+  for (const x of [c, d, e]) for (const y of [c, d, e]) if (x !== y) vouch(x, y);
+  assert.equal(compute().get(c)!.ring, false, "one team project and some solo work is not a pattern");
+});
+
+test("P5: rings of up to six people are caught", async () => {
+  const { compute, user, project, vouch, RULES } = await setup();
+  const six = [1, 2, 3, 4, 5, 6].map(() => user(1, 12)), seven = [1, 2, 3, 4, 5, 6, 7].map(() => user(1, 12));
+  for (const g of [six, seven]) {
+    for (let i = 0; i < RULES.ringMinProjects; i++) project("shipped", 100, g);
+    for (const a of g) for (const b of g) if (a !== b) vouch(a, b);
+  }
+  const S = compute();
+  assert.equal(S.get(six[0])!.ring, true);
+  assert.equal(S.get(seven[0])!.ring, false, "above ringMax a closed group is more likely a club");
+});
+
+test("P1: old work makes Connect less sure faster than it lowers the score", async () => {
+  const { rate } = await skillKit();
+  const { recency, recencyScore } = await import("../lib/skills");
+  const t = 1_800_000_000, at = t - 36 * 30 * 86400;
+  assert.equal(recency(at, t), 0.25);
+  assert.equal(recencyScore(at, t), 0.5);
+  const now = rate([{ q: 0.9, w: recency(at, t), ws: recencyScore(at, t) }]), both = rate([{ q: 0.9, w: recency(at, t) }]);
+  assert.equal(Math.round(now.score), 42);
+  assert.equal(Math.round(both.score), 37, "if the score faded as fast as confidence");
+  assert.equal(now.conf, both.conf);
+});
+
+test("P1: each skill says when it was last confirmed", async () => {
+  const { user, shipWith, skill, now } = await skillKit();
+  const [a, b, c] = [user(1, 12), user(1, 12), user(1, 12)];
+  const then = now() - 5 * 30 * 86400;
+  shipWith([a, b, c], "react", 100, then);
+  assert.equal(skill(a, "react")!.last, then);
+});
+
+test("P2: suggestions rank by how much of a score is backed by evidence", async () => {
+  const { fit } = await import("../lib/relevance");
+  const s = (score: number, conf: number) => new Map([["react", { skill: "react", label: "React", score, conf, band: "low" as const, why: "based on 1 shipped project", items: [], last: 0 }]]);
+  const person = (id: number, score: number, conf: number) => ({ id, skills: s(score, conf), listed: [], finishRate: 1, finished: 1, ended: 1, open: true, load: 0 });
+  const needs = { mode: "all" as const, list: [{ skill: "react", importance: 3 }] };
+  const stale = fit(needs, person(1, 90, 0.1))!, active = fit(needs, person(2, 50, 0.4))!;
+  assert.ok(Math.abs(stale.score - 0.36) < 1e-9 && Math.abs(active.score - 0.38) < 1e-9);
+  assert.ok(active.score > stale.score, "an active junior beats a stale star");
+});
+
+test("P3: a pair confirming each other counts part until someone outside the pair agrees", async () => {
+  const { user, shipWith, skill, RULES } = await skillKit();
+  const [a, b, c, d] = [user(1, 12), user(1, 12), user(1, 12), user(1, 12)];
+  const early = 1_700_000_000;
+  shipWith([a, b], "react", 100, early);
+  const pairOnly = skill(a, "react")!.items.find((i) => i.at === early)!.w;
+  shipWith([a, c, d], "react");
+  const backed = skill(a, "react")!.items.find((i) => i.at === early)!.w;
+  assert.ok(Math.abs(pairOnly / backed - RULES.skill.pairFactor) < 1e-9, "backed by a bigger team, the pair's project counts in full");
+});
+
+test("P3: the same people ticking the same skill again counts less", async () => {
+  const { user, shipWith, skill, RULES } = await skillKit();
+  const [a, b, c] = [user(1, 12), user(1, 12), user(1, 12)];
+  shipWith([a, b, c], "react", 100, 1_700_000_000);
+  shipWith([a, b, c], "react", 100, 1_700_000_100);
+  const [first, second] = skill(a, "react")!.items.sort((x, y) => x.at - y.at);
+  assert.ok(Math.abs(second.w / first.w - RULES.skill.repeatTick) < 0.01);
+  const fresh = user(1, 12);
+  shipWith([a, b, fresh], "react", 100, 1_700_000_200);
+  const third = skill(a, "react")!.items.sort((x, y) => x.at - y.at)[2];
+  assert.ok(third.w > second.w * 1.5, "a tick from someone new counts in full");
+});
+
+test("P4: upholding a report can take back a person's vouches or reset a split, and the ledger says so", async () => {
+  const { run, now, compute, user, project, give, vouch, RULES } = await setup();
+  const [a, b, c] = [user(1, 12), user(1, 12), user(1, 12)];
+  const pid = project("shipped", 90, [a, b, c]);
+  give(pid, a, b, 90); give(pid, a, c, 10); give(pid, c, b, 90); give(pid, c, a, 10); give(pid, b, a, 50); give(pid, b, c, 50);
+  vouch(b, a); vouch(c, a);
+  const before = compute();
+  assert.ok(before.get(b)!.earned > RULES.starter + 30);
+  run("INSERT INTO revoked (kind, target_id, report_id, created_at) VALUES ('split',?,1,?)", pid, now());
+  run("INSERT INTO revoked (kind, target_id, report_id, created_at) VALUES ('vouches',?,2,?)", b, now());
+  const S = compute();
+  for (const id of [a, b, c]) assert.ok(S.get(id)!.ledger.some((l) => l.why.includes("split reset to equal")));
+  assert.equal(S.get(b)!.ledger.find((l) => l.what.endsWith("shipped"))!.n, 30);
+  const vouchesTo = (id: number) => S.get(id)!.ledger.filter((l) => l.what === "Vouch from a teammate").length;
+  assert.equal(vouchesTo(a), 1, "only c's vouch is left");
+  assert.equal(S.get(b)!.ledger.find((l) => l.what === "Vouches removed")!.n, 0, "the explanation line moves nothing");
+});
+
+test("P6: the sign-off checklist feeds commission quality, dropped commissions count as unfinished, and hire-again stays private", async () => {
+  const { commissionQuality } = await import("../lib/skills");
+  const { hireAgainOf } = await import("../lib/commissions");
+  const { credibility } = await import("../lib/credibility");
+  assert.equal(commissionQuality(5), 1, "old sign-offs use the rating alone");
+  assert.equal(commissionQuality(5, 1, 1), 1);
+  assert.equal(commissionQuality(5, 0, 0), 0.5, "five stars cannot hide late, off-brief work");
+  assert.equal(commissionQuality(2, 0, 0), 0.2);
+  const base = { shipped: 1, left: 0, mates: 2, circle: false, ring: false, reviewsMatched: 0, reviewsTotal: 0, evidenceOk: 0, evidenceBad: 0, createdAt: 0, upheld: [] };
+  const fin = (x: object) => credibility({ ...base, ...x }, 1e10).finishRate;
+  assert.equal(fin({ commDone: 1, commDropped: 1 }), (2 + 2 * 0.7) / 5);
+  assert.ok(fin({ commDone: 1, commDropped: 1 }) < fin({ commDone: 1 }));
+  const rows = [1, 2].map((client) => ({ client_id: client, doer_id: 9, hire_again: 0 }));
+  assert.equal(hireAgainOf(rows, 9), null, "two clients' answers would give each one away");
+  assert.deepEqual(hireAgainOf([...rows, { client_id: 3, doer_id: 9, hire_again: 1 }], 9), { yes: 1, total: 3 });
+});
+
+test("P7: only independent rounds measure reviewer accuracy, and a spot check overrides the reviewers", async () => {
+  const { run, now, compute, user, project } = await setup();
+  const [x, y, breaker, z, w] = [user(1, 12), user(1, 12), user(1, 12), user(1, 12), user(1, 12)];
+  const log = (pid: number, who: number, verdict: number, outcome: number, decider: number, at: number) =>
+    run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at, decider) VALUES (?,?,?,?,?,?)", pid, who, verdict, outcome, at, decider);
+  const base = compute().get(x)!.cred.score;
+  // Two who agree decide the round themselves: no accuracy either way.
+  log(501, x, 100, 100, 0, 1); log(501, y, 100, 100, 1, 1);
+  assert.equal(compute().get(x)!.cred.score, base);
+  // A tie-break: the two first reviewers are judged, the one who broke the tie is not.
+  log(502, x, 100, 60, 0, 2); log(502, y, 60, 60, 0, 2); log(502, breaker, 60, 60, 1, 2);
+  let S = compute();
+  assert.ok(S.get(x)!.cred.score < base && S.get(y)!.cred.score > base);
+  assert.equal(S.get(breaker)!.cred.score, base);
+  // A spot check: the admin's verdict is the truth for both reviewers, and the pot follows it.
+  const pid = project("shipped", 60, [user(1, 12), user(1, 12)]);
+  log(pid, z, 100, 100, 0, 3); log(pid, w, 100, 100, 1, 3);
+  run("INSERT INTO audits (project_id, admin_id, verdict, old_pot, note, created_at) VALUES (?,?,60,100,'demo only',?)", pid, x, now());
+  S = compute();
+  assert.ok(S.get(z)!.cred.score < base && S.get(w)!.cred.score < base, "both were wrong about a demo they called live");
+  assert.ok(!S.get(z)!.ledger.some((l) => l.what === "Accurate reviews"), "no reward for a verdict the spot check overturned");
+});
+
+test("P8: commissions are rated one way only; there is no way for the doer to rate the client", async () => {
+  const { all } = await import("../lib/db");
+  const cols = all("PRAGMA table_info(commissions)").map((c) => c.name as string);
+  assert.ok(cols.includes("rating"));
+  assert.ok(!cols.some((c) => /client_rating|doer_rating|rating_by_doer/.test(c)));
+  const actions = fs.readFileSync(path.join(__dirname, "../app/actions.ts"), "utf8");
+  assert.ok(!/rateClient|rateTheClient/.test(actions));
 });

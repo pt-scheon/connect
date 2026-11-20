@@ -16,6 +16,7 @@ import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
 import { needsFromList } from "@/lib/relevance";
 import { alumUsed, giftBlock, pairBlock, type CommRow, type GiftRow } from "@/lib/commissions";
+import { auditable } from "@/lib/audits";
 import { mailReady, sendMail } from "@/lib/mail";
 import { remove as removeFile, save as saveFile, sniff, cleanName } from "@/lib/files";
 import { checkLive, liveUrl } from "@/lib/live";
@@ -522,8 +523,9 @@ export async function reviewProject(fd: FormData) {
     }
     const pot = outcome;
     // Keep each reviewer's verdict next to the outcome: this is how review accuracy is measured later.
+    // The reviewer who closed the round agrees with the outcome by definition, so that is noted too.
     for (const r of all("SELECT reviewer_id, verdict FROM reviews WHERE project_id=?", p!.id))
-      run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at) VALUES (?,?,?,?,?)", p!.id, r.reviewer_id, r.verdict, pot, now());
+      run("INSERT INTO review_log (project_id, reviewer_id, verdict, outcome, created_at, decider) VALUES (?,?,?,?,?,?)", p!.id, r.reviewer_id, r.verdict, pot, now(), r.reviewer_id === me.id ? 1 : 0);
     const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
     // Reviewer notes go on the timeline without names, so reviewers can be candid.
     for (const r of all("SELECT note, verdict FROM reviews WHERE project_id=? AND note<>''", p!.id))
@@ -960,7 +962,9 @@ export async function signOffCommission(fd: FormData) {
   const others = commRows(me.college_id).filter((x) => (x as Row).id !== c!.id);
   const block = pairBlock(others, me.id, c!.doer_id, c!.reward, now());
   if (block) fail(block + " Open a dispute so an admin can sort this one out.");
-  run("UPDATE commissions SET status='done', rating=?, rating_note=?, paid_credit=?, closed_at=? WHERE id=?", rating, s("note", 300), c!.reward, now(), c!.id);
+  const yes = (k: string) => (s(k) === "1" ? 1 : 0);
+  run("UPDATE commissions SET status='done', rating=?, rating_note=?, paid_credit=?, closed_at=?, on_time=?, matched_brief=?, hire_again=? WHERE id=?",
+    rating, s("note", 300), c!.reward, now(), yes("on_time"), yes("matched_brief"), yes("hire_again"), c!.id);
   run("UPDATE users SET resume=NULL WHERE id=?", c!.doer_id);
   notify(c!.doer_id, `“${c!.title}” was signed off. You earned ${c!.reward} credit.`, `/commissions/${c!.id}`);
   done(back, `Signed off. ${c!.reward} credit went to them.`);
@@ -997,7 +1001,7 @@ export async function resolveCommission(fd: FormData) {
   const paid = how === "pay" ? c!.reward : how === "split" ? Math.floor(c!.reward / 2) : 0;
   const fault = s("fault") === "client" ? c!.client_id : s("fault") === "doer" ? c!.doer_id : null;
   db.transaction(() => {
-    run("UPDATE commissions SET status=?, paid_credit=?, resolution=?, closed_at=? WHERE id=?", paid ? "done" : "refunded", paid, note, now(), c!.id);
+    run("UPDATE commissions SET status=?, paid_credit=?, resolution=?, closed_at=?, fault=? WHERE id=?", paid ? "done" : "refunded", paid, note, now(), s("fault") === "client" || s("fault") === "doer" ? s("fault") : "", c!.id);
     if (fault) run("INSERT INTO reports (by_id, kind, target_id, reason, open, result, reason_kind, created_at, college_id) VALUES (?,?,?,?,0,'upheld','dispute',?,?)",
       me.id, "user", fault, `Commission dispute: ${note}`, now(), me.college_id);
     for (const id of [c!.client_id, c!.doer_id]) if (id) notify(id, `An admin decided the dispute on “${c!.title}”: ${paid === c!.reward ? "paid in full" : paid ? "split" : "reward returned"}.`, `/commissions/${c!.id}`);
@@ -1062,6 +1066,10 @@ export async function closeReport(fd: FormData) {
   if (!r) fail("That report is already closed.");
   db.transaction(() => {
     run("UPDATE reports SET open=0, result=? WHERE id=?", result, r.id);
+    // Upholding can also take back what the cheating earned: the person's vouches, or a project's split.
+    const revoke = s("revoke");
+    if (result === "upheld" && ((revoke === "vouches" && r.kind === "user") || (revoke === "split" && r.kind === "project")))
+      run("INSERT INTO revoked (kind, target_id, report_id, created_at) VALUES (?,?,?,?)", revoke, r.target_id, r.id, now());
     // A commission that turns out to be coursework, or otherwise against the rules, is stopped: nobody is paid,
     // the client does not get the reward back, and it goes on the client's record.
     if (r.kind === "commission" && result === "upheld") {
@@ -1076,6 +1084,25 @@ export async function closeReport(fd: FormData) {
     }
   })();
   done(back, result === "upheld" ? "Report upheld." : "Report dismissed.");
+}
+
+/* An admin spot-checks a recently shipped project. Their verdict becomes the pot, and reviewer accuracy is judged
+   against it. A project found not to be real keeps its history but earns nothing. */
+export async function auditProject(fd: FormData) {
+  const { me, back, n, s, fail } = await ctx(fd, false);
+  if (!me.admin) fail("Admins only.");
+  const verdict = n("verdict"), note = s("note", 300);
+  if (![0, RULES.demo, RULES.live].includes(verdict) || note.length < 10) fail("Pick a verdict and say what you checked in a line.");
+  const p = auditable(me.college_id, me.id).find((x) => x.id === n("id"));
+  if (!p) fail(`That project cannot be spot-checked: it has to be shipped in the last ${RULES.review.auditDays} days, not checked yet, and not yours.`);
+  db.transaction(() => {
+    run("INSERT INTO audits (project_id, admin_id, verdict, old_pot, note, created_at) VALUES (?,?,?,?,?,?)", p!.id, me.id, verdict, p!.pot, note, now());
+    run("UPDATE projects SET pot=? WHERE id=?", verdict, p!.id);
+    logUpdate(p!.id, null, verdict === p!.pot ? `An admin spot-checked it and agreed with the reviewers (${verdict})` : `An admin spot-checked it and changed the pot from ${p!.pot} to ${verdict}: ${note}`);
+    if (verdict !== p!.pot) for (const m of all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id))
+      notify(m.user_id, `An admin spot-checked ${p!.name} and changed its pot from ${p!.pot} to ${verdict}`, `/projects/${p!.id}`);
+  })();
+  done(back, "Spot check recorded.");
 }
 
 /* ---------- updates, inbox, reports ---------- */

@@ -1,4 +1,5 @@
 import { RULES, MONTH } from "./rules";
+import { all } from "./db";
 
 /* The rules that stop commissions and gifts from being used to farm credit. Pure functions over plain rows,
    so every limit can be tested without a database. */
@@ -53,3 +54,14 @@ export function giftBlock(rows: GiftRow[], from: GiftParty, to: GiftParty, amoun
   if (got + amount > G.receiverMax) return `They can receive ${G.receiverMax} credit in ${G.windowDays} days and have had ${got}.`;
   return null;
 }
+
+/* "Would you hire them again?" is private to each client. Only the total is shown, and only once enough different
+   people have answered that no single answer can be worked out. */
+export function hireAgainOf(rows: { client_id: number; doer_id: number | null; hire_again: number | null }[], doer: number): { yes: number; total: number } | null {
+  const last = new Map<number, number>();
+  for (const r of rows) if (r.doer_id === doer && r.hire_again != null) last.set(r.client_id, r.hire_again ? 1 : 0);
+  if (last.size < RULES.comm.hireAgainMin) return null;
+  return { yes: [...last.values()].filter(Boolean).length, total: last.size };
+}
+export const hireAgain = (doer: number) =>
+  hireAgainOf(all("SELECT client_id, doer_id, hire_again FROM commissions WHERE doer_id=? AND status='done' AND hidden=0 ORDER BY closed_at", doer) as never, doer);

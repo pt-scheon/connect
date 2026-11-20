@@ -6,7 +6,7 @@ import { alumUsed, type CommRow } from "@/lib/commissions";
 import { label } from "@/lib/skills";
 import { now } from "@/lib/db";
 import * as A from "../actions";
-import { F, Who, inr } from "../ui";
+import { Av, F, inr } from "../ui";
 import { CommPill } from "./pill";
 
 export const metadata = { title: "Commissions" };
@@ -29,7 +29,8 @@ export default async function Commissions() {
       <span className="muted">{c.brief.length > 160 ? c.brief.slice(0, 157) + "..." : c.brief}</span>
       <span className="row">{skills.filter((k) => k.commission_id === c.id).map((k) => <span key={k.skill} className="chip">{label(k.skill)}</span>)}</span>
       <span className="row between small">
-        <span className="row nowrap"><Who u={users.get(c.client_id) ?? { id: c.client_id, name: "Someone" }} /></span>
+        {/* The whole card is a link, so the name inside it is plain text: a link inside a link breaks the page. */}
+        {(() => { const u = users.get(c.client_id) ?? { id: c.client_id, name: "Someone" }; return <span className="row nowrap"><Av u={u} /><span>{u.name}</span></span>; })()}
         <span className="mono">{c.reward} credit{c.money ? ` · ${inr(c.money)}` : ""} · due {new Date(c.deadline * 1000).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
       </span>
     </Link>

@@ -42,7 +42,8 @@ export const RULES = {
   // ---- credit (new) ----
   cutover: 0,               // unix time of the release; vouches made before it keep their old weight
   vouchesCounted: 5,        // only your 5 strongest vouches count
-  ringMin: 3, ringMax: 4,   // a closed vouch group of this size is a ring
+  ringMin: 3, ringMax: 6,   // a closed vouch group of this size is a ring (P5)
+  ringMinProjects: 3,       // must have shipped at least this many team projects inside the group (P0)
   ringFactor: 0.25,         // vouches inside a ring count a quarter
   reviewReward: 3,          // credit for a review that matched the final outcome
   reviewRewardCap: 15,      // per 30 days
@@ -64,7 +65,10 @@ export const RULES = {
   skill: {
     prior: 30,              // score for a skill with no evidence
     k: 2,                   // one full-weight project moves you a third of the way
-    halfLifeMonths: 18,
+    halfLifeMonths: 18,     // confidence half-life (P1)
+    scoreHalfLifeMonths: 36, // score half-life (P1)
+    repeatTick: 0.5,        // repeat tick factor (P3)
+    pairFactor: 0.5,        // unverified 2-person team factor (P3)
     tier: { A: 1, B: 0.5, C: 0 },
     qLive: 0.9, qDemo: 0.65,
     shareBoost: 0.25,       // quality moves with your share relative to an equal split
@@ -75,7 +79,7 @@ export const RULES = {
 
   // ---- relevance ----
   fit: {
-    confFloor: 0.5,         // unproven skills count half, never zero
+    missing: 0.5,           // a needed skill with no proof counts prior × 0.5 (P2)
     notOpen: 0.6,           // not marked "open to projects"
     freeLoad: 2,            // active projects before the load penalty starts
     loadStep: 0.2,          // lost per extra active project, down to loadMin
@@ -84,7 +88,7 @@ export const RULES = {
   },
 
   // ---- reviewers ----
-  review: { minDistance: 2, invited: 4, splitFlagAt: 2 /* × an equal share */ },
+  review: { minDistance: 2, invited: 4, splitFlagAt: 2 /* × an equal share */, auditDays: 60 /* admin spot-check window (P7) */ },
 
   // ---- commissions ----
   comm: {
@@ -96,6 +100,8 @@ export const RULES = {
     pairMaxCredit: 60,      // and total credit between them per window
     openMax: 3,             // commissions one person can have open at once
     alumAllowance: 40,      // credit an alum's commissions can award per 30 days (minted, not spent)
+    silentDays: 14,         // a client who does not answer a delivery for this long can be sent to the admins
+    hireAgainMin: 3,        // "hire again" total shown only after this many different clients (P6)
   },
 
   // ---- gifts (sending credit to someone) ----
@@ -143,12 +149,17 @@ For anyone who has never commissioned work, `earned` equals today's credit plus 
 `ringFactor` if both people are in the same ring. Only the `vouchesCounted` strongest count. Vouches made before
 `cutover` keep the old weight (`min(1, base/fullWeightAt)`), so nobody's credit drops on release day.
 
-**Rings.** Take the vouches that count (between people who shipped together). A ring is a group of 3 or 4
-people joined by those vouches where every member is vouched for by at least two others in the group, no vouch
-crosses the group's edge, and nobody in it has shipped with anyone outside it. Members are flagged on their
-profile, their new vouches for each other count a quarter, and each loses `ringPenalty` credibility. The moment
-one of them ships with someone new, the group stops being a ring. A pair is not a ring: two people vouching for
-each other is already halved. Today's circle flag (3+ shipped projects, 2 or fewer distinct teammates) stays.
+**Rings.** Take the vouches that count (between people who shipped together). A ring is a group of 3 to 6
+people (`ringMin` to `ringMax`) joined by those vouches where every member is vouched for by at least two others in
+the group, no vouch crosses the group's edge, nobody in it has shipped with anyone outside it, and the group has
+shipped at least `ringMinProjects` (3) team projects whose whole team is inside the group (P0, P5). Members are flagged
+on their profile, their new vouches for each other count a quarter (`ringFactor`), and each loses `ringPenalty` credibility.
+The moment one of them ships with someone new, the group stops being a ring. A pair is not a ring: two people vouching
+for each other is already halved. Today's circle flag (3+ shipped projects, 2 or fewer distinct teammates) stays.
+
+**Reversal of fraud upon upheld report.** When an admin upholds a report with result `'upheld'`, the fruit of fraud is
+revoked (P4): kind `'vouches'` revokes all vouches to or from the named user; kind `'split'` resets the project's split
+to equal shares. Reversals add an explanatory ledger line (`{ what: "Vouch revoked" | "Split reset", why: "...", n: 0 }`).
 
 ## 4. Credibility (0–100)
 
@@ -157,8 +168,8 @@ Five parts, each between 0 and 1. The first three use a smoothed rate so that on
 
 | Part | Weight | good / total |
 |---|---|---|
-| Finishing | 0.35 | shipped / (shipped + left + dropped as lead) |
-| Review accuracy | 0.25 | reviews that matched the outcome / reviews that have an outcome |
+| Finishing | 0.35 | (shipped + commDone) / (shipped + left + dropped as lead + commDone + commDropped) |
+| Review accuracy | 0.25 | reviews that matched the outcome / reviews that have an independent outcome |
 | Claims verified | 0.20 | evidence items verified / evidence items verified or rejected |
 | Account age | 0.10 | min(1, months since joining / 6) |
 | Breadth | 0.10 | min(1, distinct people shipped with / 5) |
@@ -177,8 +188,10 @@ Notes:
 
 - "Claims" here means evidence a person sent for checking (section 6). Lines left as "No proof" are not sent for
   checking and do not count either way, so writing or deleting them changes nothing.
-- A review "matched" if it equals the final verdict. The final verdict is an admin's verdict when there is one,
-  otherwise the middle verdict of the reviewers (section 7).
+- A review counts towards accuracy only if it has an independent outcome: an admin audit (`reviews.audit = 1`) or a
+  tie-break round (3+ verdicts or admin verdict; the tie-breaking reviewer's verdict matches the median and is excluded).
+  Uncontested 2-agree reviews pay spendable credit (`reviewReward`), but do not count towards credibility review accuracy (P7).
+- Abandoning an assigned commission, or having one cancelled due to inaction or lost in dispute, increments `commDropped` (P6).
 - A report is "upheld" when an admin closes it as upheld. Today reports are only opened and closed; a `result`
   column is added.
 - When credibility is used as a multiplier it is `max(floor, credibility/100)`. Admins acting as admins count 1.
@@ -204,24 +217,28 @@ A skill only counts for a person on a project when **someone else** says they us
 ### Formula
 
 ```
-score(skill) = 100 × (k × prior/100 + Σ wᵢ × qᵢ) / (k + Σ wᵢ)
-confidence   = Σ wᵢ / (Σ wᵢ + k)
-wᵢ = tier × recency × share × verifier
+score(skill) = 100 × (k × prior/100 + Σ w_scoreᵢ × qᵢ) / (k + Σ w_scoreᵢ)
+confidence   = Σ w_confᵢ / (k + Σ w_confᵢ)
+w_scoreᵢ = tier × recencyScore × share × verifier × repeatFactor × pairFactor
+w_confᵢ  = tier × recencyConf × share × verifier × repeatFactor × pairFactor
 ```
 
 | Term | Value |
 |---|---|
 | tier | A = 1, B = 0.5, C = 0 |
-| recency | 0.5 ^ (months since the evidence / 18) |
+| recencyScore | 0.5 ^ (months since the evidence / 36) |
+| recencyConf | 0.5 ^ (months since the evidence / 18) |
 | share | team project: min(1, your share / an equal share); solo project: `soloFactor`; everything else: 1 |
 | verifier | average credibility multiplier of the people who ticked the skill (teammates, or the reviewers of a solo project); the client for a commission; 1 for an admin; 0.7 for a code sent to a work email, which proves a mailbox at the company and nothing more |
+| repeatFactor | `RULES.skill.repeatTick` (0.5) when every person who ticked this skill on this project has ticked you for it before; else 1 |
+| pairFactor | `RULES.skill.pairFactor` (0.5) on a 2-person team where neither member has shipped with an outsider, verified outside evidence, or has an outside reviewer tick; else 1 |
 
 Quality `qᵢ`:
 
 | Evidence | q |
 |---|---|
 | Shipped project | (`qLive` or `qDemo`) × clamp(1 − shareBoost + shareBoost × your share / equal share, 0.6, 1.1), capped at 1 |
-| Commission | client rating / 5 |
+| Commission | 0.5 × ((on_time ? 0.5 : 0) + (matched_brief ? 0.5 : 0)) + 0.5 × (client rating / 5) |
 | Hackathon | 0.9 won, 0.75 finalist, 0.5 took part |
 | Internship | 0.7 |
 
@@ -230,9 +247,10 @@ this month. w = 1 × 1 × 1 × 0.8 = 0.8, q = 0.9. Score = 100 × (2×0.30 + 0.8
 ("low, based on 1 shipped project"). Three such projects: score 60, confidence 0.55. Nobody becomes an expert on
 one project.
 
-**Display.** Each skill shows the score, a confidence word (low / medium / high from `confLow`, `confHigh`) and
-the reason: "62 · medium · based on 3 shipped projects and 1 commission". Skills a person listed but has no
-evidence for show as "No proof" with no score. Scores are shown as 0–100, not as letter bands or percentiles.
+**Display.** Each skill shows the score, a confidence word (low / medium / high from `confLow`, `confHigh`),
+the reason: "62 · medium · based on 3 shipped projects and 1 commission", and when evidence was last confirmed:
+"last confirmed N months ago" from `last` (or "this month"). Skills a person listed but has no evidence for show
+as "No proof" with no score. Scores are shown as 0–100, not as letter bands or percentiles.
 
 ## 6. Evidence tiers
 
@@ -282,12 +300,18 @@ reviewer are judged by the same rule. An admin's verdict always wins.
 while teammates have some, or no milestone they ticked and no update they posted. A flag changes nothing by
 itself; an admin looks at it.
 
+**Admin spot checks.** Admins can spot-check a shipped project up to `auditDays` (60) days after shipping (P7).
+An admin spot check records an audit in `audits`, sets `reviews.audit = 1`, and if the pot changes (e.g. 100 to 60 or 0),
+the pot moves on read for all team members. Spent credit is not clawed back, but future balance is clamped at 0.
+Audits serve as ground truth for reviewer accuracy.
+
 ## 8. Relevance for a role or commission
 
 Roles and commissions list the skills they need, each with an importance of 1 to 3.
 
 ```
-skillFit = Σ importance × score/100 × (confFloor + (1 − confFloor) × confidence) / Σ importance
+cautious = prior + (score − prior) × confidence
+skillFit = Σ importance × (hasEvidence ? cautious/100 : (prior × fit.missing)/100) / Σ importance
 fit      = skillFit × finishRate × availability × (1 + teamBonus if they shipped with someone on the team)
 
 finishRate   = the smoothed finishing rate from credibility
@@ -296,7 +320,8 @@ availability = (1 if open to projects, else notOpen)
 ```
 
 Every suggestion carries its reason, built from the same records: "Fits: 2 reviewer-confirmed React projects,
-finished 5 of 5 joined, shipped BusPing with Riya".
+finished 5 of 5 joined, shipped BusPing with Riya". Ranking uses the cautious score (P2); a needed skill with
+no proof counts `prior × fit.missing` (0.5), replacing `confFloor`.
 
 People with **no** evidence for any needed skill are not ranked. If they listed a matching skill they appear in
 a separate row, "New here, no proof yet", in no particular order, so newcomers can still be found without typed
@@ -328,6 +353,18 @@ open → assigned → delivered → done
 - **No answer**: if the client does not respond within 14 days of delivery, the doer can send it to the admins.
 - **Disputes**: either side can open one with a reason. A college admin pays the doer, refunds the client, or
   splits the reward. A dispute an admin decides against someone counts as an upheld report for credibility.
+
+**Invariant: One-sided rating (P8).** Commission ratings are strictly one-sided: the client rates the doer.
+The doer does not rate the client back. This invariant eliminates feedback extortion and retaliatory ratings.
+If two-sided reviews are ever introduced in the future, they must be strictly double-blind with a synchronized 14-day reveal lock.
+
+**Sign-off checklist (P6).** Sign-off includes:
+1. `on_time` (delivered by deadline checkbox)
+2. `matched_brief` (matched brief checkbox)
+3. `hire_again` (private checkbox: "I would hire them again"). Private to matching; shown as a total ("Y of T clients would hire again") once the doer has completed commissions for `hireAgainMin` (3) different clients.
+4. `rating` (1 to 5 stars)
+
+An assigned commission abandoned by the doer, cancelled due to doer inaction, or decided against the doer in a dispute increments `commDropped` in credibility finishing rate.
 
 Guard rails:
 
@@ -369,6 +406,8 @@ commission_skills      (commission_id, skill, importance, PRIMARY KEY (commissio
 commission_apps        (id, commission_id, user_id, note, status, created_at, UNIQUE (commission_id, user_id))
 commission_milestones  (id, commission_id, title, done)
 gifts                  (id, college_id, from_id, to_id, amount, note, created_at)
+audits                 (id, project_id, admin_id, verdict, old_pot, note, created_at)
+revoked                (id, kind, target_id, report_id, created_at)
 ```
 
 New columns, added through `COLUMNS` in `lib/db.ts`:
@@ -377,6 +416,7 @@ New columns, added through `COLUMNS` in `lib/db.ts`:
 projects.live_url TEXT, projects.repo TEXT
 members.commits INTEGER
 reviews.created_at INTEGER, reviews.audit INTEGER DEFAULT 0     -- audit = an admin's verdict
+commissions.on_time INTEGER, commissions.matched_brief INTEGER, commissions.hire_again INTEGER
 reports.result TEXT DEFAULT ''                                  -- '', 'upheld', 'dismissed'
 reports.reason_kind TEXT DEFAULT ''                             -- '', 'coursework', ...
 users.github_id TEXT, users.github_login TEXT                   -- set only by GitHub sign-in

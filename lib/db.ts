@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS trusted_devices (id TEXT PRIMARY KEY, user_id INTEGER
 CREATE INDEX IF NOT EXISTS trusted_devices_user ON trusted_devices (user_id);
 -- For you: which projects someone opened or hid. Private to them; it orders their own board and nothing else.
 CREATE TABLE IF NOT EXISTS project_seen (user_id INTEGER NOT NULL, project_id INTEGER NOT NULL, views INTEGER DEFAULT 0, last_at INTEGER NOT NULL, hidden INTEGER DEFAULT 0, PRIMARY KEY (user_id, project_id));
+CREATE TABLE IF NOT EXISTS audits (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, admin_id INTEGER NOT NULL, verdict INTEGER NOT NULL, old_pot INTEGER, note TEXT, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS revoked (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, target_id INTEGER NOT NULL, report_id INTEGER, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS review_log (id INTEGER PRIMARY KEY, project_id INTEGER NOT NULL, reviewer_id INTEGER NOT NULL, verdict INTEGER, outcome INTEGER, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS project_skills (project_id INTEGER, skill TEXT, PRIMARY KEY (project_id, skill));
 CREATE TABLE IF NOT EXISTS member_skills (project_id INTEGER, user_id INTEGER, skill TEXT, by_id INTEGER, PRIMARY KEY (project_id, user_id, skill, by_id));
@@ -141,6 +143,12 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // Rating redesign: how a report ended ('', 'upheld', 'dismissed') and what kind it was.
   ["reports", "result", "TEXT DEFAULT ''"],
   ["reports", "reason_kind", "TEXT DEFAULT ''"],
+  // Spot checks and sign-off checklist. decider = 1 on the review that closed a round (it matches by definition).
+  ["review_log", "decider", "INTEGER"],
+  ["commissions", "on_time", "INTEGER"],
+  ["commissions", "matched_brief", "INTEGER"],
+  ["commissions", "hire_again", "INTEGER"],
+  ["commissions", "fault", "TEXT DEFAULT ''"],
   ["projects", "live_url", "TEXT DEFAULT ''"],
   // Settings: alerts from followed projects, whether people may call, who may start a chat, and a counter that signs out other devices.
   ["users", "follow_notes", "INTEGER DEFAULT 1"],

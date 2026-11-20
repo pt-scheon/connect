@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { all, get } from "@/lib/db";
 import { requireMember } from "@/lib/auth";
 import { splitFlags } from "@/lib/reviewers";
+import { auditable } from "@/lib/audits";
 import * as A from "../actions";
 import { F, Who } from "../ui";
 import { CollegeOverview } from "./overview";
@@ -25,6 +26,7 @@ export default async function Admin() {
   const hrefOf = (r: { kind: string; target_id: number }) => r.kind === "user" ? `/u/${r.target_id}` : r.kind === "commission" ? `/commissions/${r.target_id}` : `/projects/${r.target_id}`;
   const disputes = all("SELECT * FROM commissions WHERE status='disputed' AND college_id=? ORDER BY id DESC", cid);
   const evidence = all("SELECT e.*, u.name FROM evidence e JOIN users u ON u.id=e.user_id WHERE e.status='pending' AND e.college_id=? AND e.user_id<>? ORDER BY e.created_at", cid, me.id);
+  const toAudit = auditable(cid, me.id);
   const flags = splitFlags(cid);
   const nameOf = (id: number) => all("SELECT name FROM users WHERE id=?", id)[0]?.name ?? "Someone";
   const suspended = all("SELECT * FROM users WHERE suspended=1 AND deleted=0 AND college_id=?", cid);
@@ -100,6 +102,28 @@ export default async function Admin() {
             </div>
           ))}
         </div>
+        <div className="card" id="spot-checks">
+          <h2>Spot checks</h2>
+          <span className="small muted">Check 2 or 3 a month. Your verdict replaces the reviewers&apos; and decides who reviewed accurately.</span>
+          {toAudit.length === 0 && <span className="muted">No projects waiting for spot check.</span>}
+          {toAudit.map((p) => (
+            <div key={p.id} className="stack tight">
+              <span><Link href={`/projects/${p.id}`}>{p.name}</Link> <span className="small muted">· Pot {p.pot}</span></span>
+              <F action={A.auditProject} back="/admin" hidden={{ id: p.id }} className="stack tight">
+                <div className="row">
+                  <select name="verdict" id={`audit-verdict-${p.id}`} defaultValue="" required aria-label="Verdict">
+                    <option value="" disabled>Pick verdict</option>
+                    <option value="100">Live 100</option>
+                    <option value="60">Demo 60</option>
+                    <option value="0">Not real 0</option>
+                  </select>
+                  <input type="text" name="note" id={`audit-note-${p.id}`} placeholder="Note on what you verified (at least 10 chars)" minLength={10} maxLength={300} required aria-label="Audit note" />
+                  <button className="btn sm">Record verdict</button>
+                </div>
+              </F>
+            </div>
+          ))}
+        </div>
         <div className="card">
           <h2>Reports</h2>
           <span className="small muted">Uphold a report when it was right: it lowers that person&apos;s credibility for a while. Dismiss it when it was not.</span>
@@ -113,6 +137,16 @@ export default async function Admin() {
                   ? <F action={A.setSuspended} back="/admin" hidden={{ user: r.target_id, on: 1 }} confirm="Suspend this person?"><button className="btn danger sm">Suspend</button></F>
                   : <F action={A.setHidden} back="/admin" hidden={{ id: r.target_id, on: 1 }}><button className="btn danger sm">Hide project</button></F>}
                 <F action={A.closeReport} back="/admin" hidden={{ report: r.id, result: "upheld" }}><button className="btn ghost sm">Uphold</button></F>
+                {r.kind === "user" && (
+                  <F action={A.closeReport} back="/admin" hidden={{ report: r.id, result: "upheld", revoke: "vouches" }}>
+                    <button className="btn ghost sm">Uphold and remove their vouches</button>
+                  </F>
+                )}
+                {r.kind === "project" && (
+                  <F action={A.closeReport} back="/admin" hidden={{ report: r.id, result: "upheld", revoke: "split" }}>
+                    <button className="btn ghost sm">Uphold and reset the split to equal</button>
+                  </F>
+                )}
                 <F action={A.closeReport} back="/admin" hidden={{ report: r.id, result: "dismissed" }}><button className="btn ghost sm">Dismiss</button></F>
               </div>
             </div>

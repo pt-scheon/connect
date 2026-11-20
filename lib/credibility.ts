@@ -6,6 +6,7 @@ import { RULES, MONTH } from "./rules";
 
 export type CredInput = {
   shipped: number; left: number; // projects finished, and projects left or dropped as lead
+  commDone?: number; commDropped?: number; // commissions signed off, and ones an admin found they let down
   mates: number; // distinct people shipped with
   circle: boolean; ring: boolean;
   reviewsMatched: number; reviewsTotal: number; // reviews that have a final outcome
@@ -21,7 +22,8 @@ export const smoothed = (good: number, total: number, prior: number, k = RULES.c
 
 export function credibility(i: CredInput, t: number): Cred {
   const C = RULES.cred, W = C.weights;
-  const finish = smoothed(i.shipped, i.shipped + i.left, C.priorFinish);
+  const done = i.shipped + (i.commDone ?? 0), ended = done + i.left + (i.commDropped ?? 0);
+  const finish = smoothed(done, ended, C.priorFinish);
   const reviews = smoothed(i.reviewsMatched, i.reviewsTotal, C.priorReviews);
   const claims = smoothed(i.evidenceOk, i.evidenceOk + i.evidenceBad, C.priorClaims);
   const months = Math.max(0, t - i.createdAt) / MONTH;
@@ -29,7 +31,7 @@ export function credibility(i: CredInput, t: number): Cred {
   const breadth = Math.min(1, i.mates / C.breadthFullAt);
   const pts = (w: number, v: number) => Math.round(100 * w * v);
   const lines: CredLine[] = [
-    { what: "Finishing what they join", why: i.shipped + i.left ? `Finished ${i.shipped} of ${i.shipped + i.left}` : "Nothing finished or left yet", n: pts(W.finish, finish) },
+    { what: "Finishing what they join", why: ended ? `Finished ${done} of ${ended}${i.commDone || i.commDropped ? ", counting commissions" : ""}` : "Nothing finished or left yet", n: pts(W.finish, finish) },
     { what: "Accurate reviews", why: i.reviewsTotal ? `${i.reviewsMatched} of ${i.reviewsTotal} reviews matched the final outcome` : "No reviews yet", n: pts(W.reviews, reviews) },
     { what: "Evidence that checked out", why: i.evidenceOk + i.evidenceBad ? `${i.evidenceOk} of ${i.evidenceOk + i.evidenceBad} items sent for checking were verified` : "Nothing sent for checking yet", n: pts(W.claims, claims) },
     { what: "Time on Connect", why: months >= C.ageFullMonths ? `Over ${C.ageFullMonths} months` : `${Math.floor(months)} of ${C.ageFullMonths} months`, n: pts(W.age, age) },
@@ -46,10 +48,12 @@ export function credibility(i: CredInput, t: number): Cred {
 /* Credibility as a multiplier on someone's signature. */
 export const credWeight = (score: number | undefined) => Math.max(RULES.cred.floor, (score ?? 0) / 100);
 
-/* Vouch rings: a group of 3 or 4 people who all vouch inside the group, each backed by at least two of the others,
-   with no vouch crossing the group's edge and no one having shipped with anyone outside it.
+/* Vouch rings: a group of 3 to 6 people who all vouch inside the group, each backed by at least two of the others,
+   with no vouch crossing the group's edge and no one having shipped with anyone outside it, that has shipped
+   at least `ringMinProjects` team projects with nobody from outside on them. A team that shipped once and vouches
+   for each other is just a team; the same closed group shipping again and again is the pattern.
    The moment one of them ships with someone new, the group stops being a ring. */
-export function rings(vouches: { from_id: number; to_id: number }[], shippedWith: Map<number, Set<number>>): Set<number> {
+export function rings(vouches: { from_id: number; to_id: number }[], shippedWith: Map<number, Set<number>>, teams: number[][]): Set<number> {
   const near = new Map<number, Set<number>>(), into = new Map<number, Set<number>>();
   const link = (m: Map<number, Set<number>>, a: number, b: number) => { if (!m.has(a)) m.set(a, new Set()); m.get(a)!.add(b); };
   for (const v of vouches) { link(near, v.from_id, v.to_id); link(near, v.to_id, v.from_id); link(into, v.to_id, v.from_id); }
@@ -61,7 +65,8 @@ export function rings(vouches: { from_id: number; to_id: number }[], shippedWith
     for (const g of group) seen.add(g);
     if (group.size < RULES.ringMin || group.size > RULES.ringMax) continue;
     const closed = [...group].every((g) => (into.get(g)?.size ?? 0) >= 2 && [...(shippedWith.get(g) ?? [])].every((o) => group.has(o)));
-    if (closed) for (const g of group) out.add(g);
+    const inside = teams.filter((t) => t.length > 1 && t.every((m) => group.has(m))).length;
+    if (closed && inside >= RULES.ringMinProjects) for (const g of group) out.add(g);
   }
   return out;
 }
