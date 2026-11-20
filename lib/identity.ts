@@ -3,22 +3,19 @@ import { get, run, now, type Row } from "./db";
 
 /* How someone appears on Connect: their own photo, or anonymous.
    Anonymous mode swaps the name and photo everyone sees (users.name and users.picture) for an alias like
-   "flying-lion147" and a GitHub-style pattern, and keeps the real ones in real_name and real_picture. Because every
+   "Anon 48213097" and a GitHub-style pattern, and keeps the real ones in real_name and real_picture. Because every
    page already shows users.name and users.picture, the alias appears everywhere at once. The person's college admins
    can still see who it is (the profile page shows them), so anonymity cannot be used to harass people or fake reviews. */
 
-const ADJECTIVES = ["flying", "silent", "brave", "clever", "swift", "quiet", "bright", "calm", "bold", "lucky", "sunny", "misty", "wild", "gentle",
-  "fierce", "nimble", "cosmic", "electric", "golden", "hidden", "mighty", "rapid", "shy", "stormy", "witty", "frosty", "lunar", "solar", "royal", "curious"];
-const ANIMALS = ["lion", "falcon", "otter", "panda", "tiger", "wolf", "eagle", "fox", "koala", "lynx", "orca", "owl", "raven", "shark", "yak", "zebra",
-  "bison", "cobra", "dolphin", "gecko", "heron", "ibis", "jaguar", "lemur", "moose", "panther", "rhino", "sparrow", "turtle", "whale", "peacock", "mongoose"];
-
-/* "flying-lion147": two words and three digits, and not already someone's name or alias. */
+/* "Anon 48213097": like 4chan, Anon and a random eight-digit number, never already someone's name or alias. */
 export function newAlias(rand: (n: number) => number = (n) => crypto.randomInt(n)): string {
   for (let i = 0; i < 50; i++) {
-    const a = `${ADJECTIVES[rand(ADJECTIVES.length)]}-${ANIMALS[rand(ANIMALS.length)]}${100 + rand(900)}`;
+    let digits = String(1 + rand(9));
+    for (let k = 0; k < 7; k++) digits += String(rand(10));
+    const a = `Anon ${digits}`;
     if (!get("SELECT 1 FROM users WHERE alias=? OR name=?", a, a)) return a;
   }
-  return `anon-${crypto.randomBytes(4).toString("hex")}`;
+  return `Anon ${100000000 + crypto.randomInt(900000000)}`;
 }
 
 const hash = (s: string) => crypto.createHash("sha256").update(s).digest();

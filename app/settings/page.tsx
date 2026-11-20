@@ -54,7 +54,7 @@ export default async function Settings() {
 
         <span className="label set-gap" id="anonymous">Anonymous mode</span>
         <span className="small muted">
-          Appear as a random alias like <b>flying-lion147</b> with a coloured pattern instead of your name and photo, everywhere on Connect.
+          Appear as <b>Anon</b> and a random number, like <b>Anon 48213097</b>, with a coloured pattern instead of your name and photo, everywhere on Connect.
           Your links and resume are hidden, people never see when you read their messages, and in calls your camera stays off and your
           voice is disguised on your own device. Your projects, skills and credit still count. Your college&rsquo;s admins can still see who
           you are, so the rules apply the same.

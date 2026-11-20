@@ -14,21 +14,20 @@ async function setup() {
   return { run, get };
 }
 
-test("aliases look like flying-lion147 and never repeat someone's name or alias", async () => {
+test("aliases look like Anon 48213097 and never repeat someone's name or alias", async () => {
   const { run } = await setup();
   const { newAlias } = await import("../lib/identity");
-  for (let i = 0; i < 30; i++) assert.match(newAlias(), /^[a-z]+-[a-z]+\d{3}$/);
-  // Force the first pick to collide with a taken alias: the next pick is used instead.
-  run("UPDATE users SET alias='flying-lion147' WHERE id=1");
+  for (let i = 0; i < 30; i++) assert.match(newAlias(), /^Anon [1-9]\d{7}$/);
+  // The first pick is already taken, so the next one is used instead.
+  run("UPDATE users SET alias='Anon 10000000' WHERE id=1");
   let calls = 0;
-  const picks = [0, 0, 47, 1, 1, 48];
-  const alias = newAlias((n) => (calls++ < picks.length ? picks[calls - 1] % n : 0));
-  assert.notEqual(alias, "flying-lion147");
+  const alias = newAlias((n) => (calls++ < 8 ? 0 : 5 % n));
+  assert.equal(alias, "Anon 65555555");
 });
 
 test("the pattern is the same for the same alias, mirrored like GitHub's, and changes with the alias", async () => {
   const { identicon } = await import("../lib/identity");
-  const a = identicon("flying-lion147"), b = identicon("flying-lion147"), c = identicon("silent-otter402");
+  const a = identicon("Anon 48213097"), b = identicon("Anon 48213097"), c = identicon("Anon 77120394");
   assert.equal(a, b);
   assert.notEqual(a, c);
   const cells = [...a.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="1"/g)].map((m) => [Number(m[1]) - 0.5, Number(m[2]) - 0.5]);
