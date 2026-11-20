@@ -21,6 +21,12 @@ export default async function NewProject() {
           <small>Separated by commas. After it ships, teammates tick who used which. You can change this until review.</small></label>
         <label className="field"><span>Roles you need</span><textarea name="roles" id="roles" placeholder={"React frontend - has a Figma file ready\nRFID hardware"} />
           <small>One per line. Add a note after “ - ”. Leave empty if the team is full.</small></label>
+        <fieldset className="choice">
+          <legend className="label">Who can see it</legend>
+          <label><input type="radio" name="visibility" value="public" defaultChecked /><span>Everyone at my college</span></label>
+          <label><input type="radio" name="visibility" value="private" /><span>Only the team, for now</span></label>
+        </fieldset>
+        <small className="muted">Private projects stay off the board until you make them public. You can change this any time before review, and it goes public when you send it for review.</small>
         <div className="note">If you drop this project before it ships, you lose 10 credit and it stays on your profile.</div>
         <button className="btn">Post project</button>
       </F>

@@ -28,12 +28,15 @@ export default async function Project({ params }: { params: Promise<{ id: string
   const p = get("SELECT * FROM projects WHERE id=? AND college_id=?", id, me.college_id);
   if (!p) notFound();
   const back = `/projects/${id}`;
+  const college = String(get("SELECT name FROM colleges WHERE id=?", me.college_id)?.name ?? "your community");
   const S = standings();
 
   const team = all("SELECT m.role mrole, m.did, m.status mstatus, m.stake, u.* FROM members m JOIN users u ON u.id=m.user_id WHERE m.project_id=? ORDER BY m.rowid", id);
   const active = team.filter((t) => t.mstatus === "active");
   const mine = team.find((t) => t.id === me.id);
-  if (p.hidden && !mine && !me.admin) notFound();
+  // Hidden by an admin (1) or private to the team (2): only the team and admins, plus anyone the lead invited to a private one.
+  const iWasInvited = p.hidden === 2 && !!get("SELECT 1 FROM messages WHERE kind='invite' AND project_id=? AND to_id=?", id, me.id);
+  if (p.hidden && !mine && !me.admin && !iWasInvited) notFound();
   if (!mine) noteView(me.id, id); // teaches this person's For you order; private to them
   const comments = all("SELECT c.*, u.name, u.picture, u.id uid FROM comments c JOIN users u ON u.id=c.user_id WHERE c.project_id=? ORDER BY c.created_at, c.id", id);
   const updates = all("SELECT up.*, u.name uname FROM updates up LEFT JOIN users u ON u.id=up.user_id WHERE up.project_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 30", id);
@@ -140,7 +143,21 @@ export default async function Project({ params }: { params: Promise<{ id: string
 
       <div className="cols">
         <div className="stack">
-          {p.hidden ? <div className="alert">Hidden by an admin. Only the team and admins can see this project.</div> : null}
+          {p.hidden === 1 ? <div className="alert">Hidden by an admin. Only the team and admins can see this project.</div> : null}
+          {p.hidden === 2 && !lead && <div className="note">Private. Only the team{iWasInvited ? ", people the lead invited" : ""} and your community&rsquo;s admins can see this project.</div>}
+          {lead && open && p.hidden !== 1 && (
+            <F action={A.setVisibility} back={back} hidden={{ id }} className="card stack tight vis-card">
+              <fieldset className="choice">
+                <legend className="label">Who can see this project</legend>
+                <label><input type="radio" name="visibility" value="public" defaultChecked={p.hidden !== 2} /><span>Everyone at {college}</span></label>
+                <label><input type="radio" name="visibility" value="private" defaultChecked={p.hidden === 2} /><span>Only the team</span></label>
+              </fieldset>
+              <span className="small muted">{p.hidden === 2
+                ? "Private: it is not on the board, in search or on anyone's profile. People you invite to a role can still open it. It becomes public when you send it for review, so reviewers can see it."
+                : "Public: it is on your community's board, and anyone there can follow it or ask to join."}</span>
+              <div><button className="btn ghost sm">Save</button></div>
+            </F>
+          )}
           {p.status === "dropped" && <div className="alert">Dropped by its lead before it shipped. This stays on the lead&apos;s profile.</div>}
 
           {p.status === "review" && (

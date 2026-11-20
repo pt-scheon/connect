@@ -12,10 +12,10 @@ export function CollegeOverview({ cid }: { cid: number }) {
   const onProject = n(
     `SELECT COUNT(DISTINCT m.user_id) n FROM members m JOIN projects p ON p.id=m.project_id JOIN users u ON u.id=m.user_id
      WHERE p.college_id=? AND m.status='active' AND p.status IN ('recruiting','building','review') AND u.role='student' AND u.deleted=0`, cid);
-  const byStatus = new Map(all("SELECT status, COUNT(*) n FROM projects WHERE college_id=? AND hidden=0 GROUP BY status", cid).map((r) => [r.status as string, r.n as number]));
+  const byStatus = new Map(all("SELECT status, COUNT(*) n FROM projects WHERE college_id=? AND hidden<>1 GROUP BY status", cid).map((r) => [r.status as string, r.n as number]));
   const open = (byStatus.get("recruiting") ?? 0) + (byStatus.get("building") ?? 0);
   const shipped90 = n("SELECT COUNT(*) n FROM projects WHERE college_id=? AND status='shipped' AND shipped_at>?", cid, t - 90 * DAY);
-  const openRoles = n("SELECT COUNT(*) n FROM roles r JOIN projects p ON p.id=r.project_id WHERE p.college_id=? AND r.open=1 AND p.hidden=0 AND p.status IN ('recruiting','building')", cid);
+  const openRoles = n("SELECT COUNT(*) n FROM roles r JOIN projects p ON p.id=r.project_id WHERE p.college_id=? AND r.open=1 AND p.hidden<>1 AND p.status IN ('recruiting','building')", cid);
 
   // Skills students list about themselves: what the college has on paper, before anyone confirms it.
   const tally = new Map<string, { label: string; n: number }>();

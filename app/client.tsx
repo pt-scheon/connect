@@ -165,7 +165,8 @@ export function Board({ items, canReview, initial, forYou = [] }: { items: Board
       ))}
       {f !== "foryou" && list.map((p) => (
         <Link key={p.id} className="card lift" href={`/projects/${p.id}`}>
-          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} /><h2>{p.name}</h2></span><Pill status={p.status} /></span>
+          <span className="row between"><span className="row nowrap"><PIcon id={p.id} name={p.name} /><h2>{p.name}</h2></span>
+            <span className="row nowrap">{p.hidden === 2 ? <span className="pill plain">Private</span> : p.hidden === 1 ? <span className="pill bad">Hidden</span> : null}<Pill status={p.status} /></span></span>
           <span className="muted">{p.pitch}</span>
           <span className="row">
             <span className="avs">{p.team.map((u) => <Av key={u.id} u={u} />)}</span>

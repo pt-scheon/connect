@@ -29,9 +29,9 @@ const METRICS: Metric[] = [
   { id: "visits", label: "Visits", color: "orange", kind: "count", about: "Times signed-in people opened Connect: a new tab, the installed app, a link or a reload. Moving between pages inside Connect is not counted again. Counted from the day analytics started.",
     sql: `SELECT a.day d, SUM(a.hits) n FROM activity a JOIN users u ON u.id=a.user_id WHERE 1 {C} GROUP BY d` },
   { id: "projects", label: "Projects started", color: "purple", kind: "count", about: "New projects created.",
-    sql: `SELECT ${D("p.created_at")} d, COUNT(*) n FROM projects p WHERE p.hidden=0 {P} GROUP BY d` },
+    sql: `SELECT ${D("p.created_at")} d, COUNT(*) n FROM projects p WHERE p.hidden<>1 {P} GROUP BY d` },
   { id: "shipped", label: "Projects shipped", color: "green", kind: "count", about: "Projects that passed review and shipped.",
-    sql: `SELECT ${D("p.shipped_at")} d, COUNT(*) n FROM projects p WHERE p.shipped_at IS NOT NULL AND p.hidden=0 {P} GROUP BY d` },
+    sql: `SELECT ${D("p.shipped_at")} d, COUNT(*) n FROM projects p WHERE p.shipped_at IS NOT NULL AND p.hidden<>1 {P} GROUP BY d` },
   { id: "messages", label: "Messages", color: "blue", kind: "count", about: "Chat messages sent.",
     sql: `SELECT ${D("m.created_at")} d, COUNT(*) n FROM messages m JOIN users u ON u.id=m.from_id WHERE 1 {C} GROUP BY d` },
   { id: "calls", label: "Calls", color: "pink", kind: "count", about: "Voice and video calls started.",
@@ -147,7 +147,7 @@ export function analytics(cid: number | null, range: string) {
   const calls = get(filter(`SELECT COUNT(*) n, SUM(v.answered_at IS NOT NULL) answered, SUM(v.video) video,
       AVG(CASE WHEN v.answered_at IS NOT NULL AND v.ended_at IS NOT NULL THEN v.ended_at-v.answered_at END) secs
       FROM voice_calls v JOIN users u ON u.id=v.caller_id WHERE v.created_at>=${start * DAY - IST} {C}`), ...(cid ? [cid] : []));
-  const statuses = rows(`SELECT p.status d, COUNT(*) n FROM projects p WHERE p.hidden=0 {P} GROUP BY p.status`) as unknown as { d: string; n: number }[];
+  const statuses = rows(`SELECT p.status d, COUNT(*) n FROM projects p WHERE p.hidden<>1 {P} GROUP BY p.status`) as unknown as { d: string; n: number }[];
   const roles = rows(`SELECT u.role d, COUNT(*) n FROM users u WHERE u.onboarded=1 AND u.deleted=0 {C} GROUP BY u.role`) as unknown as { d: string; n: number }[];
   const verified = one(`SELECT COUNT(*) n FROM users u WHERE u.onboarded=1 AND u.deleted=0 AND u.verified=1 {C}`);
   const devices = new Map<string, number>();
@@ -163,7 +163,7 @@ export function analytics(cid: number | null, range: string) {
     ) x JOIN users u ON u.id=x.uid WHERE x.t>=${start * DAY - IST} {C} GROUP BY d`)) hours[h.d] = h.n;
   const colleges = cid ? [] : all(`SELECT c.id, c.name,
       (SELECT COUNT(*) FROM users u WHERE u.college_id=c.id AND u.onboarded=1 AND u.deleted=0) members,
-      (SELECT COUNT(*) FROM projects p WHERE p.college_id=c.id AND p.hidden=0) projects,
+      (SELECT COUNT(*) FROM projects p WHERE p.college_id=c.id AND p.hidden<>1) projects,
       (SELECT COUNT(*) FROM projects p WHERE p.college_id=c.id AND p.status='shipped' AND p.hidden=0) shipped
       FROM colleges c WHERE c.status='active' ORDER BY members DESC, c.name LIMIT 50`).map((c) => {
     const ids = new Set(all("SELECT id FROM users WHERE college_id=?", c.id).map((u) => u.id as number));

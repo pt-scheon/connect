@@ -6,7 +6,7 @@ export type Tie = { project: string; shipped: boolean };
 export function ties(): Map<number, Map<number, Tie[]>> {
   const rows = all(
     `SELECT m.user_id, m.project_id, p.name, p.status FROM members m JOIN projects p ON p.id=m.project_id
-     WHERE m.status='active' AND p.status<>'dropped'`);
+     WHERE m.status='active' AND p.status<>'dropped' AND p.hidden<>2`); // a private project's team stays private
   const byProject = new Map<number, Row[]>();
   for (const r of rows) byProject.set(r.project_id, [...(byProject.get(r.project_id) ?? []), r]);
   const T = new Map<number, Map<number, Tie[]>>();

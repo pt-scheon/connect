@@ -249,9 +249,11 @@ export async function createProject(fd: FormData) {
   if (me.role !== "student") fail("Only members can start projects.");
   const name = s("name", 60), pitch = s("pitch"), ms = lines(s("milestones", 1000)), roles = lines(s("roles", 1000));
   if (!name || !pitch || !ms.length) fail("Give it a name, one line on what it does, and at least one milestone.");
+  // hidden: 0 shows it to the whole community, 2 keeps it to the team (1 is an admin hiding it).
+  const priv = s("visibility") === "private";
   const id = db.transaction(() => {
-    const pid = Number(run("INSERT INTO projects (name, pitch, status, lead_id, college_id, created_at) VALUES (?,?,?,?,?,?)",
-      name, pitch, roles.length ? "recruiting" : "building", me.id, me.college_id, now()).lastInsertRowid);
+    const pid = Number(run("INSERT INTO projects (name, pitch, status, lead_id, college_id, created_at, hidden) VALUES (?,?,?,?,?,?,?)",
+      name, pitch, roles.length ? "recruiting" : "building", me.id, me.college_id, now(), priv ? 2 : 0).lastInsertRowid);
     run("INSERT INTO members (project_id, user_id, role) VALUES (?,?,?)", pid, me.id, s("myrole", 60) || "Lead");
     for (const m of ms) run("INSERT INTO milestones (project_id, title) VALUES (?,?)", pid, m.slice(0, 120));
     for (const k of parseSkills(s("skills", 300))) run("INSERT OR IGNORE INTO project_skills (project_id, skill) VALUES (?,?)", pid, k);
@@ -262,7 +264,18 @@ export async function createProject(fd: FormData) {
     logUpdate(pid, me.id, `${me.name} posted the project`);
     return pid;
   })();
-  done(`/projects/${id}`, "Project posted.");
+  done(`/projects/${id}`, priv ? "Project created. It is private: only your team can see it until you make it public." : "Project posted.");
+}
+/* The lead decides who sees an open project: everyone in the community, or only the team. An admin's hiding wins. */
+export async function setVisibility(fd: FormData) {
+  const { me, back, s, n, fail } = await ctx(fd);
+  const p = project(n("id"), me);
+  if (!p || p.lead_id !== me.id || !open(p)) fail("Only the lead can change who sees an open project.");
+  if (p!.hidden === 1) fail("An admin has hidden this project, so only they can show it again.");
+  const priv = s("visibility") === "private";
+  run("UPDATE projects SET hidden=? WHERE id=?", priv ? 2 : 0, p!.id);
+  if (!priv && p!.hidden === 2) logUpdate(p!.id, me.id, `${me.name} made the project public`);
+  done(back, priv ? "Private. Only your team and your community's admins can see it now." : "Public. Everyone in your community can find it now.");
 }
 export async function editProject(fd: FormData) {
   const { me, back, s, n, fail } = await ctx(fd);
@@ -457,7 +470,8 @@ export async function submitForReview(fd: FormData) {
   db.transaction(() => {
     run("DELETE FROM reviews WHERE project_id=?", p!.id);
     run("DELETE FROM review_invites WHERE project_id=?", p!.id);
-    run("UPDATE projects SET status='review', invited_at=? WHERE id=?", now(), p!.id);
+    // Outside reviewers have to see it, and credit has to be checkable, so a private project goes public at review.
+    run("UPDATE projects SET status='review', invited_at=?, hidden=CASE WHEN hidden=2 THEN 0 ELSE hidden END WHERE id=?", now(), p!.id);
     logUpdate(p!.id, me.id, "Sent for review");
     for (const id of picked) {
       run("INSERT INTO review_invites (project_id, reviewer_id, created_at) VALUES (?,?,?)", p!.id, id, now());
@@ -829,6 +843,7 @@ export async function applyToCall(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd);
   const c = get("SELECT * FROM calls WHERE id=? AND open=1 AND college_id=?", n("call"), me.college_id), p = project(n("id"), me);
   if (!c || !p || p.lead_id !== me.id || p.status === "dropped") fail("Only the lead of a live project can apply to an open call.");
+  if (p!.hidden === 2) fail("Make the project public first: alumni need to see what they would fund.");
   const S = compute();
   const team = all("SELECT user_id FROM members WHERE project_id=? AND status='active'", p!.id).map((r) => r.user_id as number);
   const credit = team.reduce((a, id) => a + (S.get(id)?.earned ?? 0), 0);
@@ -1095,7 +1110,10 @@ export async function setSuspended(fd: FormData) {
 export async function setHidden(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
-  if (!run("UPDATE projects SET hidden=? WHERE id=? AND college_id=?", n("on") ? 1 : 0, n("id"), me.college_id).changes) fail("That project is not at your college.");
+  // Showing it again only undoes an admin's hiding; a project its team made private stays private.
+  const ok = n("on") ? run("UPDATE projects SET hidden=1 WHERE id=? AND college_id=?", n("id"), me.college_id).changes
+    : run("UPDATE projects SET hidden=0 WHERE id=? AND college_id=? AND hidden=1", n("id"), me.college_id).changes;
+  if (!ok) fail("That project is not at your college, or it is not hidden.");
   done(back, n("on") ? "Hidden from everyone except its team and admins." : "Visible again.");
 }
 export async function closeReport(fd: FormData) {
@@ -1180,7 +1198,7 @@ export async function report(fd: FormData) {
 export async function postComment(fd: FormData) {
   const { me, back, n, s, fail } = await ctx(fd);
   const p = project(n("id"), me);
-  if (!p || p.status === "dropped" || p.hidden) fail("You can't comment on this project.");
+  if (!p || p.status === "dropped" || p.hidden === 1 || (p.hidden === 2 && !isActive(p.id, me.id))) fail("You can't comment on this project.");
   const text = s("text", 500);
   if (text.length < 2) fail("Write something first.");
   if (!allow(`comment:${me.id}`, 10, 600)) fail("You are posting a lot. Wait a few minutes.");
