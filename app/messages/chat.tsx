@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { loadChat, sendMessage, shareProject, type Msg } from "../chat-actions";
 import { ShareFile, VoiceNote, VoiceRecorder } from "./media";
+import { AVATAR } from "../bits";
 
 type Person = { id: number; name: string; picture: string | null };
 
@@ -76,7 +77,7 @@ function Face({ u, size = 36 }: { u: Person; size?: number }) {
   return u.picture
     // eslint-disable-next-line @next/next/no-img-element
     ? <img className="face" src={u.picture} alt="" width={size} height={size} referrerPolicy="no-referrer" />
-    : <span className="face" style={{ width: size, height: size, background: `hsl(${(u.id * 67) % 360} 55% 42%)` }}>{initials(u.name)}</span>;
+    : <span className="face" style={{ width: size, height: size, background: AVATAR[Math.abs(Number(u.id) || 0) % AVATAR.length] }}>{initials(u.name)}</span>;
 }
 const time = (t: number) => new Date(t * 1000).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
 function day(t: number) {
@@ -227,7 +228,7 @@ export function Chat({ other, initial, initialSeen, canSend, reason, projects = 
         <Link href="/messages" className="chat-back" aria-label="All conversations">←</Link>
         <Link href={`/u/${other.id}`} className="row nowrap chat-who">
           <Face u={other} size={40} />
-          <span className="stack" style={{ gap: 0 }}><b>{other.name}</b>{other.branch && <span className="small muted">{other.branch}</span>}</span>
+          <span className="stack" style={{ gap: 0, minWidth: 0 }}><b className="ellipsis">{other.name}</b>{other.branch && <span className="small muted">{other.branch}</span>}</span>
         </Link>
         {callButtons && <span className="chat-calls">{callButtons}</span>}
       </header>

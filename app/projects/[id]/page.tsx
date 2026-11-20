@@ -443,9 +443,9 @@ export default async function Project({ params }: { params: Promise<{ id: string
               <span className="label">Alumni funding</span>
               <div className="stat"><b>{inr(grant.amount)}</b><span className="small muted">from <Link href={`/u/${grant.alum_id}`}>{grant.alum_name}</Link>, class of {grant.grad_year}</span></div>
               {parts.map((x) => (
-                <div key={x.id} className="row between small">
+                <div key={x.id} className="part-row small">
                   <span>{x.title}</span>
-                  <span className="mono">{inr(x.amount)} <span className={`pill ${x.paid ? "ok" : "warn"}`}>{x.paid ? "Paid" : "Held"}</span></span>
+                  <span className="mono nowrap">{inr(x.amount)} <span className={`pill ${x.paid ? "ok" : "warn"}`}>{x.paid ? "Paid" : "Held"}</span></span>
                 </div>
               ))}
             </div>
