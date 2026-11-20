@@ -6,6 +6,7 @@ import { EMPTY } from "@/lib/credit";
 import { CLUB, isLead, manages, seesClub } from "@/lib/clubs";
 import * as A from "../../actions";
 import { F, Pill, Who } from "../../ui";
+import { DeleteClub } from "./delete-club";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const me = await currentUser();
@@ -186,16 +187,12 @@ export default async function Club({ params }: { params: Promise<{ id: string }>
               </span>
             </F>
           )}
+          {lead && <DeleteClub club={id} name={c.name} back={back} action={A.deleteClub} />}
         </div>
       )}
 
-      {lead && c.status !== "declined" && (
-        <F action={A.deleteClub} back={back} hidden={{ club: id }} className="card stack">
-          <span className="label">Delete the club</span>
-          <p className="small muted">Removes the club, its roster and its plans. Members are told. Projects and credit are not touched. This cannot be undone.</p>
-          <label className="field"><span>Type the club&rsquo;s name to confirm</span><input type="text" name="confirm" id="club-delete-confirm" autoComplete="off" required /></label>
-          <div><button className="btn danger">Delete {c.name}</button></div>
-        </F>
+      {lead && c.status === "pending" && (
+        <div className="card"><DeleteClub club={id} name={c.name} back={back} action={A.deleteClub} /></div>
       )}
 
       {projects.length > 0 && (

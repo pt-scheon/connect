@@ -840,3 +840,24 @@ h1,h2,h3{overflow-wrap:anywhere}
 .club-role input[type=text]{flex:0 1 150px;width:auto;padding:7px 10px}
 .club-role label{gap:6px;align-items:center;color:var(--muted);white-space:nowrap;flex:none}
 .club-ask{padding:12px 0;border-top:1px solid var(--line)}
+
+/* Delete a club: a quiet line in its settings opens a sheet. On a phone it slides up from the bottom; on a
+   computer it is a centred card that rises in. The page behind dims. */
+.danger-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px;margin-top:4px}
+.danger-link{color:var(--bad);font-weight:600;min-height:32px}
+.danger-link:hover{text-decoration:underline}
+dialog.sheet{border:0;padding:20px 22px 22px;background:var(--surface);color:var(--ink);border-radius:var(--r-xl);width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);
+  box-shadow:var(--shadow-pop);animation:sheet-in .32s var(--ease-out)}
+dialog.sheet::backdrop{background:color-mix(in srgb,var(--black) 45%,transparent);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);animation:sheet-fade .24s var(--ease-out)}
+dialog.sheet input[type=text]{background:var(--sunk)}
+.sheet-grip{display:none}
+.sheet-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+@keyframes sheet-in{from{opacity:0;transform:translateY(16px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes sheet-fade{from{opacity:0}to{opacity:1}}
+@media (max-width:600px){
+  dialog.sheet{margin:auto 0 0;width:100%;max-width:100%;border-radius:var(--r-xl) var(--r-xl) 0 0;padding:10px 20px calc(22px + env(safe-area-inset-bottom));animation:sheet-up .36s var(--ease-out)}
+  .sheet-grip{display:block;width:36px;height:5px;border-radius:var(--r-pill);background:var(--line2);margin:0 auto 12px}
+  .sheet-actions{flex-direction:column-reverse}
+  .sheet-actions .btn{width:100%;min-height:48px}
+}
+@keyframes sheet-up{from{transform:translateY(100%)}to{transform:none}}
