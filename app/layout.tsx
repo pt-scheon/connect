@@ -42,8 +42,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const dms = member ? unreadMessages(me.id) : 0;
   const jar = await cookies();
   const saved = jar.get("theme")?.value;
-  // The cookie notice shows until this device answers. Someone who already chose "no statistics" in Settings has answered.
-  const consent = readConsent(jar.get(CONSENT_COOKIE)?.value) ?? (me?.stats_on === 0 ? "necessary" : null);
+  // The cookie notice shows on this device until it is closed.
+  const consent = readConsent(jar.get(CONSENT_COOKIE)?.value);
   // A saved choice wins; with none, the page follows the device setting (see globals.css).
   const theme = saved === "light" || saved === "dark" ? saved : undefined;
   const unread = signedIn ? get("SELECT COUNT(*) n FROM notifications WHERE user_id=? AND seen=0", me.id).n : 0;

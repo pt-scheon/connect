@@ -74,12 +74,6 @@ export default async function Settings() {
           <small>You can always reply to someone you wrote to first, and a project lead can still send you a role invite.</small>
         </label>
 
-        <label className="check">
-          <input type="checkbox" name="stats_on" id="stats_on" defaultChecked={me.stats_on !== 0} />
-          <span><b>Count my visits in usage statistics</b><br />
-            <small className="muted">Which days you open Connect, for the admins&rsquo; charts. Counts only, never which pages, and never shown per person. <Link href="/cookies">Cookies and statistics</Link></small></span>
-        </label>
-
         <span className="label set-gap" id="two-step">Sign-in security</span>
         <label className="check">
           <input type="checkbox" name="two_step" id="two_step" defaultChecked={me.two_step !== 0} />

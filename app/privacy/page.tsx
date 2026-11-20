@@ -18,7 +18,7 @@ export default function Privacy() {
         <li><b>For your board&rsquo;s For you order:</b> which projects you opened, how often, and which you marked &ldquo;Not for me&rdquo;. Only your own board uses it; nobody else can see it, and it never affects anyone&rsquo;s credit or scores.</li>
         <li><b>From messages and calls:</b> the messages you send, and the photos, videos, files and voice notes you attach. For calls we keep a log of who called whom, when, and for how long. Calls are not recorded.</li>
         <li><b>When you sign in:</b> the time and the kind of device (for example &ldquo;Chrome on Windows&rdquo;) of your latest sign-in, so we can show it to you and tell you about a sign-in you did not make. We do not keep your network address.</li>
-        <li><b>Which days you use Connect:</b> for each day you open it, a count of how many pages you loaded, not which ones. Admins see these only added up across everyone, as charts, never per person. You can turn this off in the cookie notice, on the <Link href="/cookies">Cookies</Link> page or in Settings. Deleting your account deletes them.</li>
+        <li><b>Which days you use Connect:</b> for each day you open it, a count of how many pages you loaded, not which ones. Admins see these only added up across everyone, as charts, never per person. Deleting your account deletes them.</li>
         <li><b>Sign-in codes:</b> when a code is emailed to you we keep only a scrambled copy of it until it is used or expires, and a scrambled marker for each device you chose to trust.</li>
         <li><b>If you turn on alerts:</b> an address your browser gives us for that device, so we can send it notifications. Turning alerts off removes it.</li>
       </ul>

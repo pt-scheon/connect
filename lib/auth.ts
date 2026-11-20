@@ -57,7 +57,7 @@ export const currentUser = cache(async (): Promise<Row | null> => {
   // stream, prefetches, form actions). Next.js hides its own navigation headers from page code, so a click from one
   // page to another inside Connect looks like a prefetch and is not counted either.
   try {
-    // Not counted when the person said no to statistics, in Settings or in the cookie notice on this device.
+    // Not counted for anyone who said no to statistics while the old cookie notice offered that choice.
     if (u.stats_on === 0 || (await cookies()).get(CONSENT_COOKIE)?.value === "necessary") return u;
     const h = await headers(), dest = h.get("sec-fetch-dest");
     if (dest ? dest === "document" : (h.get("accept") ?? "").includes("text/html"))
