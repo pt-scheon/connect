@@ -14,6 +14,8 @@ import { baseUrl, currentUser, demoMode, standings } from "@/lib/auth";
 import { signOut } from "./actions";
 import { NavLinks, Toast } from "./client";
 import { Av } from "./ui";
+import "@fontsource-variable/bricolage-grotesque/index.css";
+import "@fontsource-variable/instrument-sans/index.css";
 import "./globals.css";
 import "./public.css";
 
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
   ...(demoMode ? { robots: { index: false, follow: false } } : {}),
 };
 export const viewport: Viewport = {
-  themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0B0A09" }, { media: "(prefers-color-scheme: light)", color: "#F7F5F2" }],
+  themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0D1410" }, { media: "(prefers-color-scheme: light)", color: "#EEF0EA" }],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

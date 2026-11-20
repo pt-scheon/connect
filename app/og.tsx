@@ -9,7 +9,7 @@ export function ogCard({ eyebrow, title, subtitle, stats, stamp }: {
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "64px 72px",
-        background: "#0B0A09", color: "#F0EDE8", fontFamily: "sans-serif" }}>
+        background: "#0D1410", color: "#EAF0E9", fontFamily: "sans-serif" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <div style={{ display: "flex", position: "relative", width: 76, height: 44 }}>
             <div style={{ position: "absolute", left: 0, top: 0, width: 44, height: 44, borderRadius: 0, background: "#F4783A" }} />
@@ -23,7 +23,7 @@ export function ogCard({ eyebrow, title, subtitle, stats, stamp }: {
           {subtitle ? <div style={{ fontSize: 30, color: "#C9C6BF", lineHeight: 1.3, maxWidth: 1000 }}>{subtitle}</div> : null}
           {stamp ? (
             <div style={{ display: "flex" }}>
-              <div style={{ fontSize: 22, color: "#7EA6EF", border: "2px solid #7EA6EF", borderRadius: 0, padding: "6px 14px", letterSpacing: 2 }}>{stamp}</div>
+              <div style={{ fontSize: 22, color: "#4FD08A", border: "2px solid #4FD08A", borderRadius: 0, padding: "6px 14px", letterSpacing: 2 }}>{stamp}</div>
             </div>
           ) : null}
         </div>
