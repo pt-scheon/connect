@@ -11,7 +11,7 @@ import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerif
 import { addFeedback, answerFeedback } from "@/lib/feedback";
 import { CODE_MINUTES, TRUST_DAYS, checkLoginCode, domainTakesMail, forgetDevices, needsCode, pendingToken, readPending, sendLoginCode, trustDevice } from "@/lib/twostep";
 import { addCollege, collegeById, collegeForEmail, isMember } from "@/lib/college";
-import { domainOf, isEmail, isPublicMail } from "@/lib/domains";
+import { domainOf, isEmail, isPublicMail, slugify } from "@/lib/domains";
 import { notify, logUpdate, allow, deviceName } from "@/lib/notify";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
@@ -1313,6 +1313,23 @@ export async function saveCollege(fd: FormData) {
     for (const u of all("SELECT id FROM users WHERE college_id=? AND verified=1", c.id))
       notify(u.id, `${name} is open on Connect. Welcome in.`, "/");
   done(back, "Community saved.");
+}
+/* A site admin opens a community before anyone from it has signed up, so its students land in it straight away. */
+export async function createCollege(fd: FormData) {
+  const { me, back, s, fail } = await superCtx(fd);
+  const name = s("name", 80);
+  const domains = s("domains", 300).toLowerCase().split(/[\s,]+/).map((d) => d.replace(/^@/, "")).filter(Boolean);
+  if (name.length < 3 || !domains.length || domains.some((d) => !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) || isPublicMail(d)))
+    fail("Give a name and at least one college or company email domain, like nirmauni.ac.in. Personal mail domains are not allowed.");
+  for (const d of domains) {
+    const other = get("SELECT name FROM colleges WHERE (',' || domains || ',') LIKE ?", `%,${d},%`);
+    if (other) fail(`${d} already belongs to ${other.name}.`);
+  }
+  const base = slugify(s("slug", 40) || name);
+  let slug = base;
+  for (let i = 2; get("SELECT 1 FROM colleges WHERE slug=?", slug); i++) slug = `${base}-${i}`;
+  run("INSERT INTO colleges (slug, name, domains, status, requested_by, created_at) VALUES (?,?,?,'active',?,?)", slug, name, domains.join(","), me.id, now());
+  done(back, `${name} is open. Anyone who verifies an email on ${domains.join(" or ")} joins it.`);
 }
 export async function setCollegeAdmin(fd: FormData) {
   const { back, n, s, fail } = await superCtx(fd);

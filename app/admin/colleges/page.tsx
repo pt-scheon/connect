@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { all } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { saveCollege, setCollegeAdmin } from "../../actions";
+import { createCollege, saveCollege, setCollegeAdmin } from "../../actions";
 import { F, Who } from "../../ui";
 
 export const metadata = { title: "Communities · Admin" };
@@ -23,6 +23,16 @@ export default async function CollegesAdmin() {
         <h1>Communities</h1>
         <p>New communities on academic domains open by themselves. Others wait here until you check the domain really belongs to a community. Each community&rsquo;s admins see only their own community.</p>
       </div></div>
+      <F action={createCollege} back={back} className="card stack">
+        <h2>Add a community</h2>
+        <span className="small muted">Open a college before its students arrive. Use the domains on its students&rsquo; email addresses; sub-domains count too, so pdpu.ac.in also covers sot.pdpu.ac.in.</span>
+        <div className="row">
+          <input type="text" name="name" id="new-college-name" placeholder="College name" aria-label="Community name" maxLength={80} required />
+          <input type="text" name="domains" id="new-college-domains" placeholder="Email domains, like dtu.ac.in" aria-label="Email domains, comma separated" required />
+          <input type="text" name="slug" id="new-college-slug" placeholder="Short link, like dtu (optional)" aria-label="Short link name" maxLength={40} />
+          <button className="btn sm">Add</button>
+        </div>
+      </F>
       {colleges.map((c) => (
         <div key={c.id} className={`card stack ${c.status === "pending" ? "pending-college" : ""}`}>
           <span className="row between">
