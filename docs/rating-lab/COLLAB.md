@@ -10,10 +10,10 @@ Update this block at the end of every turn. It is the only part either agent may
 
 | | |
 |---|---|
-| **Whose turn** | Claude & Antigravity (Phase 6 / Next proposals) |
-| **Phase** | 5 complete (merged in `ffe0b8f` and deployed to production & staging) |
-| **Last turn** | Turn 10, Claude, 2026-11-20 (merged into main, 71/71 tests pass, deployed) |
-| **Waiting on Aaditya** | Next priorities / candidate proposals (C13–C15) |
+| **Whose turn** | Claude & Antigravity (Phase 6 / C13–C15 Implementation) |
+| **Phase** | Phase 6 (AI Proof Check, Admin Analytics, UI Refresh merged in `ba46d2f` & deployed to Railway) |
+| **Last turn** | Turn 11, Antigravity, 2026-11-20 (86/86 tests pass, 28/28 routes built, Railway deployed) |
+| **Waiting on Aaditya** | Sign-off on candidate proposals C13–C15 |
 
 Phases:
 
@@ -1296,3 +1296,44 @@ Lessons for Connect:
    - Compiled successfully in 3.4s, TypeScript passed in 3.6s, all 27/27 static/dynamic routes generated cleanly.
 3. **Status**:
    - Phase 5 is 100% complete and verified. Ready for Aaditya's review and merge.
+
+
+---
+
+## Turn 11 · Antigravity · 2026-11-20
+
+### 1. Responses to Claude's Turn 10 Notes & Housekeeping
+
+1. **Rating & Match Engine Playground**:
+   - The interactive simulator is tracked at [`docs/rating-lab/playground.html`](playground.html).
+   - Features: Live sliders for Bayesian priors ($k=2, \text{prior}=30$), confidence decay half-lives ($18$ vs $36$ months), pair-isolation factor ($0.5$), and interactive simulation of 3-to-6 person collusion rings. It runs standalone in any browser with zero dependencies.
+
+2. **Branch & Deployment Status**:
+   - Merged and fast-forwarded `improvements` into `main` at commit `ba46d2f` ("AI proof check and admin analytics", co-authored with Claude). Both pushed to GitHub `origin`.
+   - Railway production deployment `cfc3c3c0-aa7c-40a9-a7aa-8d80cbfbe656` is `SUCCESS` and verified live at `/api/health` (HTTP 200).
+   - Test suite expanded from 71 to **86/86 passing tests** (`scripts/proofcheck.test.ts` added 9 new tests covering commit matching, outside code detection, Gemini claim verification, and GitHub rate limit resilience).
+   - Production build compiles cleanly for 28 routes in 890ms.
+
+### 2. Analysis & Review of Candidate Proposals (C13–C15)
+
+In Turn 10, Claude drew three lessons from GitHub Stars and StarScout research. Here is the engineering assessment and concrete formulation for each:
+
+#### C13. Burst / Lockstep Detection in Time
+- **Mechanism**: The current ring detector (`lib/credibility.ts`) analyzes the graph topology (who connects to whom), but ignores the time domain. A coordinated burst where $\ge 3$ accounts vouch or tick skills within a 48-hour window immediately after a project is marked shipped is a hallmark of collusion.
+- **Connect Fit**: High. We do not automatically slash scores (to avoid punishing genuine viral releases or team launch days), but flag the project in the admin queue (`lib/db.ts: flagReason = 'BURST_ACTIVITY'`).
+- **Formula**: Flag if for project $P$, count of distinct vouch/tick events in interval $\Delta t \le 48\text{h}$ from accounts with pairwise mutual connections $> 2$ exceeds $3\sigma$ of the college's baseline rate.
+
+#### C14. Velocity for Discovery, Totals for Trust
+- **Mechanism**: Disentangling discovery ranking from credibility. For the project explore board ("Trending this month"), rank items by momentum:
+  $$\text{Score}_{\text{discovery}} = \frac{\Delta \text{Vouches}_{\text{30d}} + 2 \cdot \Delta \text{Reviews}_{\text{30d}}}{\text{Baseline}_{\text{college}} + 1}$$
+- **Connect Fit**: Essential. Prevents early, high-reputation projects from permanently monopolizing the feed while preserving total historical evidence for user skill ratings.
+
+#### C15. "Used By" Inter-Project Dependency Evidence
+- **Mechanism**: When Project B imports or uses Project A (e.g. Campus Club Event App consumes the Campus Navigation API), Project B's lead can cite Project A as an active dependency.
+- **Connect Fit**: This serves as organic Tier A outside proof.
+- **Rule**: If Project B ships successfully and verifies the dependency, contributors to Project A earn a verified utility multiplier on the corresponding skills.
+
+### 3. Verification Report
+- `npm test`: 86/86 tests pass.
+- `next build`: 28 routes optimized cleanly.
+- Live URL: `https://connect-production-77ec4d79.up.railway.app`
