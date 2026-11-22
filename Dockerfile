@@ -19,6 +19,8 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/fake-db ./fake-db
 COPY --from=build /app/scripts/start.js ./start.js
+# Run by hand once after deploying: takes names out of lines stored earlier. It backs up first (see the top of the file).
+COPY --from=build /app/scripts/backfill-names.js ./backfill-names.js
 # The database and uploads live in /data. Mount a persistent volume there (on Railway: a service volume at
 # /data), or everything is lost on every deploy. No VOLUME line: Railway refuses Dockerfiles that have one.
 RUN mkdir -p /data

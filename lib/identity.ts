@@ -4,8 +4,31 @@ import { get, run, now, type Row } from "./db";
 /* How someone appears on Connect: their own photo, or anonymous.
    Anonymous mode swaps the name and photo everyone sees (users.name and users.picture) for an alias like
    "Anon 48213097" and a GitHub-style pattern, and keeps the real ones in real_name and real_picture. Because every
-   page already shows users.name and users.picture, the alias appears everywhere at once. The person's college admins
-   can still see who it is (the profile page shows them), so anonymity cannot be used to harass people or fake reviews. */
+   page shows users.name and users.picture as they are now, and lines the app stores hold no names (see NAME below), the
+   alias appears everywhere at once. The person's college admins can still see who it is (the profile page shows them), so
+   anonymity cannot be used to harass people or fake reviews. */
+
+/* Where a name goes in a stored line (activity, inbox, team chat). The line keeps the person's id in actor_id instead
+   of the name, so it follows anonymous mode, a new alias and account deletion. The slot is only ever the first or the
+   last thing in a line; anywhere else it is something a person typed. */
+export const NAME = "{name}";
+
+/* A stored line as people read it, with the name that person goes by now. */
+export function lineText(line: Row): string {
+  const text = String(line.text ?? "");
+  if (!line.actor_id) return text;
+  const name = String(get("SELECT name FROM users WHERE id=?", line.actor_id)?.name ?? "Someone");
+  return text.startsWith(NAME) ? name + text.slice(NAME.length) : text.endsWith(NAME) ? text.slice(0, -NAME.length) + name : text;
+}
+
+/* Ringing and joining a call pass the person's name and photo to other browsers in rows that live a minute or two.
+   They take on the name as it changes, so a call that is ringing goes on ringing under the new one. */
+export function renameSignals(userId: number) {
+  const u = get("SELECT name, picture FROM users WHERE id=?", userId);
+  if (!u) return;
+  run("UPDATE call_signals SET payload=json_set(payload,'$.from.name',?,'$.from.picture',?) WHERE type='ring' AND call_id IN (SELECT id FROM voice_calls WHERE caller_id=?)", u.name, u.picture, userId);
+  run("UPDATE team_signals SET payload=json_set(payload,'$.name',?,'$.picture',?) WHERE type='joined' AND from_id=?", u.name, u.picture, userId);
+}
 
 /* "Anon 48213097": like 4chan, Anon and a random eight-digit number, never already someone's name or alias. */
 export function newAlias(rand: (n: number) => number = (n) => crypto.randomInt(n)): string {
@@ -64,10 +87,12 @@ export function setAnonymous(u: Row, on: boolean, fresh = false): string | null 
       run("UPDATE users SET anon=1, alias=?, real_name=?, real_picture=?, name=?, picture=?, anon_since=? WHERE id=?",
         alias, u.name, u.picture ?? null, alias, identiconUrl(alias), now(), u.id);
     }
+    renameSignals(u.id);
     return alias;
   }
   if (!u.anon) return null;
   run("UPDATE users SET anon=0, name=COALESCE(real_name, name), picture=real_picture, real_name=NULL, real_picture=NULL WHERE id=?", u.id);
+  renameSignals(u.id);
   return null;
 }
 

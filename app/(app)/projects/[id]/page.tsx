@@ -11,6 +11,7 @@ import * as A from "@/app/actions";
 import { JoinAsk, SplitForm } from "@/app/client";
 import { ProofCheck } from "./proof-check";
 import { unreadTeam } from "@/lib/teamchat";
+import { lineText } from "@/lib/identity";
 import { callStatus } from "@/lib/teamspace";
 import { imageAiOn } from "@/lib/aiimage";
 import { aiProjectImage } from "@/app/identity-actions";
@@ -217,7 +218,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
 
           {onTeam && (() => {
             const fresh = unreadTeam(id, me.id);
-            const lastMsg = get("SELECT t.text, t.kind, u.name FROM team_messages t LEFT JOIN users u ON u.id=t.user_id WHERE t.project_id=? ORDER BY t.id DESC LIMIT 1", id);
+            const lastMsg = get("SELECT t.text, t.kind, t.actor_id, u.name FROM team_messages t LEFT JOIN users u ON u.id=t.user_id WHERE t.project_id=? ORDER BY t.id DESC LIMIT 1", id);
             const openTasks = get("SELECT COUNT(*) n FROM team_tasks WHERE project_id=? AND status<>'done'", id)?.n ?? 0;
             const pages = get("SELECT COUNT(*) n FROM team_notes WHERE project_id=? AND deleted_at IS NULL", id)?.n ?? 0;
             const starred = all("SELECT id, title, icon FROM team_notes WHERE project_id=? AND deleted_at IS NULL AND important=1 ORDER BY updated_at DESC LIMIT 3", id);
@@ -228,7 +229,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
                   <span className="row nowrap"><h2>Team space</h2>{live && <span className="pill ok">● Call on now</span>}</span>
                   <Link className="btn sm" href={`/projects/${id}/chat`}>{live ? "Join" : "Open"}</Link>
                 </span>
-                <span className="small muted ellipsis">{lastMsg ? (lastMsg.kind === "system" ? lastMsg.text : `${lastMsg.name ?? "Someone"}: ${lastMsg.kind === "image" ? (lastMsg.text || "Photo") : lastMsg.text}`)
+                <span className="small muted ellipsis">{lastMsg ? (lastMsg.kind === "system" ? lineText(lastMsg) : `${lastMsg.name ?? "Someone"}: ${lastMsg.kind === "image" ? (lastMsg.text || "Photo") : lastMsg.text}`)
                   : "Only the team can see it: a group chat with everyone's role, team calls, pinned messages, notes and a task board."}</span>
                 <span className="row team-space-links">
                   <Link href={`/projects/${id}/chat`}>Chat{fresh > 0 && <span className="pill info">{fresh} new</span>}</Link>
@@ -437,7 +438,7 @@ export default async function Project({ params }: { params: Promise<{ id: string
               {updates.map((x) => (
                 <div key={x.id} className={`item ${x.kind === "post" ? "post" : x.text.startsWith("Shipped") ? "ship" : ""}`}>
                   <span className="dot" />
-                  <span>{x.kind === "post" && <b>{x.uname}: </b>}{x.text} <span className="muted small">· {timeAgo(x.created_at)}</span></span>
+                  <span>{x.kind === "post" && <b>{x.uname}: </b>}{lineText(x)} <span className="muted small">· {timeAgo(x.created_at)}</span></span>
                 </div>
               ))}
             </div>

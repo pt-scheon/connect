@@ -1,4 +1,5 @@
 import { all, get, run, now, type Row } from "./db";
+import { lineText } from "./identity";
 
 /* Team chat: one group conversation per project. Only its current team can read or write it; someone who leaves
    loses access, and nobody else (admins included) can open it. Each message shows who sent it with their role on
@@ -28,7 +29,7 @@ export function teamMessages(projectId: number, meId: number, after = 0, limit =
      LEFT JOIN users u ON u.id=t.user_id LEFT JOIN members m ON m.project_id=t.project_id AND m.user_id=t.user_id
      WHERE t.project_id=? AND t.id>? ORDER BY t.id DESC LIMIT ?`, projectId, after, limit,
   ).reverse().map((r) => ({
-    id: r.id, mine: r.user_id === meId, kind: r.kind, text: r.text, created_at: r.created_at,
+    id: r.id, mine: r.user_id === meId, kind: r.kind, text: lineText(r), created_at: r.created_at,
     from: r.user_id ? {
       id: r.user_id, name: r.deleted ? "Deleted user" : r.name ?? "Someone", picture: r.deleted ? null : r.picture ?? null,
       role: r.role || "Member", lead: r.user_id === r.lead_id, gone: r.mstatus !== "active",
@@ -37,9 +38,9 @@ export function teamMessages(projectId: number, meId: number, after = 0, limit =
   }));
 }
 
-/* A line from Connect itself: "Riya joined as Backend". */
-export const systemLine = (projectId: number, text: string) =>
-  run("INSERT INTO team_messages (project_id, user_id, text, kind, created_at) VALUES (?,NULL,?,'system',?)", projectId, text.slice(0, 200), now());
+/* A line from Connect itself: "Riya joined as Backend". The name is stored as NAME (lib/identity.ts), with that person's id as `actor`. */
+export const systemLine = (projectId: number, text: string, actor = 0) =>
+  run("INSERT INTO team_messages (project_id, user_id, text, kind, created_at, actor_id) VALUES (?,NULL,?,'system',?,?)", projectId, text.slice(0, 200), now(), actor);
 
 export function markTeamRead(projectId: number, userId: number) {
   const top = get("SELECT MAX(id) n FROM team_messages WHERE project_id=?", projectId)?.n ?? 0;

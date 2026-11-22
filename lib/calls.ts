@@ -1,6 +1,7 @@
 import { all, get, run, now, type Row } from "./db";
 import { notify } from "./notify";
 import { push } from "./push";
+import { NAME } from "./identity";
 
 /* Voice and video calls. Audio and video go straight between the two browsers (WebRTC); the server only rings
    people and passes the connection details between them. One call at a time per person. */
@@ -82,10 +83,7 @@ export function finish(c: Row, status: "ended" | "missed" | "declined" | "failed
     : status === "declined" ? `Declined ${kind}` : status === "failed" ? `${c.video ? "Video" : "Voice"} call could not connect` : `Missed ${kind}`;
   const missed = status === "missed" || (status === "ended" && !c.answered_at);
   run("INSERT INTO messages (from_id, to_id, text, kind, seen, created_at) VALUES (?,?,?,?,?,?)", c.caller_id, c.callee_id, text, "call", missed ? 0 : 1, t);
-  if (missed) {
-    const who = get("SELECT name FROM users WHERE id=?", c.caller_id)?.name ?? "Someone";
-    notify(c.callee_id, `Missed ${kind} from ${who}`, `/messages/${c.caller_id}`);
-  }
+  if (missed) notify(c.callee_id, `Missed ${kind} from ${NAME}`, `/messages/${c.caller_id}`, c.caller_id);
   for (const id of [c.caller_id, c.callee_id]) signal(c.id, id, null, "ended", { status, by });
   // Stops the ringing notification on their devices, and leaves a missed-call one if they never picked up.
   const caller = get("SELECT id, name FROM users WHERE id=?", c.caller_id);

@@ -1,5 +1,6 @@
 import { all, get } from "@/lib/db";
 import { currentUser, standings, skillScores } from "@/lib/auth";
+import { lineText } from "@/lib/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,8 @@ export async function GET() {
     projects_opened_or_hidden: all("SELECT project_id, views, last_at, hidden FROM project_seen WHERE user_id=?", id),
     feedback_sent: all("SELECT kind, text, page, status, reply, created_at, replied_at FROM feedback WHERE user_id=?", id),
     messages: all("SELECT to_id, from_id, text, kind, file_name, file_size, created_at FROM messages WHERE from_id=? OR to_id=? ORDER BY id", id, id),
-    notifications: all("SELECT text, href, seen, created_at FROM notifications WHERE user_id=?", id),
+    notifications: all("SELECT text, actor_id, href, seen, created_at FROM notifications WHERE user_id=?", id)
+      .map(({ actor_id, text, ...rest }) => ({ text: lineText({ text, actor_id }), ...rest })),
     reports_filed: all("SELECT kind, target_id, reason, created_at FROM reports WHERE by_id=?", id),
     skills: [...(skillScores().get(id)?.values() ?? [])].map(({ label, score, conf, band, why }) => ({ skill: label, score, confidence: Math.round(conf * 100) / 100, band, why })),
     skill_ticks_given: all("SELECT project_id, user_id, skill FROM member_skills WHERE by_id=?", id),

@@ -35,8 +35,12 @@ const security = [
 const nextConfig: NextConfig = {
   // Builds a self-contained server in .next/standalone for the Dockerfile.
   output: "standalone",
-  // Next copies whatever lib/db's default path points at into that server: a local database must never go along.
-  outputFileTracingExcludes: { "/**": ["./data/**/*", "./db/**/*", "./uploads/**/*", "./fake-db/**/*", "./**/*.db", "./**/*.db-*", "./.env*"] },
+  /* Private files must never be traced into the standalone server. The paths in lib/db-path.ts and lib/files.ts opt
+     out themselves; these catch other code. Patterns match anywhere in a path (a bare "data/**" would also drop any
+     "metadata/" folder), so they name the files; scripts/check-standalone.js checks the result. */
+  outputFileTracingExcludes: {
+    "/*": ["**/uploads/**/*", "**/*.db*", "**/*.sqlite*", "**/.env*"],
+  },
   poweredByHeader: false,
   // Don't write an AGENTS.md into the project on every `next dev`.
   agentRules: false,

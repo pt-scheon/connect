@@ -9,6 +9,7 @@ import { mailReady } from "./mail";
 import { readyProviders } from "./oauth";
 import { TRUST_DAYS, codeAddress, twoStepOn } from "./twostep";
 import { avatar, history, rank } from "./public";
+import { lineText } from "./identity";
 
 /* What the showcase's signed-in pages (sign-in, onboarding, profile, inbox, messages, settings, feedback) read, as JSON.
    Everything here is about the person who is signed in, or a person in their own community they may already see on
@@ -136,7 +137,7 @@ export function inbox(u: Row) {
   const since = sinceOf(u);
   const today = dayNo(now());
   const items = all("SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC, id DESC LIMIT 60", u.id).map((n) => ({
-    id: n.id as number, text: String(n.text ?? ""), href: String(n.href ?? "/"), at: iso(n.created_at), unseen: !n.seen,
+    id: n.id as number, text: lineText(n), href: String(n.href ?? "/"), at: iso(n.created_at), unseen: !n.seen,
     isNew: (n.created_at ?? 0) > since, group: groupOf(n.created_at ?? 0, today),
   }));
   return { items, newCount: items.filter((i) => i.isNew).length };

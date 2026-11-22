@@ -17,6 +17,7 @@ import { domainOf, isEmail, isPublicMail, slugify } from "@/lib/domains";
 import { notify, logUpdate, allow, deviceName } from "@/lib/notify";
 import { CONSENT_COOKIE, CONSENT_DAYS } from "@/lib/consent";
 import { systemLine } from "@/lib/teamchat";
+import { NAME, renameSignals } from "@/lib/identity";
 import { forgetTeamspace } from "@/lib/teamspace";
 import { resumeFacts, writeResume } from "@/lib/resume";
 import { parseSkills } from "@/lib/skills";
@@ -154,7 +155,7 @@ export async function saveProfile(fd: FormData) {
   if (alumCollege) {
     run("UPDATE users SET verified=0, college_email=NULL, college_id=? WHERE id=?", alumCollege.id, me.id);
     for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", alumCollege.id))
-      notify(a.id, `${me.name} says they are an alum of ${alumCollege.name}. Approve them if that is true.`, "/admin");
+      notify(a.id, `${NAME} says they are an alum of ${alumCollege.name}. Approve them if that is true.`, "/admin", me.id);
   }
   const auto = !me.onboarded && autoVerify(me.id);
   revalidatePath("/", "layout");
@@ -251,7 +252,7 @@ export async function askCollegeAdmin(fd: FormData) {
   if (!c) fail("Pick your community.");
   run("UPDATE users SET college_id=? WHERE id=? AND verified=0", c.id, me.id);
   for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", c.id))
-    notify(a.id, `${me.name} asked to be verified as a member of ${c.name}`, "/admin");
+    notify(a.id, `${NAME} asked to be verified as a member of ${c.name}`, "/admin", me.id);
   done("/onboarding", `Asked the admins of ${c.name}. You will get a note in your inbox once they verify you.`);
 }
 
@@ -273,7 +274,7 @@ export async function createProject(fd: FormData) {
       const [title, ...note] = r.split(" - ");
       run("INSERT INTO roles (project_id, title, note) VALUES (?,?,?)", pid, title.slice(0, 60), note.join(" - ").slice(0, 160));
     }
-    logUpdate(pid, me.id, `${me.name} posted the project`);
+    logUpdate(pid, me.id, `${NAME} posted the project`, "event", me.id);
     return pid;
   })();
   done(`/projects/${id}`, priv ? "Project created. It is private: only your team can see it until you make it public." : "Project posted.");
@@ -286,7 +287,7 @@ export async function setVisibility(fd: FormData) {
   if (p!.hidden === 1) fail("An admin has hidden this project, so only they can show it again.");
   const priv = s("visibility") === "private";
   run("UPDATE projects SET hidden=? WHERE id=?", priv ? 2 : 0, p!.id);
-  if (!priv && p!.hidden === 2) logUpdate(p!.id, me.id, `${me.name} made the project public`);
+  if (!priv && p!.hidden === 2) logUpdate(p!.id, me.id, `${NAME} made the project public`, "event", me.id);
   done(back, priv ? "Private. Only your team and your community's admins can see it now." : "Public. Everyone in your community can find it now.");
 }
 export async function editProject(fd: FormData) {
@@ -346,7 +347,7 @@ export async function inviteToRole(fd: FormData) {
   if (get("SELECT 1 FROM notifications WHERE user_id=? AND href=? AND text LIKE ?", to.id, `/projects/${r.project_id}`, `%invited you%${r.title}%`))
     fail(`${to.name.split(" ")[0]} has already been invited to this role.`);
   if (!allow(`invite:${me.id}`, 15, 3600)) fail("You have sent a lot of invites. Try again in an hour.");
-  notify(to.id, `${me.name} invited you to apply for ${r.title} on ${r.name}`, `/projects/${r.project_id}`);
+  notify(to.id, `${NAME} invited you to apply for ${r.title} on ${r.name}`, `/projects/${r.project_id}`, me.id);
   if (!get("SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)", to.id, me.id, me.id, to.id))
     run("INSERT INTO messages (from_id, to_id, text, kind, project_id, created_at) VALUES (?,?,?,?,?,?)",
       me.id, to.id, `Invited you to join ${r.name} as ${r.title}.`, "invite", r.project_id, now());
@@ -396,7 +397,7 @@ export async function requestJoin(fd: FormData) {
   if ((compute().get(me.id)?.credit ?? 0) < RULES.stake) fail(`You need ${RULES.stake} free credit to stake. Finish what you have joined first.`);
   const note = s("note", 400);
   run("INSERT INTO requests (role_id, project_id, user_id, note) VALUES (?,?,?,?)", r.id, p.id, me.id, note);
-  notify(p.lead_id, `${me.name} asked to join ${p.name} as ${r.title}${note ? `: "${note.length > 80 ? note.slice(0, 77) + "..." : note}"` : ""}`, `/projects/${p.id}#requests`);
+  notify(p.lead_id, `${NAME} asked to join ${p.name} as ${r.title}${note ? `: "${note.length > 80 ? note.slice(0, 77) + "..." : note}"` : ""}`, `/projects/${p.id}#requests`, me.id);
   done(back, `Request sent. ${RULES.stake} credit is held until the team answers.`);
 }
 export async function withdrawRequest(fd: FormData) {
@@ -420,9 +421,8 @@ export async function answerRequest(fd: FormData) {
     run("UPDATE roles SET open=0 WHERE id=?", q.role_id);
     run("DELETE FROM requests WHERE role_id=? AND status='pending'", q.role_id);
     if (!get("SELECT 1 FROM roles WHERE project_id=? AND open=1", p.id)) run("UPDATE projects SET status='building' WHERE id=? AND status='recruiting'", p.id);
-    const who = get("SELECT name FROM users WHERE id=?", q.user_id);
-    logUpdate(p.id, q.user_id, `${who.name} joined as ${q.title}`);
-    systemLine(p.id, `${who.name} joined the team as ${q.title}`);
+    logUpdate(p.id, q.user_id, `${NAME} joined as ${q.title}`, "event", q.user_id);
+    systemLine(p.id, `${NAME} joined the team as ${q.title}`, q.user_id);
     notify(q.user_id, `You are on the ${p.name} team as ${q.title}`, `/projects/${p.id}`);
   })();
   done(back, "Added to the team.");
@@ -617,7 +617,7 @@ export async function voteGone(fd: FormData) {
       run("UPDATE members SET status='left', left_at=? WHERE project_id=? AND user_id=?", now(), p!.id, target);
       run("DELETE FROM gone_votes WHERE project_id=? AND (target_id=? OR voter_id=?)", p!.id, target, target);
       notify(target, `Your team removed you from ${p!.name}. Your stake is lost.`, `/projects/${p!.id}`);
-      systemLine(p!.id, `${get("SELECT name FROM users WHERE id=?", target)?.name ?? "A teammate"} was removed by the team`);
+      systemLine(p!.id, `${NAME} was removed by the team`, target);
       msg = "Removed from the team. Their stake is lost.";
     }
   })();
@@ -629,7 +629,7 @@ export async function leaveProject(fd: FormData) {
   if (!p || p.status === "shipped" || p.status === "dropped" || !isActive(p.id, me.id)) fail("You are not on an open project here.");
   if (p!.lead_id === me.id) fail("You are the lead. Drop the project instead.");
   run("UPDATE members SET status='left', left_at=? WHERE project_id=? AND user_id=?", now(), p!.id, me.id);
-  systemLine(p!.id, `${me.name} left the team`);
+  systemLine(p!.id, `${NAME} left the team`, me.id);
   done(back, "You left. This shows on your profile.");
 }
 export async function dropProject(fd: FormData) {
@@ -657,7 +657,7 @@ export async function vouch(fd: FormData) {
      WHERE a.user_id=? AND b.user_id=? AND a.status='active' AND b.status='active' AND p.status='shipped'`, me.id, to);
   if (to === me.id || !together) fail("You can only vouch for someone you shipped a project with.");
   const r = run("INSERT OR IGNORE INTO vouches (from_id, to_id, created_at) VALUES (?,?,?)", me.id, to, now());
-  if (r.changes) notify(to, `${me.name} vouched for you`, `/u/${to}`);
+  if (r.changes) notify(to, `${NAME} vouched for you`, `/u/${to}`, me.id);
   done(back, "Vouched.");
 }
 export async function addClaim(fd: FormData) {
@@ -712,8 +712,8 @@ export async function submitEvidence(fd: FormData) {
     if (mailReady()) await sendMail(work, "Confirm your internship on Connect", `${me.name} listed an internship on Connect: "${title}".\n\nIf that is you, your code is ${code}. It expires in 15 minutes.\nIf it is not, ignore this email.`);
     else if (process.env.NODE_ENV !== "production") console.log(`[connect] work email code for evidence ${id}: ${code}`);
   }
-  if (mate) notify(mate.id, `${me.name} says you were on their team at ${title}. Confirm it if that is true.`, `/u/${me.id}?tab=work#evidence`);
-  for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", me.college_id)) notify(a.id, `${me.name} added evidence to check: ${title}`, "/admin#evidence");
+  if (mate) notify(mate.id, `${NAME} says you were on their team at ${title}. Confirm it if that is true.`, `/u/${me.id}?tab=work#evidence`, me.id);
+  for (const a of all("SELECT id FROM users WHERE admin=1 AND college_id=?", me.college_id)) notify(a.id, `${NAME} added evidence to check: ${title}`, "/admin#evidence", me.id);
   done(back + "#evidence", code ? `Added. A code was sent to ${work}; enter it to confirm.` : "Added. It counts once it is checked.");
 }
 function settle(e: Row, status: "verified" | "rejected", method: string, by: number, note = "") {
@@ -889,8 +889,8 @@ export async function answerApplication(fd: FormData) {
     const gid = run("INSERT INTO grants (project_id, alum_id, amount) VALUES (?,?,?)", a.project_id, me.id, total).lastInsertRowid;
     for (const p of parts) run("INSERT INTO grant_parts (grant_id, title, amount) VALUES (?,?,?)", gid, p.title, p.amount);
     run("UPDATE applications SET status='accepted' WHERE id=?", a.id);
-    logUpdate(a.project_id, me.id, `Funded by ${me.name}`);
-    notify(a.lead_id, `${me.name} is funding ${a.name}`, `/projects/${a.project_id}`);
+    logUpdate(a.project_id, me.id, `Funded by ${NAME}`, "event", me.id);
+    notify(a.lead_id, `${NAME} is funding ${a.name}`, `/projects/${a.project_id}`, me.id);
   })();
   done(back, "Funded. Mark each payment as paid after you send it.");
 }
@@ -899,7 +899,7 @@ export async function markPaid(fd: FormData) {
   const part = get("SELECT gp.id, gp.title, g.alum_id, g.project_id, p.lead_id FROM grant_parts gp JOIN grants g ON g.id=gp.grant_id JOIN projects p ON p.id=g.project_id WHERE gp.id=?", n("part"));
   if (!part || part.alum_id !== me.id) fail("Only the alum funding this can mark a payment.");
   run("UPDATE grant_parts SET paid=1 WHERE id=?", part.id);
-  notify(part.lead_id, `${me.name} marked a payment as sent: ${part.title}`, `/projects/${part.project_id}`);
+  notify(part.lead_id, `${NAME} marked a payment as sent: ${part.title}`, `/projects/${part.project_id}`, me.id);
   done(back, "Marked as paid.");
 }
 
@@ -951,7 +951,7 @@ export async function applyCommission(fd: FormData) {
   if (c.client_id === me.id) fail("You cannot apply to your own commission.");
   if (!allow(`capply:${me.id}`, 10, 86400)) fail("You have applied to several today. Try again tomorrow.");
   const r = run("INSERT OR IGNORE INTO commission_apps (commission_id, user_id, note, created_at) VALUES (?,?,?,?)", c.id, me.id, s("note", 400), now());
-  if (r.changes) notify(c.client_id, `${me.name} applied to do “${c.title}”`, `/commissions/${c.id}`);
+  if (r.changes) notify(c.client_id, `${NAME} applied to do “${c.title}”`, `/commissions/${c.id}`, me.id);
   done(back, "Applied. The person who posted it picks one applicant.");
 }
 export async function withdrawCommissionApp(fd: FormData) {
@@ -1047,7 +1047,7 @@ export async function markCommissionPaid(fd: FormData) {
   const c = commission(n("id"), me);
   if (!c || c.client_id !== me.id || !c.money || c.status !== "done") fail("Only the person who posted it can mark the money as sent, after sign-off.");
   run("UPDATE commissions SET money_paid=1 WHERE id=?", c!.id);
-  notify(c!.doer_id, `${me.name} marked the payment for “${c!.title}” as sent`, `/commissions/${c!.id}`);
+  notify(c!.doer_id, `${NAME} marked the payment for “${c!.title}” as sent`, `/commissions/${c!.id}`, me.id);
   done(back, "Marked as paid.");
 }
 export async function disputeCommission(fd: FormData) {
@@ -1095,7 +1095,7 @@ export async function sendGift(fd: FormData) {
   if (block) fail(block);
   if (!allow(`gift:${me.id}`, 5, 86400)) fail("You have sent credit several times today. Try again tomorrow.");
   run("INSERT INTO gifts (college_id, from_id, to_id, amount, note, created_at) VALUES (?,?,?,?,?,?)", me.college_id, me.id, to.id, amount, s("note", 140), now());
-  notify(to.id, `${me.name} sent you ${amount} credit to use`, "/credit");
+  notify(to.id, `${NAME} sent you ${amount} credit to use`, "/credit", me.id);
   done(back, `Sent ${amount} credit to ${to.name.split(" ")[0]}. It is theirs to stake or spend; it does not change what either of you has earned.`);
 }
 
@@ -1225,7 +1225,7 @@ export async function postComment(fd: FormData) {
     for (const r of all("SELECT DISTINCT user_id FROM comments WHERE project_id=? AND user_id<>?", p!.id, me.id))
       if (!team.includes(r.user_id)) notify(r.user_id, `${p!.name} replied: ${short}`, `/projects/${p!.id}#questions`);
   } else {
-    for (const id of team) notify(id, `${me.name} asked about ${p!.name}: ${short}`, `/projects/${p!.id}#questions`);
+    for (const id of team) notify(id, `${NAME} asked about ${p!.name}: ${short}`, `/projects/${p!.id}#questions`, me.id);
   }
   done(back + "#questions");
 }
@@ -1312,7 +1312,9 @@ export async function deleteAccount(fd: FormData) {
     run(`UPDATE users SET name='Deleted user', email=NULL, college_email=NULL, picture=NULL, about='', skills='', resume=NULL,
          github='', linkedin='', website='', sub=?, admin=0, super=0, email_notes=0, open_to_join=0, deleted=1, suspended=1 WHERE id=?`, `deleted:${me.id}:${crypto.randomUUID()}`, me.id);
     for (const f of all("SELECT file_key FROM evidence WHERE user_id=? AND file_key IS NOT NULL", me.id)) removeFile(f.file_key);
-    // Their uploaded photo, and the real name and photo anonymous mode kept aside, go too.
+    // Their uploaded photo, and the real name and photo anonymous mode kept aside, go too. Stored lines about them hold
+    // only their id, so those now read "Deleted user", and so does a ring still waiting to be delivered.
+    renameSignals(me.id);
     if (me.photo_key) removeFile(me.photo_key);
     run("UPDATE users SET photo_key=NULL, photo_mime=NULL, real_name=NULL, real_picture=NULL, alias=NULL, anon=0 WHERE id=?", me.id);
     for (const q of ["DELETE FROM identities WHERE user_id=?", "DELETE FROM codes WHERE user_id=?", "DELETE FROM notifications WHERE user_id=?",

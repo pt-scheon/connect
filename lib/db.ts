@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import { FAKE, sampleSql } from "./sample";
+import { dbFile } from "./db-path";
 import { baseDomain, domainOf, guessName, matchCollege, slugify } from "./domains";
 
 const SCHEMA = `
@@ -227,9 +228,12 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // When someone left a project or was voted gone, for the credit history on profiles.
   ["members", "left_at", "INTEGER"],
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
+  // Whom a stored line names; the text itself holds only a slot for the name (lib/identity.ts). 0: nobody, or nobody known.
+  // Empty: written before this, when lines held the name itself (scripts/backfill-names.js).
+  ["updates", "actor_id", "INTEGER"],
+  ["notifications", "actor_id", "INTEGER"],
+  ["team_messages", "actor_id", "INTEGER"],
 ];
-
-const file = process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");
 
 function open() {
   // `next build` runs many workers at once and pre-renders nothing from data, so each gets a private in-memory
@@ -239,6 +243,7 @@ function open() {
     m.transaction(() => migrate(m)).immediate();
     return m;
   }
+  const file = dbFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   // Wait up to 30 seconds for a lock rather than failing: during `next build` several workers open the same file at once.
   const d = new Database(file, { timeout: 30_000 });

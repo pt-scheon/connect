@@ -3,6 +3,7 @@ import { standings, skillScores } from "./auth";
 import { EMPTY } from "./credit";
 import { ties, pathTo } from "./graph";
 import { timeAgo } from "./notify";
+import { lineText } from "./identity";
 import { needsFor, fitsMe, type Need } from "./relevance";
 import { rankBoard, viewerSignals, type FeedProject } from "./feed";
 import { canon, label } from "./skills";
@@ -95,7 +96,8 @@ export function collegeWork(me: Row, college: Row) {
     .slice(0, 3);
   const updates = all(
     `SELECT up.*, p.name FROM updates up JOIN projects p ON p.id=up.project_id
-     WHERE p.hidden=0 AND p.status<>'dropped' AND p.college_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 8`, cid);
+     WHERE p.hidden=0 AND p.status<>'dropped' AND p.college_id=? ORDER BY up.created_at DESC, up.id DESC LIMIT 8`, cid,
+  ).map((u): Row => ({ ...u, text: lineText(u) })); // the name each person goes by now
   const classmates = Number(get("SELECT COUNT(*) n FROM users WHERE college_id=? AND role='student' AND verified=1 AND suspended=0 AND deleted=0", cid)?.n ?? 0);
   return { items, forYou, canReview, near, updates, classmates, standing: mine };
 }

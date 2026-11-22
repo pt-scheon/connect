@@ -4,6 +4,7 @@ import { canMessage, toMsg } from "@/lib/chat";
 import { allow, notify } from "@/lib/notify";
 import { LIMITS, cleanName, maxFor, save, sizeText, sniff } from "@/lib/files";
 import { pushMessage } from "@/lib/push";
+import { NAME } from "@/lib/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     me!.id, to, caption, t.kind, key, cleanName(file.name, t.ext), t.mime, bytes.length,
     t.kind === "image" || t.kind === "video" ? dim("w") : null, t.kind === "image" || t.kind === "video" ? dim("h") : null,
     secs > 0 && secs < 3600 ? secs : null, now()).lastInsertRowid))();
-  if (first) notify(to, `${me!.name} sent you a ${{ image: "photo", video: "video", voice: "voice note", file: "file" }[t.kind]}`, `/messages/${me!.id}`);
+  if (first) notify(to, `${NAME} sent you a ${{ image: "photo", video: "video", voice: "voice note", file: "file" }[t.kind]}`, `/messages/${me!.id}`, me!.id);
   pushMessage(to, me!, caption || { image: "📷 Photo", video: "🎬 Video", voice: "🎙️ Voice note", file: `📎 ${file.name}` }[t.kind]);
   return Response.json({ message: toMsg(get("SELECT * FROM messages WHERE id=?", id), me!.id) });
 }

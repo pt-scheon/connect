@@ -1,5 +1,6 @@
 import { all, db, get, run, now, type Row } from "./db";
 import { notify } from "./notify";
+import { NAME } from "./identity";
 
 /* Clubs. Any verified member can ask to start one, even a club of just themselves, but it stays hidden until an
    admin of their community approves it. Inside an approved club, the lead and the co-leads they choose run it:
@@ -46,7 +47,7 @@ export function requestClub(me: Me, name: string, about: string): number | strin
     run("INSERT INTO club_members (club_id, user_id, role, confirmed) VALUES (?,?,'Lead',1)", cid, me.id);
     return cid;
   })();
-  for (const a of admins(me.college_id)) if (a.id !== me.id) notify(a.id, `${me.name} asked to start a club: ${name}`, "/admin#clubs");
+  for (const a of admins(me.college_id)) if (a.id !== me.id) notify(a.id, `${NAME} asked to start a club: ${name}`, "/admin#clubs", me.id);
   // An admin starting a club needs nobody's permission.
   if (me.admin) run("UPDATE clubs SET status='active', decided_by=?, decided_at=? WHERE id=?", me.id, now(), id);
   return id;
@@ -79,7 +80,7 @@ export function askToJoin(me: Me, c: Row): string | null {
   if (m?.confirmed) return "You are already in this club.";
   if (m?.invited_by) { run("UPDATE club_members SET confirmed=1 WHERE club_id=? AND user_id=?", c.id, me.id); return null; }
   if (!m) run("INSERT INTO club_members (club_id, user_id) VALUES (?,?)", c.id, me.id);
-  for (const x of managers(c)) notify(x, `${me.name} asked to join ${c.name}`, `/clubs/${c.id}`);
+  for (const x of managers(c)) notify(x, `${NAME} asked to join ${c.name}`, `/clubs/${c.id}`, me.id);
   return null;
 }
 const managers = (c: Row): number[] => [...new Set([c.lead_id, ...all("SELECT user_id FROM club_members WHERE club_id=? AND confirmed=1 AND manage=1", c.id).map((r) => r.user_id as number)])];
@@ -99,7 +100,7 @@ export function inviteMember(me: Me, c: Row, userId: number): string | null {
     return null;
   }
   if (!m) run("INSERT INTO club_members (club_id, user_id, invited_by) VALUES (?,?,?)", c.id, u.id, me.id);
-  notify(u.id, `${me.name} invited you to join ${c.name}`, `/clubs/${c.id}`);
+  notify(u.id, `${NAME} invited you to join ${c.name}`, `/clubs/${c.id}`, me.id);
   return null;
 }
 export function answerInvite(me: Me, c: Row, accept: boolean): string | null {
@@ -107,7 +108,7 @@ export function answerInvite(me: Me, c: Row, accept: boolean): string | null {
   if (!m || m.confirmed || !m.invited_by) return "There is no invitation waiting for you here.";
   if (accept) run("UPDATE club_members SET confirmed=1 WHERE club_id=? AND user_id=?", c.id, me.id);
   else run("DELETE FROM club_members WHERE club_id=? AND user_id=?", c.id, me.id);
-  if (accept) notify(m.invited_by, `${me.name} joined ${c.name}`, `/clubs/${c.id}`);
+  if (accept) notify(m.invited_by, `${NAME} joined ${c.name}`, `/clubs/${c.id}`, me.id);
   return null;
 }
 
@@ -166,7 +167,7 @@ export function deleteClub(me: Me, c: Row, typed: string): string | null {
     run("UPDATE commissions SET club_id=NULL WHERE club_id=?", c.id);
     run("DELETE FROM clubs WHERE id=?", c.id);
   })();
-  for (const u of people) notify(u, `${c.name} was deleted by ${me.name}`, "/clubs");
+  for (const u of people) notify(u, `${c.name} was deleted by ${NAME}`, "/clubs", me.id);
   return null;
 }
 

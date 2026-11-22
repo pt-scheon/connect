@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { all, get, run, now, db, type Row } from "./db";
 import { systemLine } from "./teamchat";
+import { NAME } from "./identity";
 
 /* A project's team space, beside its team chat (lib/teamchat.ts): pinned messages, Notion-style notes, a task board
    and team calls. Like the chat, all of it is for the project's current team only; the pages and API routes check
@@ -29,7 +30,7 @@ export function setPin(projectId: number, messageId: number, by: { id: number; n
   if (!on) { run("DELETE FROM team_pins WHERE project_id=? AND message_id=?", projectId, messageId); return null; }
   if ((get("SELECT COUNT(*) n FROM team_pins WHERE project_id=?", projectId)?.n ?? 0) >= MAX_PINS) return `Up to ${MAX_PINS} pinned messages. Unpin one first.`;
   run("INSERT INTO team_pins (project_id, message_id, by_id, created_at) VALUES (?,?,?,?)", projectId, messageId, by.id, now());
-  systemLine(projectId, `${by.name} pinned a message`);
+  systemLine(projectId, `${NAME} pinned a message`, by.id);
   return null;
 }
 
@@ -252,7 +253,7 @@ export function joinCall(projectId: number, me: { id: number; name: string }, de
     if (!c) {
       const id = Number(run("INSERT INTO team_calls (project_id, started_by, video, created_at) VALUES (?,?,?,?)", projectId, me.id, video ? 1 : 0, now()).lastInsertRowid);
       c = get("SELECT * FROM team_calls WHERE id=?", id)!;
-      systemLine(projectId, `${me.name} started a team ${video ? "video" : "voice"} call`);
+      systemLine(projectId, `${NAME} started a team ${video ? "video" : "voice"} call`, me.id);
       started = true;
     }
     const inIt = callPeople(c.id);

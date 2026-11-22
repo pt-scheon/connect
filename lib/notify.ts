@@ -1,15 +1,17 @@
 import { all, get, run, now } from "./db";
 import { emailNote } from "./mail";
+import { lineText } from "./identity";
 
-/* An entry in someone's inbox. */
-export function notify(userId: number, text: string, href: string) {
-  run("INSERT INTO notifications (user_id, text, href, created_at) VALUES (?,?,?,?)", userId, text, href, now());
-  emailNote(userId, text, href);
+/* An entry in someone's inbox. One that names a person has NAME (lib/identity.ts) for the name and their id as `actor`. */
+export function notify(userId: number, text: string, href: string, actor = 0) {
+  run("INSERT INTO notifications (user_id, text, href, created_at, actor_id) VALUES (?,?,?,?,?)", userId, text, href, now(), actor);
+  // An email cannot be changed later, so it gets the name they go by as it is sent.
+  emailNote(userId, lineText({ text, actor_id: actor }), href);
 }
 
-/* A line on a project's timeline. kind "event" is written by the app, "post" by a teammate. */
-export function logUpdate(projectId: number, userId: number | null, text: string, kind: "event" | "post" = "event") {
-  run("INSERT INTO updates (project_id, user_id, kind, text, created_at) VALUES (?,?,?,?,?)", projectId, userId, kind, text, now());
+/* A line on a project's timeline. kind "event" is written by the app, "post" by a teammate. `actor` as in notify. */
+export function logUpdate(projectId: number, userId: number | null, text: string, kind: "event" | "post" = "event", actor = 0) {
+  run("INSERT INTO updates (project_id, user_id, kind, text, created_at, actor_id) VALUES (?,?,?,?,?,?)", projectId, userId, kind, text, now(), actor);
   if (kind === "post" || FOLLOWED.test(text)) tellFollowers(projectId, userId, text);
 }
 
