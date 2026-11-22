@@ -1,7 +1,7 @@
 /* A working database of invented people, projects, clubs and pictures, for a fresh clone and for test copies.
 
-     npm run setup                      installs the website's packages, then makes data/connect.db
-     node scripts/setup.js --db-only    only the database (at DATABASE_PATH, if set)
+     npm run setup                      makes data/connect.db
+     node scripts/setup.js --db-only    the same (at DATABASE_PATH, if set)
 
    A database that already has people in it is left untouched. Nothing here contains a real person. */
 const { execSync } = require("node:child_process");
@@ -10,7 +10,6 @@ const path = require("node:path");
 
 const root = path.join(__dirname, "..");
 const run = (cmd, cwd = root, env = process.env) => execSync(cmd, { cwd, env, stdio: "inherit" });
-if (!process.argv.includes("--db-only") && !fs.existsSync(path.join(root, "frontend", "node_modules"))) run("npm ci", path.join(root, "frontend"));
 
 const file = path.resolve(root, process.env.DATABASE_PATH || "data/connect.db");
 function people() {

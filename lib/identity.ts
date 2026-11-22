@@ -23,7 +23,7 @@ const hash = (s: string) => crypto.createHash("sha256").update(s).digest();
 /* A GitHub-style pattern: a 5×5 grid, mirrored left to right, in one colour picked from the seed. Same seed, same pattern. */
 export function identicon(seed: string): string {
   const h = hash(`identicon:${seed}`);
-  const hue = Math.round((h[0] / 255) * 360), sat = 55 + (h[1] % 20), light = 45 + (h[2] % 12);
+  const hue = 354 + (h[0] % 12), sat = 55 + (h[1] % 20), light = 34 + (h[2] % 30); // red, like the rest of Connect
   const colour = `hsl(${hue} ${sat}% ${light}%)`;
   const cells: string[] = [];
   for (let y = 0; y < 5; y++) for (let x = 0; x < 3; x++) {
@@ -40,14 +40,14 @@ export function cover(name: string): string {
   const shapes: string[] = [];
   for (let i = 0; i < 4; i++) {
     const x = h[2 + i * 4] % 100, y = h[3 + i * 4] % 100, r = 18 + (h[4 + i * 4] % 34), kind = h[5 + i * 4] % 3;
-    const fill = `hsl(${(a + i * 47) % 360} 90% ${70 - i * 6}% / ${0.35 + (i % 2) * 0.2})`;
+    const fill = `hsl(${(a % 10) - 3} 90% ${70 - i * 6}% / ${0.35 + (i % 2) * 0.2})`;
     shapes.push(kind === 0 ? `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}"/>`
       : kind === 1 ? `<rect x="${x - r / 2}" y="${y - r / 2}" width="${r}" height="${r}" rx="${r / 4}" fill="${fill}" transform="rotate(${h[6 + i] % 90} ${x} ${y})"/>`
       : `<polygon points="${x},${y - r} ${x + r},${y + r} ${x - r},${y + r}" fill="${fill}"/>`);
   }
   const letter = (name.trim()[0] || "?").toUpperCase().replace(/[<>&"']/g, "?");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="240" height="240"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">`
-    + `<stop offset="0" stop-color="hsl(${a} 80% 52%)"/><stop offset="1" stop-color="hsl(${b} 75% 42%)"/></linearGradient></defs>`
+    + `<stop offset="0" stop-color="hsl(${(a % 10) - 3} 80% ${34 + (a % 22)}%)"/><stop offset="1" stop-color="hsl(${(b % 10) - 3} 75% ${16 + (b % 18)}%)"/></linearGradient></defs>`
     + `<rect width="100" height="100" fill="url(#g)"/>${shapes.join("")}`
     + `<text x="50" y="50" dy=".35em" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif" font-size="46" font-weight="700" fill="#fff" fill-opacity=".92">${letter}</text></svg>`;
 }

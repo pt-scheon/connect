@@ -1,0 +1,83 @@
+/* Members' pages in the public pages' language: Geist, big light headings, mono captions, flat near-black, hairlines.
+   Loaded after app/globals.css, which still draws every component; this only changes how they look. */
+html{scroll-padding-top:88px}
+:root:root{
+  --display:var(--font-geist-sans),system-ui,sans-serif;
+  --body:var(--font-geist-sans),system-ui,sans-serif;
+  --mono:var(--font-geist-mono),ui-monospace,monospace;
+  --code:var(--font-geist-mono),ui-monospace,monospace;
+  --bg:#0f0000; --surface:#0f0000; --surface2:#1c0a09; --sunk:#1c0a09; --pill:#2a1513; --pill-hover:#3b1d1a;
+  --line:rgba(255,255,255,.14); --line2:rgba(255,255,255,.26);
+  --mark:#e60000; --bar:rgba(15,0,0,.94);
+  --r-lg:18px;
+}
+html body{font:400 16px/1.5 var(--body);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:clip}
+html body::before{display:none}
+html body.guest{background:var(--bg)}
+html ::selection{background:#f00;color:#fff}
+
+/* page */
+html main.wrap{max-width:1280px;min-height:62vh;min-height:62svh;padding:44px 40px 88px;margin-inline:auto;width:100%}
+html .head{margin-bottom:12px}
+html main h1{font-family:var(--display);font-size:clamp(2.7rem,6vw,5.5rem);font-weight:300;line-height:.98;letter-spacing:-.05em;overflow-wrap:break-word}
+html main h2{font-family:var(--display);font-size:clamp(1.4rem,2vw,1.85rem);font-weight:400;line-height:1.1;letter-spacing:-.025em}
+html main h3{font-family:var(--display);font-weight:500;letter-spacing:-.015em}
+html main .head p{max-width:34em;color:var(--muted);font-size:clamp(1.05rem,1.4vw,1.35rem);line-height:1.32;letter-spacing:-.01em}
+html main .narrow h1,html main .name-row h1{font-size:clamp(2.4rem,5vw,4.25rem)}
+html main .name-row{flex-wrap:wrap}
+html main .team-space h1,html main .dm h1,html main .team-space h2,html main .dm h2{font-size:1.25rem;font-weight:500;letter-spacing:-.02em;line-height:1.2}
+html main .team-space input.note-title,html main .team-space .note-title{font-weight:300;letter-spacing:-.04em}
+
+/* captions and figures */
+html main .label,html main .mono,html main .bubble-time,html main .call-status{font-family:var(--mono);letter-spacing:0}
+html main .label{font-size:.78rem;font-weight:500;color:var(--muted)}
+html main .big,html main .stat b{font-family:var(--display);font-weight:300;letter-spacing:-.045em}
+
+/* panels: hairlines, no fills */
+html main .card{background:transparent;border:1px solid var(--line);box-shadow:none}
+html main a.card:hover,html main .card.lift:hover{background:var(--surface2);border-color:var(--line2)}
+html main .card.unread{border-color:var(--accent)}
+html main .card.start{background:linear-gradient(120% 130% at 100% 0%,rgba(255,0,0,.22),transparent 62%)}
+html main .card.invite{background:#f6efed;border-color:#f6efed;color:#0f0000}
+html main .card.invite .muted,html main .card.invite .label{color:rgba(15,0,0,.66)}
+html main .card.invite .btn{background:#0f0000;color:#fff}
+html main .card .card{border-color:var(--line)}
+html main .card.task-sheet,html dialog.sheet{background:#160605;border:1px solid var(--line2)}
+
+/* controls */
+html main .btn{font-family:var(--body);font-weight:500;letter-spacing:-.01em}
+html main .btn.ghost{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18)}
+html main .btn.ghost:hover{background:rgba(255,255,255,.22)}
+html main .pill,html main .chip{font-family:var(--mono);font-weight:500;letter-spacing:0}
+html main .chip{max-width:100%;min-width:0;white-space:normal;overflow-wrap:break-word}
+html main :focus-visible{outline-color:#ff665e}
+
+/* the time inside a red bubble */
+html main .bubble .bubble-time{opacity:1;color:inherit}
+
+/* "(fake)" needs air beside a big light name */
+html main h1 .fake-tag{margin-left:.5em}
+/* on touch screens these are flex boxes, which swallow the space before a count */
+@media (pointer:coarse){html main .filters a,html main .filters button,html main .tabs a,html main .tabs button{column-gap:.35em}}
+
+/* notices */
+html .member-note{margin:0;padding:8px 40px;background:#f6efed;color:#0f0000;font:500 12px/1.4 var(--mono);text-align:center}
+html .member-note a{color:inherit;text-decoration:underline}
+html .strip{background:#8f1712;color:#fff;border:0}
+html .strip a{color:#fff;text-decoration:underline}
+html body:has(.sx) main.wrap{padding-block:0}
+
+/* the team space and messages fit under the header and notice */
+html main.wrap:has(.team-space),html main.wrap:has(.dm),html main.wrap:has(.team-chat-wrap){padding-block:20px 28px}
+@media (max-width:760px){
+  html body{font-size:15.5px}
+  html main.wrap{padding:28px 16px 56px}
+  html .member-note{padding-inline:16px;font-size:11px}
+  html body:has(.bottom-nav) .sh-end{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+}
+@media print{
+  :root:root:root{color-scheme:light;--bg:#fff;--surface:#fff;--surface2:#fff;--sunk:#fff;--pill:#fff;--ink:#000;--muted:#444;--line:#ccc;--line2:#999;--accent:#8f1712;--ok:#000;--warn:#444;--bad:#8f1712;--blue-t:#8f1712;--green-t:#000;--orange-t:#444;--purple-t:#444;--pink-t:#8f1712;--teal-t:#444;--indigo-t:#444;--red-t:#8f1712}
+  html body{background:#fff;color:#000}
+  html main .card.invite{background:#fff}
+  html .member-note{display:none}
+}

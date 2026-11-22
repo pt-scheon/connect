@@ -8,6 +8,7 @@ import { after } from "next/server";
 import { all, get, run, db, now, type Row } from "@/lib/db";
 import { compute, RULES } from "@/lib/credit";
 import { sampleSql } from "@/lib/sample";
+import { AFTER_COOKIE, afterPath } from "@/lib/after";
 import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify, recordLogin } from "@/lib/auth";
 import { addFeedback, answerFeedback } from "@/lib/feedback";
 import { CODE_MINUTES, TRUST_DAYS, checkLoginCode, domainTakesMail, forgetDevices, needsCode, pendingToken, readPending, sendLoginCode, trustDevice } from "@/lib/twostep";
@@ -30,8 +31,8 @@ import { eligibleReviewers, pickReviewers, teamTies, verdictOf } from "@/lib/rev
 
 /* ---------- plumbing ---------- */
 function safeBack(v: FormDataEntryValue | null) {
-  const s = String(v || "/");
-  if (!s.startsWith("/") || s.startsWith("//")) return "/";
+  const s = String(v || "/work");
+  if (!s.startsWith("/") || s.startsWith("//")) return "/work";
   const u = new URL(s, "http://x");
   u.searchParams.delete("err");
   u.searchParams.delete("ok");
@@ -81,7 +82,9 @@ export async function devSignIn(fd: FormData) {
     redirect("/signin/verify");
   }
   await setSession(u.id);
-  redirect("/");
+  const to = afterPath(jar.get(AFTER_COOKIE)?.value);
+  jar.delete(AFTER_COOKIE);
+  redirect(to);
 }
 /* Step two of sign-in: the code from the email. Right code: signed in, and the device is remembered if they asked. */
 export async function verifyLogin(fd: FormData) {
@@ -102,7 +105,9 @@ export async function verifyLogin(fd: FormData) {
   recordLogin(id!, device, notify);
   await setSession(id!);
   revalidatePath("/", "layout");
-  redirect("/");
+  const to = afterPath(jar.get(AFTER_COOKIE)?.value);
+  jar.delete(AFTER_COOKIE);
+  redirect(to);
 }
 export async function resendLogin() {
   const id = readPending((await cookies()).get("pending")?.value);
@@ -153,7 +158,7 @@ export async function saveProfile(fd: FormData) {
   }
   const auto = !me.onboarded && autoVerify(me.id);
   revalidatePath("/", "layout");
-  if (auto) redirect("/?ok=" + encodeURIComponent(`Your college or work email is verified. You start with ${RULES.starter} credit.`));
+  if (auto) redirect("/work?ok=" + encodeURIComponent(`Your college or work email is verified. You start with ${RULES.starter} credit.`));
   redirect(me.onboarded ? `/u/${me.id}` : "/onboarding");
 }
 /* A link a person adds to their profile: https only, and on the right site when one is expected. */
@@ -212,7 +217,7 @@ export async function verifyCode(fd: FormData) {
     for (const a of all("SELECT id FROM users WHERE super=1")) notify(a.id, `New college waiting for approval: ${college.name} (@${college.domains})`, "/admin/colleges");
     done("/onboarding", `Email confirmed. ${college.name} is new on Connect, so the team checks it first. You will get in as soon as it is approved.`);
   }
-  done("/", `Verified at ${college.name}. You start with ${RULES.starter} credit.`);
+  done("/work", `Verified at ${college.name}. You start with ${RULES.starter} credit.`);
 }
 /* The email Google or LinkedIn confirmed at sign-in is already proof. If it is on a college domain, the student can join
    that college with it (adding the college, with a name they give, if it is new on Connect). */
@@ -235,7 +240,7 @@ export async function joinWithSignInEmail(fd: FormData) {
     for (const a of all("SELECT id FROM users WHERE super=1")) notify(a.id, `New college waiting for approval: ${college.name} (@${college.domains})`, "/admin/colleges");
     done("/onboarding", `Email confirmed. ${college.name} is new on Connect, so the team checks it first.`);
   }
-  done("/", `Verified at ${college.name}. You start with ${RULES.starter} credit.`);
+  done("/work", `Verified at ${college.name}. You start with ${RULES.starter} credit.`);
 }
 
 /* No email code available: the student names their college and waits for one of its admins to vouch for them. */
@@ -1107,7 +1112,7 @@ export async function verifyStudent(fd: FormData) {
   const { me, back, n, fail } = await ctx(fd, false);
   if (!me.admin) fail("Admins only.");
   if (!run("UPDATE users SET verified=1 WHERE id=? AND role='student' AND deleted=0 AND college_id=?", n("user"), me.college_id).changes) fail("They are not waiting at your college.");
-  notify(n("user"), `An admin verified you as a member. You start with ${RULES.starter} credit and can join projects now.`, "/");
+  notify(n("user"), `An admin verified you as a member. You start with ${RULES.starter} credit and can join projects now.`, "/work");
   done(back, "Verified.");
 }
 export async function setSuspended(fd: FormData) {
@@ -1352,7 +1357,7 @@ export async function saveCollege(fd: FormData) {
   run("UPDATE colleges SET name=?, domains=?, status=? WHERE id=?", name, domains.join(","), status, c.id);
   if (status === "active" && c.status !== "active")
     for (const u of all("SELECT id FROM users WHERE college_id=? AND verified=1", c.id))
-      notify(u.id, `${name} is open on Connect. Welcome in.`, "/");
+      notify(u.id, `${name} is open on Connect. Welcome in.`, "/work");
   done(back, "Community saved.");
 }
 /* A site admin opens a community before anyone from it has signed up, so its students land in it straight away. */

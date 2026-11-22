@@ -32,15 +32,15 @@ const FEMININE = new Set(["ananya", "diya", "saanvi", "aadhya", "kavya", "ira", 
   "hetvi", "jinal", "anushka", "khushi"]);
 const SKIN = ["#f3cfa8", "#eabf91", "#ddaa78", "#cf9862", "#bf8452", "#ad7046", "#9a5f3a", "#85502f", "#e5b48a", "#c98d5b"];
 const HAIR = ["#16100c", "#1f1611", "#2a1d15", "#33241a", "#3d2a1d", "#4a3322", "#1a1a1d"];
-const BACKDROP = ["#ffd6a5", "#caffbf", "#9bf6ff", "#a0c4ff", "#bdb2ff", "#ffc6ff", "#fdffb6", "#ffadad", "#b8e0d2", "#f6efed", "#ffb3b3", "#d0f4de"];
-const CLOTH = ["#1d3557", "#e63946", "#2a9d8f", "#f4a261", "#6d597a", "#457b9d", "#f1faee", "#222222", "#e9c46a", "#3a5a40", "#ff5a1f", "#7a2cff", "#0f4c5c"];
+const BACKDROP = ["#ffd5d2", "#ffc2be", "#ffaaa4", "#f6efed", "#ffb3b3", "#e57a74", "#ff8078", "#c4473f", "#a8201b", "#6e120e", "#f0443c", "#ffe3e1"];
+const CLOTH = ["#3a0300", "#e0221c", "#83332e", "#ff665e", "#5c100c", "#b3120d", "#fff1f0", "#222222", "#d9807a", "#4d0f0c", "#ff3b2f", "#9b1813", "#1c0a09"];
 
 function portrait(seedText, name) {
   const r = rng(seedText);
   const first = String(name || "").trim().split(/\s+/)[0].toLowerCase();
   const fem = FEMININE.has(first) || (!FEMININE.has(first) && first === "tenzin" && r.chance(0.5));
   const skin = r.pick(SKIN), skinD = shade(skin, -0.16), hair = r.pick(HAIR), bg = r.pick(BACKDROP);
-  let cloth = r.pick(CLOTH); if (cloth === bg) cloth = "#1d3557";
+  let cloth = r.pick(CLOTH); if (cloth === bg) cloth = "#3a0300";
   const clothD = shade(cloth, -0.22);
   const glasses = r.chance(0.28), smileOpen = r.chance(0.45), lift = r.range(-2, 2);
   const hx = 100, hy = 92 + lift, rx = 37 + r.range(-2, 2), ry = 45 + r.range(-2, 2);
@@ -67,7 +67,7 @@ function portrait(seedText, name) {
   // Ears, head.
   parts.push(`<ellipse cx="${hx - rx + 1}" cy="${hy + 4}" rx="7" ry="11" fill="${skinD}"/><ellipse cx="${hx + rx - 1}" cy="${hy + 4}" rx="7" ry="11" fill="${skinD}"/>`);
   parts.push(`<ellipse cx="${hx}" cy="${hy}" rx="${rx}" ry="${ry}" fill="${skin}"/>`);
-  if (fem && r.chance(0.5)) parts.push(`<circle cx="${hx - rx + 2}" cy="${hy + 17}" r="2.4" fill="#f5d061"/><circle cx="${hx + rx - 2}" cy="${hy + 17}" r="2.4" fill="#f5d061"/>`);
+  if (fem && r.chance(0.5)) parts.push(`<circle cx="${hx - rx + 2}" cy="${hy + 17}" r="2.4" fill="#ffd5d2"/><circle cx="${hx + rx - 2}" cy="${hy + 17}" r="2.4" fill="#ffd5d2"/>`);
 
   // Hair on top of the head.
   const cap = (drop) => `M${hx - rx - 2} ${hy + drop} C${hx - rx - 6} ${hy - ry - 14} ${hx + rx + 6} ${hy - ry - 14} ${hx + rx + 2} ${hy + drop}`;
@@ -95,7 +95,7 @@ function portrait(seedText, name) {
   const ey = hy + 2, ex = 14 + r.range(-1, 1.5), tilt = r.range(-1.5, 1.5);
   parts.push(`<path d="M${hx - ex - 8} ${ey - 11 + tilt} q8 -5 15 -1 M${hx + ex - 7} ${ey - 12 - tilt} q7 -4 15 1" stroke="${hair}" stroke-width="3.4" stroke-linecap="round" fill="none"/>`);
   for (const sx of [-1, 1]) parts.push(`<ellipse cx="${hx + sx * ex}" cy="${ey}" rx="4.2" ry="4.9" fill="#2b1d14"/><circle cx="${hx + sx * ex + 1.4}" cy="${ey - 1.6}" r="1.3" fill="#fff"/>`);
-  if (glasses) parts.push(`<g fill="none" stroke="#1b1b1f" stroke-width="2.6"><rect x="${hx - ex - 11}" y="${ey - 9}" width="22" height="17" rx="6"/><rect x="${hx + ex - 11}" y="${ey - 9}" width="22" height="17" rx="6"/><path d="M${hx - ex + 11} ${ey - 2} q${ex - 11} -5 ${2 * (ex - 11)} 0"/></g>`);
+  if (glasses) parts.push(`<g fill="none" stroke="#1f1514" stroke-width="2.6"><rect x="${hx - ex - 11}" y="${ey - 9}" width="22" height="17" rx="6"/><rect x="${hx + ex - 11}" y="${ey - 9}" width="22" height="17" rx="6"/><path d="M${hx - ex + 11} ${ey - 2} q${ex - 11} -5 ${2 * (ex - 11)} 0"/></g>`);
   parts.push(`<path d="M${hx - 1} ${ey + 6} q-5 11 0 14 q4 1 6 -1" stroke="${skinD}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`);
   parts.push(`<circle cx="${hx - ex - 6}" cy="${ey + 15}" r="5.5" fill="#ff7b7b" opacity=".16"/><circle cx="${hx + ex + 6}" cy="${ey + 15}" r="5.5" fill="#ff7b7b" opacity=".16"/>`);
   const my = hy + 27;
@@ -120,9 +120,9 @@ const KINDS = {
   map: ["figma", "ui design", "gis", "illustrator", "blender", "user research"],
 };
 const SCHEMES = [
-  ["#ff5a1f", "#ff0000", "#fff3e8"], ["#1638ff", "#7a2cff", "#eef0ff"], ["#00a676", "#1d3b16", "#e9fff4"], ["#111111", "#3a3a3a", "#ffd23f"],
-  ["#7a2cff", "#ff4fa3", "#fff0fb"], ["#0f4c5c", "#2a9d8f", "#e6fbf8"], ["#e63946", "#6d1a36", "#ffeef0"], ["#f4a261", "#e76f51", "#fff6ec"],
-  ["#264653", "#1d3557", "#e9f5ff"], ["#ffb3b3", "#ff5a5a", "#0f0000"],
+  ["#ff3b2f", "#b3120d", "#fff1f0"], ["#8f1712", "#3a0300", "#ffe3e1"], ["#e0221c", "#5c100c", "#fff1f0"], ["#1c0a09", "#4d0f0c", "#ffc2be"],
+  ["#c4261f", "#ff665e", "#fff3f2"], ["#5c100c", "#a8201b", "#ffe8e6"], ["#e63b36", "#6d1512", "#ffeeee"], ["#ff8078", "#d9201a", "#fff3f2"],
+  ["#4d0f0c", "#83332e", "#ffe3e1"], ["#ffb3b3", "#ff5a5a", "#0f0000"],
 ];
 const TOPICS = [
   [/\bprint/i, "print"], [/\bbus|ride|cab|auto|transport/i, "bus"], [/solar|sun|power|standby|energy|plug/i, "sun"], [/water|aqua|tank/i, "drop"], [/drone|crop|krishi|farm/i, "leaf"],
@@ -166,23 +166,23 @@ function scene(kind, variant, r, ink, paper, accent) {
   const g = [];
   if (kind === "hardware" && variant === 1) {
     g.push(`<g transform="translate(360 270) rotate(${r.range(-6, 6).toFixed(1)})"><rect x="-150" y="-110" width="300" height="220" rx="36" fill="${paper}"/><rect x="-150" y="-110" width="300" height="220" rx="36" fill="none" stroke="${ink}" stroke-opacity=".12" stroke-width="8"/>`);
-    g.push(`<rect x="-110" y="-70" width="150" height="96" rx="14" fill="#16261d"/><path d="M-96 -10 L-74 -10 L-62 -40 L-46 10 L-32 -26 L-20 -10 L26 -10" stroke="#7cff4f" stroke-width="5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`);
+    g.push(`<rect x="-110" y="-70" width="150" height="96" rx="14" fill="#240c0a"/><path d="M-96 -10 L-74 -10 L-62 -40 L-46 10 L-32 -26 L-20 -10 L26 -10" stroke="#ff8078" stroke-width="5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`);
     g.push(`<circle cx="92" cy="-40" r="24" fill="${accent}"/><circle cx="92" cy="-40" r="10" fill="#fff" opacity=".7"/><circle cx="92" cy="30" r="14" fill="${ink}" opacity=".7"/><rect x="-110" y="52" width="200" height="16" rx="8" fill="${ink}" opacity=".15"/>`);
     g.push(`<rect x="-20" y="110" width="40" height="80" fill="${ink}" opacity=".6"/></g>`);
     for (let i = 1; i <= 3; i++) g.push(`<path d="M${520 + i * 6} ${150 - i * 34} a${i * 40} ${i * 40} 0 0 1 0 ${i * 80}" transform="rotate(-20 520 150)" stroke="${paper}" stroke-width="9" fill="none" stroke-linecap="round" opacity="${1 - i * 0.22}"/>`);
   } else if (kind === "hardware") {
-    g.push(`<g transform="translate(400 262) rotate(${r.range(-8, 8).toFixed(1)})"><rect x="-230" y="-140" width="460" height="280" rx="22" fill="#0e5a3c"/><rect x="-230" y="-140" width="460" height="280" rx="22" fill="none" stroke="#0a4029" stroke-width="10"/>`);
+    g.push(`<g transform="translate(400 262) rotate(${r.range(-8, 8).toFixed(1)})"><rect x="-230" y="-140" width="460" height="280" rx="22" fill="#6e120e"/><rect x="-230" y="-140" width="460" height="280" rx="22" fill="none" stroke="#4d0f0c" stroke-width="10"/>`);
     for (let i = 0; i < 14; i++) {
       const y = -110 + i * 17, x1 = -210, x2 = r.range(-130, 190);
-      g.push(`<path d="M${x1} ${y} H${(x2 * 0.5).toFixed(0)} L${(x2 * 0.5 + 18).toFixed(0)} ${y + 14} H${x2.toFixed(0)}" stroke="#d6b65a" stroke-width="3" fill="none" opacity=".85"/><circle cx="${x2.toFixed(0)}" cy="${y + 14}" r="4.5" fill="#d6b65a"/>`);
+      g.push(`<path d="M${x1} ${y} H${(x2 * 0.5).toFixed(0)} L${(x2 * 0.5 + 18).toFixed(0)} ${y + 14} H${x2.toFixed(0)}" stroke="#ffaaa4" stroke-width="3" fill="none" opacity=".85"/><circle cx="${x2.toFixed(0)}" cy="${y + 14}" r="4.5" fill="#ffaaa4"/>`);
     }
-    g.push(`<rect x="-62" y="-62" width="124" height="124" rx="10" fill="#1b1b1f"/><rect x="-46" y="-46" width="92" height="92" rx="6" fill="#2b2b31"/>`);
-    for (let i = 0; i < 8; i++) for (const side of [-1, 1]) g.push(`<rect x="${side * 66 - (side < 0 ? 10 : 0)}" y="${-52 + i * 14}" width="10" height="6" fill="#c9c9cf"/><rect y="${side * 66 - (side < 0 ? 10 : 0)}" x="${-52 + i * 14}" width="6" height="10" fill="#c9c9cf"/>`);
-    g.push(`<circle cx="160" cy="-96" r="9" fill="${accent}"/><circle cx="160" cy="-96" r="20" fill="${accent}" opacity=".3"/><circle cx="-170" cy="96" r="7" fill="#7cff4f"/><circle cx="-170" cy="96" r="16" fill="#7cff4f" opacity=".3"/>`);
-    g.push(`<rect x="110" y="40" width="80" height="60" rx="6" fill="#20232a"/><rect x="118" y="48" width="64" height="44" rx="3" fill="#3a3f4b"/></g>`);
+    g.push(`<rect x="-62" y="-62" width="124" height="124" rx="10" fill="#1f1514"/><rect x="-46" y="-46" width="92" height="92" rx="6" fill="#2e1c1a"/>`);
+    for (let i = 0; i < 8; i++) for (const side of [-1, 1]) g.push(`<rect x="${side * 66 - (side < 0 ? 10 : 0)}" y="${-52 + i * 14}" width="10" height="6" fill="#d8c4c2"/><rect y="${side * 66 - (side < 0 ? 10 : 0)}" x="${-52 + i * 14}" width="6" height="10" fill="#d8c4c2"/>`);
+    g.push(`<circle cx="160" cy="-96" r="9" fill="${accent}"/><circle cx="160" cy="-96" r="20" fill="${accent}" opacity=".3"/><circle cx="-170" cy="96" r="7" fill="#ff8078"/><circle cx="-170" cy="96" r="16" fill="#ff8078" opacity=".3"/>`);
+    g.push(`<rect x="110" y="40" width="80" height="60" rx="6" fill="#2a1513"/><rect x="118" y="48" width="64" height="44" rx="3" fill="#4a2b28"/></g>`);
   } else if (kind === "ml" && variant === 1) {
     g.push(`<g transform="translate(400 255) rotate(${r.range(-5, 5).toFixed(1)})"><rect x="-260" y="-170" width="520" height="340" rx="22" fill="${paper}"/><path d="M-220 130 H230 M-220 130 V-140" stroke="${ink}" stroke-opacity=".35" stroke-width="4"/>`);
-    const centres = [[-120, 50, accent], [40, -60, ink], [150, 60, "#ff4fa3"]];
+    const centres = [[-120, 50, accent], [40, -60, ink], [150, 60, "#ff5a52"]];
     for (const [cx, cy, col] of centres) for (let i = 0; i < 22; i++) {
       const a = r.range(0, Math.PI * 2), d = Math.abs(r.range(0, 1) + r.range(0, 1) - 1) * 70;
       g.push(`<circle cx="${(cx + Math.cos(a) * d).toFixed(0)}" cy="${(cy + Math.sin(a) * d * 0.8).toFixed(0)}" r="7" fill="${col}" opacity=".8"/>`);
@@ -205,7 +205,7 @@ function scene(kind, variant, r, ink, paper, accent) {
   } else if (kind === "web" && variant === 1) {
     // A task board: three columns of cards.
     g.push(`<g transform="translate(400 262) rotate(${r.range(-5, 5).toFixed(1)})"><rect x="-290" y="-180" width="580" height="360" rx="18" fill="${paper}"/><rect x="-290" y="-180" width="580" height="44" rx="18" fill="${ink}" opacity=".12"/>`);
-    g.push(`<circle cx="-262" cy="-158" r="7" fill="#ff5f57"/><circle cx="-240" cy="-158" r="7" fill="#febc2e"/><circle cx="-218" cy="-158" r="7" fill="#28c840"/>`);
+    g.push(`<circle cx="-262" cy="-158" r="7" fill="#ff5f57"/><circle cx="-240" cy="-158" r="7" fill="#ffaaa4"/><circle cx="-218" cy="-158" r="7" fill="#ffd5d2"/>`);
     for (let c = 0; c < 3; c++) {
       const x = -268 + c * 182;
       g.push(`<rect x="${x}" y="-118" width="172" height="282" rx="14" fill="${ink}" opacity=".07"/><rect x="${x + 14}" y="-104" width="${r.range(50, 90).toFixed(0)}" height="11" rx="5.5" fill="${ink}" opacity=".55"/>`);
@@ -216,15 +216,15 @@ function scene(kind, variant, r, ink, paper, accent) {
   } else if (kind === "web" && variant === 2) {
     // A landing page with a hero, a button and a row of people.
     g.push(`<g transform="translate(400 262) rotate(${r.range(-5, 5).toFixed(1)})"><rect x="-290" y="-180" width="580" height="360" rx="18" fill="${paper}"/><rect x="-290" y="-180" width="580" height="44" rx="18" fill="${ink}" opacity=".12"/>`);
-    g.push(`<circle cx="-262" cy="-158" r="7" fill="#ff5f57"/><circle cx="-240" cy="-158" r="7" fill="#febc2e"/><circle cx="-218" cy="-158" r="7" fill="#28c840"/>`);
+    g.push(`<circle cx="-262" cy="-158" r="7" fill="#ff5f57"/><circle cx="-240" cy="-158" r="7" fill="#ffaaa4"/><circle cx="-218" cy="-158" r="7" fill="#ffd5d2"/>`);
     g.push(`<rect x="-250" y="-104" width="260" height="26" rx="13" fill="${ink}" opacity=".8"/><rect x="-250" y="-66" width="200" height="26" rx="13" fill="${ink}" opacity=".8"/><rect x="-250" y="-22" width="230" height="12" rx="6" fill="${ink}" opacity=".3"/><rect x="-250" y="-2" width="180" height="12" rx="6" fill="${ink}" opacity=".3"/>`);
     g.push(`<rect x="-250" y="34" width="120" height="40" rx="20" fill="${accent}"/><rect x="-118" y="34" width="110" height="40" rx="20" fill="none" stroke="${ink}" stroke-opacity=".4" stroke-width="3"/>`);
     g.push(`<rect x="40" y="-110" width="220" height="200" rx="22" fill="${accent}" opacity=".9"/><circle cx="150" cy="-10" r="62" fill="#fff" opacity=".85"/><path d="M118 -10 l22 22 l44 -48" stroke="${ink}" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`);
-    for (let i = 0; i < 5; i++) g.push(`<circle cx="${-236 + i * 28}" cy="122" r="17" fill="${[accent, ink, "#ffb3b3", "#4fd1ff", "#7cff4f"][i]}" stroke="${paper}" stroke-width="4" opacity=".95"/>`);
+    for (let i = 0; i < 5; i++) g.push(`<circle cx="${-236 + i * 28}" cy="122" r="17" fill="${[accent, ink, "#ffb3b3", "#e57a74", "#ff8078"][i]}" stroke="${paper}" stroke-width="4" opacity=".95"/>`);
     g.push(`<rect x="-90" y="114" width="120" height="14" rx="7" fill="${ink}" opacity=".3"/></g>`);
   } else if (kind === "web") {
     g.push(`<g transform="translate(400 262) rotate(${r.range(-5, 5).toFixed(1)})"><rect x="-290" y="-180" width="580" height="360" rx="18" fill="${paper}"/><rect x="-290" y="-180" width="580" height="44" rx="18" fill="${ink}" opacity=".12"/>`);
-    g.push(`<circle cx="-262" cy="-158" r="7" fill="#ff5f57"/><circle cx="-240" cy="-158" r="7" fill="#febc2e"/><circle cx="-218" cy="-158" r="7" fill="#28c840"/><rect x="-180" y="-168" width="300" height="20" rx="10" fill="${paper}"/>`);
+    g.push(`<circle cx="-262" cy="-158" r="7" fill="#ff5f57"/><circle cx="-240" cy="-158" r="7" fill="#ffaaa4"/><circle cx="-218" cy="-158" r="7" fill="#ffd5d2"/><rect x="-180" y="-168" width="300" height="20" rx="10" fill="${paper}"/>`);
     g.push(`<rect x="-262" y="-114" width="150" height="270" rx="12" fill="${ink}" opacity=".08"/>`);
     for (let i = 0; i < 6; i++) g.push(`<rect x="-246" y="${-96 + i * 38}" width="${r.range(70, 118).toFixed(0)}" height="12" rx="6" fill="${ink}" opacity="${i === 1 ? 0.75 : 0.3}"/>`);
     g.push(`<rect x="-92" y="-114" width="358" height="118" rx="14" fill="${accent}"/>`);
@@ -261,7 +261,7 @@ function cover(seedText, p) {
   let kind = kindOf(p.skills || [], r);
   const variant = Math.floor(r.next() * 3) % (kind === "web" ? 3 : 2);
   const dark = c3 === "#0f0000";
-  const ink = dark ? "#0f0000" : "#15131a", paper = dark ? "#fff7f5" : c3, accent = r.pick(["#ffd23f", "#ff5a1f", "#7cff4f", "#ff4fa3", "#4fd1ff"]);
+  const ink = dark ? "#0f0000" : "#1a0d0c", paper = dark ? "#fff7f5" : c3, accent = r.pick(["#ffd5d2", "#ff3b2f", "#ff8078", "#f0443c", "#ffaaa4"]);
   const text = `${p.name} ${p.pitch || ""}`;
   const topic = (TOPICS.find(([re]) => re.test(text)) || [null, r.pick(["code", "wave", "pin"])])[1];
   if (!(p.skills || []).length) kind = { bot: "build", bridge: "build", leaf: "hardware", pin: "map", heart: "mobile", bird: "ml", hand: "ml" }[topic] || kind;

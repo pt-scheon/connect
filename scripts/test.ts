@@ -1109,3 +1109,22 @@ test("test sign-in only lists invented people, and their names say (fake)", asyn
   run("UPDATE users SET name='Anon 48213097' WHERE id=?", fake);
   assert.deepEqual(splitFake(get("SELECT name FROM users WHERE id=?", fake)!.name), ["Anon 48213097", true]);
 });
+
+test("after sign-in only Connect's own member pages are accepted", async () => {
+  const { afterPath } = await import("../lib/after");
+  for (const ok of ["/people", "/people?q=react", "/clubs/3", "/projects/4/chat"]) assert.equal(afterPath(ok), ok);
+  for (const bad of ["//evil.example", "https://evil.example", "/people//evil.example", "/admin/../../x", "/peoplex", "/\\evil.example", "/api/me/export", ""]) assert.equal(afterPath(bad), "/work");
+});
+
+test("opened colleges are told apart from sample ones and count real people only", async () => {
+  const { run, now } = await import("../lib/db");
+  const P = await import("../lib/public");
+  const college = (slug: string, by: number | null) => Number(run("INSERT INTO colleges (slug, name, domains, status, requested_by, created_at) VALUES (?,?,?,'active',?,?)", slug, slug, `${slug}.edu`, by, now()).lastInsertRowid);
+  const person = (sub: string, c: number) => run("INSERT INTO users (sub, name, verified, onboarded, role, college_id, created_at) VALUES (?,?,1,1,'student',?,?)", sub, sub, c, now());
+  const team = college("reg-team", null), sample = college("reg-sample", 0), claimed = college("reg-claimed", 0);
+  person("google:reg-a", team); person("demo:reg:1", team); person("demo:reg:2", sample); person("google:reg-b", claimed); person("demo:reg:3", claimed);
+  const got = Object.fromEntries(P.colleges().map((c) => [c.slug, c]));
+  assert.deepEqual([got["reg-team"].opened, got["reg-team"].real.members, got["reg-team"].members], [true, 1, 2]);
+  assert.deepEqual([got["reg-sample"].opened, got["reg-sample"].real.members], [false, 0]);
+  assert.deepEqual([got["reg-claimed"].opened, got["reg-claimed"].real.members], [true, 1]);
+});

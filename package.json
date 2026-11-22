@@ -11,12 +11,12 @@
     "export-data": "tsx scripts/export-data.ts",
     "test": "tsx --test scripts/test.ts scripts/feed.test.ts scripts/clubs.test.ts scripts/proofcheck.test.ts scripts/camera.test.ts scripts/teamchat.test.ts scripts/identity.test.ts scripts/progress.test.ts scripts/public.test.ts scripts/account.test.ts",
     "sample-art": "node scripts/sample-art.js",
-    "dev:showcase": "npm --prefix frontend run dev",
     "setup": "node scripts/setup.js"
   },
   "dependencies": {
     "@google/genai": "^3.2.0",
     "better-sqlite3": "^13.1.1",
+    "geist": "^1.9.2",
     "next": "16.4.6",
     "nodemailer": "10.2.1",
     "react": "19.3.0",

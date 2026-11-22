@@ -6,10 +6,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Connect",
     short_name: "Connect",
     description: "Build with people from your community. Credit comes only from what ships.",
-    start_url: "/",
+    start_url: "/work",
     display: "standalone",
-    background_color: "#0B0A09",
-    theme_color: "#0B0A09",
+    background_color: "#0F0000",
+    theme_color: "#0F0000",
     // Lets you pick Connect in your phone's share sheet (Gallery, Files, Chrome...) and send it to someone.
     share_target: {
       action: "/share",

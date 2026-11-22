@@ -9,9 +9,9 @@ export function markPng(size: number, padded = false) {
   );
   return new ImageResponse(
     (
-      <div style={{ width: size, height: size, display: "flex", position: "relative", background: "#0B0A09", borderRadius: 0 }}>
-        {dot(cx - gap / 2, "#F4783A")}
-        {dot(cx + gap / 2, "#8A857E")}
+      <div style={{ width: size, height: size, display: "flex", position: "relative", background: "#0F0000", borderRadius: 0 }}>
+        {dot(cx - gap / 2, "#E0221C")}
+        {dot(cx + gap / 2, "#8A4843")}
       </div>
     ),
     { width: size, height: size },

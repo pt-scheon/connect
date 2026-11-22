@@ -2,7 +2,7 @@
    with every person's and project's picture alongside. For looking at the test data outside the app, or loading it
    somewhere else.
 
-     npm run export-data                  writes ../sample-data (next to backend/ and frontend/)
+     npm run export-data                  writes ../sample-data (next to this repository)
      npm run export-data -- <folder>      writes there instead
 
    Reads the database in DATABASE_PATH (default ./data/connect.db). It only reads. */

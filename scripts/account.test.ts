@@ -29,7 +29,7 @@ test("sign-in return address: only trusted sites, only a path, never another sit
   assert.equal(R.landing("http://localhost:3000/inbox", "/signin").href, "http://localhost:3000/signin");
   // Started on Connect itself: stays on Connect.
   assert.notEqual(new URL(R.landing(null, "/signin").href).port, "3000");
-  assert.equal(new URL(R.arrival(null, true).href).pathname, "/");
+  assert.equal(new URL(R.arrival(null, true).href).pathname, "/work");
 });
 
 test("trusted origins: named ones, and localhost only outside production", async () => {

@@ -1,14 +1,15 @@
-/* Connect's design system (DESIGN.md): the system font, calm neutral surfaces, one blue accent, soft rounded shapes,
+/* Connect's design system (DESIGN.md): the system font, calm neutral surfaces, one red scheme on near-black, soft rounded shapes,
    pills for every selection, whisper-light shadows.
    waive 56: .convos-head is sticky inside the conversation list's own scroller, not the page. */
 :root{
-  /* Dark */
-  --bg:#000000; --surface:#1c1c1e; --surface2:#2c2c2e; --sunk:#2c2c2e; --pill:#3a3a3c; --pill-hover:#48484a;
-  --ink:#f5f5f7; --muted:#a1a1a6; --line:#38383a; --line2:#48484a; --silver:#86868b;
-  --accent:#0a84ff; --accent-ink:#ffffff; --accent-soft:rgba(10,132,255,.2);
-  --mark:#0071e3; --mark-ink:#ffffff;
-  --ok:#30d158; --ok-soft:rgba(48,209,88,.16); --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.16); --bad:#ff453a; --bad-soft:rgba(255,69,58,.16);
-  --shadow:none; --shadow-pop:0 12px 40px rgba(0,0,0,.6); --bar:rgba(22,22,23,.8);
+  /* One scheme for everyone: red on near-black. States differ by lightness and by their words, never by another hue:
+     pale is good, mid red needs a look, strong red is a problem. */
+  --bg:#0f0000; --surface:#1c0a09; --surface2:#24100e; --sunk:#160605; --pill:#2c1513; --pill-hover:#3b1d1a;
+  --ink:#ffffff; --muted:#bda9a7; --line:#3a1f1c; --line2:#57302c; --silver:#9c8583;
+  --accent:#ff665e; --accent-ink:#0f0000; --accent-soft:rgba(255,59,47,.18);
+  --mark:#d9201a; --mark-ink:#ffffff;
+  --ok:#ffd5d2; --ok-soft:rgba(255,213,210,.13); --warn:#ff9c96; --warn-soft:rgba(255,120,110,.14); --bad:#ff665e; --bad-soft:rgba(255,40,30,.17);
+  --shadow:none; --shadow-pop:0 14px 44px rgba(0,0,0,.6); --bar:rgba(15,0,0,.8);
   --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
   --body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
   /* Figures and times use the text font with tabular numbers; only code is monospace. */
@@ -17,29 +18,8 @@
   --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:28px; --r-pill:980px;
   --ease:cubic-bezier(.4,0,.6,1); --ease-out:cubic-bezier(0,0,.2,1);
   /* Same in both themes: text on photos and video, the call screen, call buttons and a brand mark. */
-  --white:#ffffff; --black:#000000; --danger:#ff3b30; --danger-deep:#d70015; --go:#34c759; --info:#0a84ff; --linkedin:#0a66c2;
+  --white:#ffffff; --black:#000000; --danger:#e0221c; --danger-deep:#b3120d; --go:#ffffff; --info:#8f1712; --linkedin:#5c100c;
   color-scheme:dark;
-}
-:root[data-theme="light"]{
-  --bg:#f5f5f7; --surface:#ffffff; --surface2:#fbfbfd; --sunk:#f0f0f3; --pill:#e8e8ed; --pill-hover:#dedee4;
-  --ink:#1d1d1f; --muted:#5e5e63; --line:#e5e5ea; --line2:#d2d2d7; --silver:#86868b;
-  --accent:#0071e3; --accent-ink:#ffffff; --accent-soft:rgba(0,113,227,.1);
-  --mark:#0071e3; --mark-ink:#ffffff;
-  --ok:#1d7333; --ok-soft:#e9f6ec; --warn:#b25000; --warn-soft:#fff4e5; --bad:#d70015; --bad-soft:#fdecee;
-  --shadow:0 2px 12px rgba(0,0,0,.06); --shadow-pop:0 10px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06); --bar:rgba(250,250,252,.8);
-  color-scheme:light;
-}
-/* No saved choice yet: follow the device's light or dark setting. */
-@media (prefers-color-scheme: light){
-  :root:not([data-theme]){
-  --bg:#f5f5f7; --surface:#ffffff; --surface2:#fbfbfd; --sunk:#f0f0f3; --pill:#e8e8ed; --pill-hover:#dedee4;
-    --ink:#1d1d1f; --muted:#5e5e63; --line:#e5e5ea; --line2:#d2d2d7; --silver:#86868b;
-    --accent:#0071e3; --accent-ink:#ffffff; --accent-soft:rgba(0,113,227,.1);
-    --mark:#0071e3; --mark-ink:#ffffff;
-    --ok:#1d7333; --ok-soft:#e9f6ec; --warn:#b25000; --warn-soft:#fff4e5; --bad:#d70015; --bad-soft:#fdecee;
-    --shadow:0 2px 12px rgba(0,0,0,.06); --shadow-pop:0 10px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06); --bar:rgba(250,250,252,.8);
-    color-scheme:light;
-  }
 }
 
 *{box-sizing:border-box}
@@ -161,13 +141,13 @@ form[data-pending] .btn{background-image:linear-gradient(90deg,transparent,color
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:30;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px);
   padding:10px 12px 10px 16px;border-radius:10px;font-weight:500;background:var(--ink);color:var(--bg);box-shadow:0 10px 30px -10px color-mix(in srgb,var(--ink) 60%,transparent);animation:rise .22s ease-out}
-.toast.err{background:var(--bad);color:var(--white)}
+.toast.err{background:var(--mark);color:var(--white)}
 .toast button{background:none;border:0;color:inherit;font-size:1.2rem;line-height:1;opacity:.7;padding:0 4px}
 @keyframes rise{from{opacity:0;translate:0 10px}}
 
 .bell{position:relative;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--ink)}
 .bell:hover{border-color:var(--accent);text-decoration:none}
-.bell b{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:var(--white);font:500 .68rem/18px var(--mono);text-align:center;padding:0 4px}
+.bell b{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:var(--mark);color:var(--white);font:500 .68rem/18px var(--mono);text-align:center;padding:0 4px}
 .who{margin-left:0}
 .right{margin-left:auto;display:flex;align-items:center;gap:10px}
 
@@ -390,7 +370,7 @@ td{padding-block:11px}
 .convo.on{background:var(--surface);border-left-color:var(--accent)}
 .convo-body{display:flex;flex-direction:column;min-width:0;flex:1}
 .convo.unread b{color:var(--ink)} .convo.unread .convo-body>.small{color:var(--ink);font-weight:600}
-.convo .count{min-width:20px;height:20px;border-radius:99px;background:var(--mark);color:var(--accent-ink);font:600 .72rem var(--mono);display:grid;place-items:center;padding:0 6px}
+.convo .count{min-width:20px;height:20px;border-radius:99px;background:var(--mark);color:var(--mark-ink);font:600 .72rem var(--mono);display:grid;place-items:center;padding:0 6px}
 .ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
 .chat-wrap{display:flex;flex-direction:column;min-height:0;min-width:0}
 .chat{display:flex;flex-direction:column;min-height:0;flex:1;min-width:0}
@@ -407,7 +387,7 @@ td{padding-block:11px}
 .bubble-row.mine{justify-content:flex-end}
 .bubble{max-width:min(520px,76%);padding:8px 12px 6px;border-radius:18px;background:var(--surface2);border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;font-size:.95rem}
 .bubble-row:not(.mine).tail .bubble{border-bottom-left-radius:6px}
-.bubble-row.mine .bubble{background:var(--mark);color:var(--accent-ink);border-color:transparent}
+.bubble-row.mine .bubble{background:var(--mark);color:var(--mark-ink);border-color:transparent}
 .bubble-row.mine.tail .bubble{border-bottom-right-radius:6px}
 .bubble-time{display:block;text-align:right;font:400 .65rem var(--mono);opacity:.6;margin-top:2px}
 .seen{text-align:right;font:400 .7rem var(--mono);color:var(--muted);margin:-4px 4px 6px}
@@ -419,7 +399,7 @@ td{padding-block:11px}
 .chat-input{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
 .chat-input textarea{flex:1;resize:none;border-radius:20px;padding:10px 14px;min-height:42px;max-height:140px;line-height:1.4}
 .chat-input.note{border-radius:0;border-width:1px 0 0}
-.send{width:42px;height:42px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;background:var(--mark);color:var(--accent-ink);transition:transform .12s,opacity .12s}
+.send{width:42px;height:42px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;background:var(--mark);color:var(--mark-ink);transition:transform .12s,opacity .12s}
 .send:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed} .send:not(:disabled):active{transform:scale(.92)}
 .chat-err{flex-basis:100%;color:var(--bad);font-size:.82rem;padding-left:6px}
 .chat-tools{display:flex;justify-content:flex-end;padding:6px 14px;border-top:1px solid var(--line)}
@@ -445,7 +425,7 @@ td{padding-block:11px}
 /* ---------- chat attachments ---------- */
 .chat{position:relative}
 .chat.dragging .chat-scroll{outline:2px dashed var(--accent);outline-offset:-10px}
-.drop-hint{position:absolute;inset:auto 0 90px;margin:auto;width:max-content;z-index:5;padding:8px 16px;border-radius:99px;background:var(--mark);color:var(--accent-ink);font-weight:600;pointer-events:none}
+.drop-hint{position:absolute;inset:auto 0 90px;margin:auto;width:max-content;z-index:5;padding:8px 16px;border-radius:99px;background:var(--mark);color:var(--mark-ink);font-weight:600;pointer-events:none}
 .attach{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;flex:none}
 .attach:hover:not(:disabled){color:var(--ink);border-color:var(--line2)} .attach:disabled{color:var(--muted);border-color:var(--line);background:transparent;cursor:not-allowed}
 .tray{flex-basis:100%;display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px}
@@ -465,7 +445,7 @@ td{padding-block:11px}
 .file-card:hover{border-color:var(--line2)}
 .file-dl{color:var(--muted);padding:0 6px}
 .file-ico{width:40px;height:46px;border-radius:8px;display:grid;place-items:center;flex:none;font:700 .66rem var(--mono);color:var(--white);background:color-mix(in oklab,var(--silver) 55%,var(--black))}
-.file-ico.pdf{background:var(--danger)} .file-ico.doc{background:var(--info)} .file-ico.ppt{background:var(--accent)} .file-ico.xls{background:var(--go)}
+.file-ico.pdf{background:var(--danger)} .file-ico.doc{background:var(--info)} .file-ico.ppt{background:var(--accent)} .file-ico.xls{background:var(--indigo)}
 .photo-msg .bubble-time,.file-msg .bubble-time{opacity:.7;color:var(--muted);padding:0 6px}
 .lightbox{position:fixed;inset:0;z-index:100;background:color-mix(in oklab,var(--black) 92%,transparent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;outline:none}
 .lightbox img{max-width:100%;max-height:calc(100dvh - 110px);border-radius:12px;object-fit:contain}
@@ -513,40 +493,6 @@ td{padding-block:11px}
 .call-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
 .call-btn:hover{border-color:var(--accent);color:var(--accent)}
 .profile-calls{gap:6px}
-.call-screen{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--white);
-  background:var(--black);animation:pop .18s ease-out}
-.call-screen.has-video{background:var(--black)}
-.call-remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--black)}
-.call-id{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:1}
-.call-face{border-radius:50%;object-fit:cover;display:grid;place-items:center;color:var(--white);font-weight:700}
-.call-pulse{border-radius:50%;display:block}
-.call-pulse.on{animation:ringpulse 1.6s infinite}
-@keyframes ringpulse{0%{box-shadow:0 0 0 0 color-mix(in oklab,var(--accent) 55%,transparent)}100%{box-shadow:0 0 0 34px color-mix(in oklab,var(--accent) 0%,transparent)}}
-.call-name{font:700 1.7rem var(--display)}
-.call-top{position:absolute;top:max(18px,env(safe-area-inset-top));left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:2;text-shadow:0 1px 6px color-mix(in oklab,var(--black) 60%,transparent)}
-.call-screen:not(.has-video) .call-top{position:static;margin-top:10px}
-.call-status{font:500 .95rem var(--mono);opacity:.85}
-.call-local{position:absolute;right:16px;top:max(70px,calc(env(safe-area-inset-top) + 56px));width:min(28vw,180px);aspect-ratio:3/4;object-fit:cover;border-radius:16px;
-  border:2px solid color-mix(in oklab,var(--white) 35%,transparent);background:var(--black);z-index:3;transform:scaleX(-1);box-shadow:0 10px 30px color-mix(in oklab,var(--black) 50%,transparent)}
-.call-local.off{opacity:.25}
-.call-screen:not(.has-video) .call-local{display:none}
-.call-controls{position:absolute;bottom:max(28px,env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:16px;z-index:4;flex-wrap:wrap;padding:0 16px}
-.cc{width:58px;height:58px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;color:var(--white);background:color-mix(in oklab,var(--white) 16%,var(--black));transition:transform .12s,background .12s}
-.cc:hover{background:color-mix(in oklab,var(--white) 26%,transparent)} .cc:active{transform:scale(.92)}
-.cc.off{background:var(--white);color:var(--black)}
-.cc.end{background:var(--danger)} .cc.end:hover{background:var(--danger)}
-.cc.accept{background:var(--go);animation:ringpulse 1.6s infinite}
-.call-err{position:absolute;bottom:120px;z-index:5;background:color-mix(in oklab,var(--danger) 90%,transparent);padding:8px 14px;border-radius:12px;font-size:.88rem;max-width:90%}
-.call-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;background:var(--danger-deep);color:var(--white);padding:10px 16px;border-radius:12px;cursor:pointer;max-width:90vw}
-/* Minimised: a floating card so you can keep using the app during a call. */
-.call-screen.mini{inset:auto 16px 16px auto;width:260px;height:auto;min-height:0;border-radius:20px;padding:14px;gap:8px;box-shadow:0 20px 50px color-mix(in oklab,var(--black) 50%,transparent);border:1px solid color-mix(in oklab,var(--white) 12%,transparent)}
-.call-screen.mini.has-video{height:340px;justify-content:flex-end}
-.call-screen.mini .call-remote{border-radius:20px}
-.call-screen.mini .call-local{width:72px;top:10px;right:10px}
-.call-screen.mini .call-top{position:static}
-.call-screen.mini .call-controls{position:static;gap:8px}
-.call-screen.mini .cc{width:42px;height:42px}
-@media (max-width:560px){.cc{width:54px;height:54px}.call-local{width:30vw}}
 
 /* ---------- call and message alerts ---------- */
 .push-toggle{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--sunk)}
@@ -646,7 +592,7 @@ main:focus{outline:none}
   .bottom-nav a:hover{text-decoration:none;color:var(--ink)}
   .bottom-nav a[aria-current="page"]{color:var(--ink);box-shadow:inset 0 2px 0 var(--accent)}
   .bn-icon{position:relative;display:grid;place-items:center}
-  .bn-icon b{position:absolute;top:-5px;right:-10px;min-width:16px;height:16px;padding:0 4px;background:var(--bad);color:var(--white);font:500 .62rem/16px var(--mono);text-align:center}
+  .bn-icon b{position:absolute;top:-5px;right:-10px;min-width:16px;height:16px;padding:0 4px;background:var(--mark);color:var(--white);font:500 .62rem/16px var(--mono);text-align:center}
   body:has(.bottom-nav){padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   body:has(.bottom-nav) .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
   /* The chat fills the screen; leave room for the tab bar under it */
@@ -718,27 +664,17 @@ td.n,th.n{font-family:var(--body)}
    Fills are the base colours; the -t versions are deeper shades for text on light backgrounds,
    so coloured words keep 4.5:1. Dark mode uses the brighter dark-appearance colours. */
 :root{
-  --blue:#0a84ff; --green:#30d158; --orange:#ff9f0a; --purple:#bf5af2; --pink:#ff375f; --teal:#40c8e0; --indigo:#5e5ce6; --yellow:#ffd60a; --red:#ff453a;
-  --blue-t:#409cff; --green-t:#30d158; --orange-t:#ffb340; --purple-t:#da8fff; --pink-t:#ff6482; --teal-t:#5de6ff; --indigo-t:#7d7aff; --red-t:#ff6961;
-}
-:root[data-theme="light"]{
-  --blue:#007aff; --green:#34c759; --orange:#ff9500; --purple:#af52de; --pink:#ff2d55; --teal:#30b0c7; --indigo:#5856d6; --yellow:#ffcc00; --red:#ff3b30;
-  --blue-t:#0071e3; --green-t:#1d7333; --orange-t:#b02e00; --purple-t:#8944ab; --pink-t:#d30f45; --teal-t:#0071a4; --indigo-t:#3634a3; --red-t:#d70015;
-}
-@media (prefers-color-scheme: light){
-  :root:not([data-theme]){
-    --blue:#007aff; --green:#34c759; --orange:#ff9500; --purple:#af52de; --pink:#ff2d55; --teal:#30b0c7; --indigo:#5856d6; --yellow:#ffcc00; --red:#ff3b30;
-    --blue-t:#0071e3; --green-t:#1d7333; --orange-t:#b02e00; --purple-t:#8944ab; --pink-t:#d30f45; --teal-t:#0071a4; --indigo-t:#3634a3; --red-t:#d70015;
-  }
+  /* The accent names predate the red scheme; each is now a shade of red, far enough apart to tell apart in charts. */
+  --blue:#f0302a; --green:#ffc2be; --orange:#ff8078; --purple:#a8201b; --pink:#ff5a52; --teal:#e58f8a; --indigo:#c4473f; --yellow:#ffded8; --red:#ff3b2f;
+  --blue-t:#ff665e; --green-t:#ffd5d2; --orange-t:#ff9c96; --purple-t:#ee8883; --pink-t:#ff7a73; --teal-t:#f0a9a5; --indigo-t:#e97f79; --red-t:#ff665e;
 }
 
-/* project icons: a letter on a soft vertical gradient, like an app icon */
 .picon{--c:var(--blue);display:inline-grid;place-items:center;flex:none;width:32px;height:32px;border-radius:9px;color:#fff;
   font:600 .95rem/1 var(--display);letter-spacing:-.02em;
   background:linear-gradient(180deg,color-mix(in srgb,var(--c) 78%,white),var(--c));box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)}
 .picon.lg{width:48px;height:48px;border-radius:12px;font-size:1.4rem}
-.picon.c0{--c:#007aff}.picon.c1{--c:#34a853}.picon.c2{--c:#ff9500}.picon.c3{--c:#af52de}
-.picon.c4{--c:#ff2d55}.picon.c5{--c:#5856d6}.picon.c6{--c:#30b0c7}.picon.c7{--c:#ff6b00}
+.picon.c0{--c:#e0221c}.picon.c1{--c:#9b1813}.picon.c2{--c:#c4473f}.picon.c3{--c:#6e120e}
+.picon.c4{--c:#f0443c}.picon.c5{--c:#83332e}.picon.c6{--c:#b3120d}.picon.c7{--c:#5a201c}
 a.card .row.nowrap{gap:12px}
 
 /* status badges: each status its own colour */
@@ -892,8 +828,7 @@ dialog.sheet input[type=text]{background:var(--sunk)}
 /* Mesh background (chosen over Sunset and Aurora, side by side): soft glows of the system colours in the corners
    of the app's canvas. Cards stay solid, so the text on them keeps its contrast. */
 :root{--mix-a:18%;--mix-b:14%}
-:root[data-theme="dark"],:root:not([data-theme]){--mix-a:24%;--mix-b:18%}
-@media (prefers-color-scheme: light){:root:not([data-theme]){--mix-a:18%;--mix-b:14%}}
+:root{--mix-a:30%;--mix-b:18%}
 body:not(.guest)::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:
   radial-gradient(55% 45% at 0% 0%,color-mix(in srgb,var(--blue) var(--mix-a),transparent),transparent 70%),
   radial-gradient(45% 40% at 100% 8%,color-mix(in srgb,var(--purple) var(--mix-b),transparent),transparent 70%),
@@ -953,20 +888,20 @@ body:not(.guest) .foot{background:transparent}
 .tier-badge .tb-mark{color:#fff;fill:#fff}
 .tier-badge .tb-pip{fill:var(--tb1)} .tier-badge .tb-pip.on{fill:#fff}
 .tier-badge.dim{opacity:.32;filter:grayscale(.6)}
-.tier-rookie{--tb1:#6e6e73;--tb2:#a1a1a6}
-.tier-bronze{--tb1:#8a4f22;--tb2:#c27c43}
-.tier-silver{--tb1:#5f6b7a;--tb2:#a3afbd}
-.tier-gold{--tb1:#a87700;--tb2:#e0a800}
-.tier-platinum{--tb1:#1d7f79;--tb2:#38b2a9}
-.tier-diamond{--tb1:#1f55c9;--tb2:#4f8cff}
-.tier-legend{--tb1:#7a22b8;--tb2:#c44ae0}
-.tier-name.tier-rookie{color:var(--muted)}
-.tier-name.tier-bronze{color:#b5703a}
-.tier-name.tier-silver{color:#8794a5}
-.tier-name.tier-gold{color:#c99200}
-.tier-name.tier-platinum{color:#2a9d95}
-.tier-name.tier-diamond{color:#3d7bfa}
-.tier-name.tier-legend{color:#b03fd6}
+.tier-rookie{--tb1:#4a2b28;--tb2:#7a5652}
+.tier-bronze{--tb1:#4d0f0c;--tb2:#83251f}
+.tier-silver{--tb1:#6b2d29;--tb2:#a8615c}
+.tier-gold{--tb1:#7a120d;--tb2:#c4261f}
+.tier-platinum{--tb1:#a53b35;--tb2:#e57a74}
+.tier-diamond{--tb1:#b3120d;--tb2:#ff3b2f}
+.tier-legend{--tb1:#d9201a;--tb2:#ffaaa4}
+.tier-name.tier-rookie{color:#bda9a7}
+.tier-name.tier-bronze{color:#d9807a}
+.tier-name.tier-silver{color:#e09a95}
+.tier-name.tier-gold{color:#f06b64}
+.tier-name.tier-platinum{color:#f5a09a}
+.tier-name.tier-diamond{color:#ff665e}
+.tier-name.tier-legend{color:#ffc2be}
 .tier-name{font-weight:600}
 .name-row{gap:12px;flex-wrap:wrap}
 .rank-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:var(--r-pill);background:var(--sunk);font-size:.85rem;text-decoration:none}
@@ -974,5 +909,21 @@ body:not(.guest) .foot{background:transparent}
 /* Project icons are images now: the team's own, or a cover drawn from the name */
 img.picon.pimg{object-fit:cover;background:var(--sunk);padding:0}
 
+/* ================= The public pages' red ================= */
+html body{
+  background:
+    radial-gradient(90% 55% at 20% -12%,rgba(255,60,40,.38),transparent 62%),
+    radial-gradient(70% 40% at 100% 0%,rgba(200,20,10,.22),transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+}
+html h1{font-weight:300;letter-spacing:-.045em}
+html h2{font-weight:400;letter-spacing:-.03em}
+::selection{background:#ff0000;color:#fff}
+/* Destructive buttons keep an outline, so they never pass for the main action. */
+html .btn.danger{border:1.5px dashed var(--bad)}
+/* Dark marks on the pale fills. */
+.pc-mark.ok,.pc-mark.warn,.pub-cols > div:nth-child(2)::before,.pub-cols > div:nth-child(3)::before{color:var(--bg)}
 /* "(fake)" beside invented test people */
 .fake-tag{font:500 11px/1 var(--body);letter-spacing:0;color:var(--muted);white-space:nowrap}
+

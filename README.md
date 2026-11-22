@@ -4,13 +4,12 @@ A network of colleges where students build projects together. Each college is it
 
 ## Run it locally
 
-The app is at the top of this repository and the website is in `frontend/`.
+Connect is one Next.js app: the public pages and the members' pages, at one address.
 
 ```bash
 npm ci
-npm run setup                    # installs the website and makes a working database of invented people
-npm run dev                      # the app, http://localhost:4000
-npm run dev:showcase             # in a second terminal: the website, http://localhost:3000
+npm run setup                    # makes a working database of invented people
+npm run dev                      # http://localhost:4000
 ```
 
 On http://localhost:4000/signin, pick any fake account to sign in without a password. Tanvi Kulkarni is a college
@@ -41,6 +40,11 @@ Someone who uses both with the same verified email lands on one account.
 - `CONTACT_EMAIL`: optional, shown on the privacy page.
 - `ADMIN_EMAILS`: your own sign-in email. Admins approve alumni, register clubs, handle reports and can ship a project with a single review.
 - `GEMINI_API_KEY`: turns on "Write with AI" for resumes.
+
+### The old website addresses
+
+`forward/` is a tiny server for the addresses the separate website used to have: it opens the same path on this site.
+Deploy that folder to those services with `SITE_URL` set to this site's address.
 
 ### 3. Hosting
 

@@ -12,7 +12,7 @@ export async function toggleFollow(fd: FormData) {
   const id = Math.trunc(Number(fd.get("id"))) || 0;
   const back = `/projects/${id}`;
   const p = get("SELECT id FROM projects WHERE id=? AND college_id=? AND hidden=0", id, me.college_id);
-  if (!p) redirect("/");
+  if (!p) redirect("/work");
   if (!allow(`follow:${me.id}`, 30, 600)) redirect(back + "?err=" + encodeURIComponent("Slow down a little. Try again in a few minutes."));
   const on = get("SELECT 1 FROM follows WHERE project_id=? AND user_id=?", id, me.id);
   if (on) run("DELETE FROM follows WHERE project_id=? AND user_id=?", id, me.id);

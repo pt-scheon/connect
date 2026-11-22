@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import "./throwaway-db";
 import { FEED, learnInterest, rankBoard, score, type FeedProject, type FeedViewer } from "../lib/feed";
 
 const DAY = 86400, T = 1_800_000_000;
