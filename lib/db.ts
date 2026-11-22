@@ -228,6 +228,11 @@ const COLUMNS: [table: string, column: string, type: string][] = [
   // When someone left a project or was voted gone, for the credit history on profiles.
   ["members", "left_at", "INTEGER"],
   ["projects", "invited_at", "INTEGER"], // when reviewers were picked; empty for projects sent for review under the old rule
+  // Whom a stored line names; the text itself holds only a slot for the name (lib/identity.ts). 0: nobody, or nobody known.
+  // Empty: written before this, when lines held the name itself (scripts/backfill-names.js).
+  ["updates", "actor_id", "INTEGER"],
+  ["notifications", "actor_id", "INTEGER"],
+  ["team_messages", "actor_id", "INTEGER"],
 ];
 
 function open() {

@@ -5,6 +5,7 @@ import { allow, notify } from "@/lib/notify";
 import { iceServers } from "@/lib/calls";
 import { push } from "@/lib/push";
 import { onTeam } from "@/lib/teamchat";
+import { NAME } from "@/lib/identity";
 import { inCall, joinCall, leaveCall, sendSignal } from "@/lib/teamspace";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
       // The rest of the team hears about it: inbox, and a notification on devices with alerts on.
       const kind = r.video ? "video" : "voice";
       for (const m of all("SELECT user_id FROM members WHERE project_id=? AND status='active' AND user_id<>?", p.id, me.id)) {
-        notify(m.user_id, `${me.name} started a team ${kind} call in ${p.name}`, `/projects/${p.id}/chat`);
+        notify(m.user_id, `${NAME} started a team ${kind} call in ${p.name}`, `/projects/${p.id}/chat`, me.id);
         void push(m.user_id, { type: "team", project: p.id, title: `${p.name} team call`, text: `${me.name} started a ${kind} call. Tap to join.`, url: `/projects/${p.id}/chat` }, { ttl: 120, urgent: true });
       }
     }

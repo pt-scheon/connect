@@ -6,6 +6,7 @@ import { collegeById, isMember } from "@/lib/college";
 import { EMPTY, RULES } from "@/lib/credit";
 import { ties, pathTo } from "@/lib/graph";
 import { timeAgo } from "@/lib/notify";
+import { lineText } from "@/lib/identity";
 import { needsFor, fitsMe, type Need } from "@/lib/relevance";
 import { rankBoard, viewerSignals, type FeedProject } from "@/lib/feed";
 import { Board, Count, type BoardItem } from "./client";
@@ -144,7 +145,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ f
                 {feed.map((x) => (
                   <div key={x.id} className={`item ${x.kind === "post" ? "post" : x.text.startsWith("Shipped") ? "ship" : ""}`}>
                     <span className="dot" />
-                    <span><Link href={`/projects/${x.project_id}`}>{x.name}</Link> <span className="muted">· {timeAgo(x.created_at)}</span><br />{x.text}</span>
+                    <span><Link href={`/projects/${x.project_id}`}>{x.name}</Link> <span className="muted">· {timeAgo(x.created_at)}</span><br />{lineText(x)}</span>
                   </div>
                 ))}
               </div>

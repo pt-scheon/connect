@@ -9,7 +9,7 @@
     "seed": "tsx scripts/seed.ts && node scripts/sample-art.js",
     "typecheck": "tsc --noEmit",
     "export-data": "tsx scripts/export-data.ts",
-    "test": "tsx --test scripts/test.ts scripts/feed.test.ts scripts/clubs.test.ts scripts/proofcheck.test.ts scripts/camera.test.ts scripts/teamchat.test.ts scripts/identity.test.ts scripts/progress.test.ts scripts/public.test.ts scripts/account.test.ts scripts/db-path.test.ts",
+    "test": "tsx --test scripts/test.ts scripts/feed.test.ts scripts/clubs.test.ts scripts/proofcheck.test.ts scripts/camera.test.ts scripts/teamchat.test.ts scripts/identity.test.ts scripts/progress.test.ts scripts/public.test.ts scripts/account.test.ts scripts/names.test.ts scripts/backfill-names.test.ts scripts/db-path.test.ts",
     "sample-art": "node scripts/sample-art.js",
     "dev:showcase": "npm --prefix frontend run dev",
     "setup": "node scripts/setup.js"
