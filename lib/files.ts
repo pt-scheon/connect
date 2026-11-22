@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { dbFile } from "./db-path";
 
 /* Chat attachments. Stored on disk next to the database (so the same volume keeps both), under random names.
    A file is accepted by what its bytes are, never by its name or the type the browser claims. */
@@ -18,8 +19,7 @@ export const LIMITS = {
 export type Kind = "image" | "file" | "video" | "voice";
 export type Checked = { kind: Kind; mime: string; ext: string };
 
-const dbFile = () => process.env.DATABASE_PATH || path.join(process.cwd(), "data", "connect.db");
-export const uploadDir = () => path.join(path.dirname(dbFile()), "uploads");
+export const uploadDir = () => path.join(/* turbopackIgnore: true */ path.dirname(dbFile()), "uploads");
 
 const starts = (b: Buffer, sig: number[], at = 0) => sig.every((x, i) => b[at + i] === x);
 const ascii = (b: Buffer, s: string, at = 0) => b.subarray(at, at + s.length).toString("latin1") === s;

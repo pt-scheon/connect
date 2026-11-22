@@ -1,6 +1,14 @@
+/* The order of "For you" (lib/feed.ts). Uses a throwaway database, never the real one. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FEED, learnInterest, rankBoard, score, type FeedProject, type FeedViewer } from "../lib/feed";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { FeedProject, FeedViewer } from "../lib/feed";
+
+process.env.DATABASE_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "connect-feed-")), "test.db");
+// Not a normal import: those run before the line above, and lib/feed opens the database as it loads.
+const { FEED, learnInterest, rankBoard, score } = require("../lib/feed") as typeof import("../lib/feed");
 
 const DAY = 86400, T = 1_800_000_000;
 const proj = (o: Partial<FeedProject> & { id: number }): FeedProject => ({
