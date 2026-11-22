@@ -61,8 +61,12 @@ export const currentUser = cache(async (): Promise<Row | null> => {
     // Not counted for anyone who said no to statistics while the old cookie notice offered that choice.
     if (u.stats_on === 0 || (await cookies()).get(CONSENT_COOKIE)?.value === "necessary") return u;
     const h = await headers(), dest = h.get("sec-fetch-dest");
-    if (dest ? dest === "document" : (h.get("accept") ?? "").includes("text/html"))
-      run("INSERT INTO activity (day, user_id) VALUES (?,?) ON CONFLICT (day, user_id) DO UPDATE SET hits=hits+1", Math.floor((now() + 19800) / 86400), id);
+    if (dest ? dest === "document" : (h.get("accept") ?? "").includes("text/html")) {
+      // Public and members' pages have separate layouts, so moving between them is a full load too. One that came from
+      // a page of Connect, and is not a reload, still marks the day but is not another visit.
+      const inside = h.get("sec-fetch-site") === "same-origin" && !!h.get("referer") && !(h.get("cache-control") ?? "").includes("max-age=0");
+      run("INSERT INTO activity (day, user_id) VALUES (?,?) ON CONFLICT (day, user_id) DO UPDATE SET hits=hits+?", Math.floor((now() + 19800) / 86400), id, inside ? 0 : 1);
+    }
   } catch { /* never block a page over a count */ }
   return u;
 });

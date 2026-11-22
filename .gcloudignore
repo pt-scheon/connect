@@ -10,9 +10,9 @@ db
 *.db-wal
 *.db-shm
 uploads
-frontend
 buildathon
 prototype
 docs
 .claude
 .hallmark
+forward

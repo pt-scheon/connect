@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { prepare } from "./messages/chat";
+import { prepare } from "@/app/(app)/messages/chat";
 
 /* Uploads one image to `url` (a profile photo or a project's image), shrunk and stripped of hidden data first. */
 async function send(url: string, file: File): Promise<string | null> {

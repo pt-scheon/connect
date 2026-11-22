@@ -26,6 +26,6 @@ export function landing(next: string | null, path: string): URL {
 
 /* Where a finished sign-in goes: the page asked for, or the person's profile setup first if they have not done it. */
 export function arrival(next: string | null, onboarded: boolean): URL {
-  if (!next) return new URL("/", baseUrl());
+  if (!next) return new URL("/work", baseUrl());
   return onboarded ? new URL(next) : landing(next, "/onboarding");
 }

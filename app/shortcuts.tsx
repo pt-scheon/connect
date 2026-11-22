@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-/* Press "/" to jump to the page's search box (the board, People). Ignored while typing somewhere else. */
+/* Press "/" to jump to the page's search box (Work, People). Ignored while typing somewhere else. */
 export function Shortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -6,8 +6,9 @@ import { RANKS, TIERS, tierFor, type Rank, type Tier } from "./tiers";
 import { progressOf } from "./progress";
 import { isMember } from "./college";
 import { unreadMessages } from "./chat";
+import { openedSql, sampleSql } from "./sample";
 
-/* Read-only data for the public showcase site (../frontend), served as JSON from app/api/public/*.
+/* Read-only data for the public pages (app/(site)), also served as JSON from app/api/public/*.
 
    The rule: nothing here may be more than a signed-out visitor can already see on Connect today.
    - A college's public page (/c/slug) shows its name, counts and shipped projects (name, pitch, pot, date).
@@ -70,6 +71,14 @@ function projectCard(p: Row) {
 /* True while the invented people from scripts/demo-data.js are in the database, so both sites can say so. */
 export const hasSampleData = () => !!get("SELECT 1 FROM users WHERE sub LIKE 'demo:%' LIMIT 1");
 
+/* The counts beside the header's links: shipped work, and colleges opened for real students. */
+export function navCounts() {
+  return {
+    work: get(`SELECT COUNT(*) n FROM projects p JOIN colleges c ON c.id=p.college_id WHERE ${SHIPPED}`)!.n as number,
+    colleges: get(`SELECT COUNT(*) n FROM colleges c WHERE c.status='active' AND ${openedSql()}`)!.n as number,
+  };
+}
+
 export function overview() {
   const n = (sql: string) => (get(sql)?.n ?? 0) as number;
   return {
@@ -93,8 +102,8 @@ export function overview() {
   };
 }
 
-export function shippedProjects(opts: { college?: string; limit?: number } = {}) {
-  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+export function shippedProjects(opts: { college?: string; limit?: number; every?: boolean } = {}) {
+  const limit = opts.every ? -1 : Math.min(Math.max(opts.limit ?? 50, 1), 200); // every: for the Work page, not the API
   const rows = opts.college
     ? all(`SELECT p.*, c.slug cslug, c.name cname FROM projects p JOIN colleges c ON c.id=p.college_id WHERE ${SHIPPED} AND c.slug=? ORDER BY p.shipped_at DESC LIMIT ?`, opts.college, limit)
     : all(`SELECT p.*, c.slug cslug, c.name cname FROM projects p JOIN colleges c ON c.id=p.college_id WHERE ${SHIPPED} ORDER BY p.shipped_at DESC LIMIT ?`, limit);
@@ -138,24 +147,38 @@ function collegeCounts(id: number) {
   };
 }
 
+/* The same counts with every invented person, and every project one of them leads, left out. */
+export function realCounts(id: number) {
+  const n = (sql: string) => (get(sql, id)?.n ?? 0) as number;
+  const led = `SELECT COUNT(*) n FROM projects p JOIN users u ON u.id=p.lead_id WHERE p.college_id=? AND p.hidden=0 AND NOT ${sampleSql("u.sub")}`;
+  return {
+    members: n(`SELECT COUNT(*) n FROM users u WHERE u.college_id=? AND ${PERSON} AND NOT ${sampleSql("u.sub")}`),
+    shipped: n(`${led} AND p.status='shipped'`),
+    building: n(`${led} AND p.status IN ('recruiting','building','review')`),
+    alumni: n(`SELECT COUNT(*) n FROM users WHERE college_id=? AND role='alum' AND verified=1 AND deleted=0 AND NOT ${sampleSql()}`),
+  };
+}
+
 export function colleges() {
-  return all("SELECT * FROM colleges WHERE status='active' ORDER BY name").map((c) => ({
+  return all(`SELECT c.*, ${openedSql()} opened FROM colleges c WHERE c.status='active' ORDER BY c.name`).map((c) => ({
     slug: c.slug as string, name: c.name as string, since: iso(c.created_at), ...collegeCounts(c.id),
+    opened: !!c.opened, real: realCounts(c.id),
   }));
 }
 
 export function college(slug: string) {
-  const c = get("SELECT * FROM colleges WHERE slug=? AND status='active'", slug);
+  const c = get(`SELECT c.*, ${openedSql()} opened FROM colleges c WHERE c.slug=? AND c.status='active'`, slug);
   if (!c) return null;
   return {
     slug: c.slug as string, name: c.name as string, since: iso(c.created_at),
     domains: String(c.domains).split(",").map((d) => d.trim()).filter(Boolean),
     counts: collegeCounts(c.id),
+    opened: !!c.opened, real: realCounts(c.id),
     shipped: shippedProjects({ college: slug, limit: 50 }),
   };
 }
 
-export function builders(limit = 20) {
+export function builders(limit = 20, most = 100) {
   const s = compute();
   return all(`SELECT u.id, u.name, u.branch, u.grad_year, u.anon, u.alias, u.photo_key, c.slug cslug, c.name cname FROM users u JOIN colleges c ON c.id=u.college_id WHERE ${PERSON} AND c.status='active'`)
     .map((u) => {
@@ -169,7 +192,7 @@ export function builders(limit = 20) {
     })
     .filter((b) => b.shipped > 0)
     .sort((a, b) => b.earned - a.earned || b.shipped - a.shipped)
-    .slice(0, Math.min(Math.max(limit, 1), 100));
+    .slice(0, Math.min(Math.max(limit, 1), most));
 }
 
 export function builder(id: number) {

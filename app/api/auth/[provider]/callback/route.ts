@@ -5,6 +5,7 @@ import { get } from "@/lib/db";
 import { autoVerify, baseUrl, recordLogin, setSession, upsertUser } from "@/lib/auth";
 import { allow, deviceName, ipOf, notify } from "@/lib/notify";
 import { PROVIDERS, callbackUrl, ready } from "@/lib/oauth";
+import { AFTER_COOKIE, afterPath } from "@/lib/after";
 import { NEXT_COOKIE, arrival, cleanNext, landing } from "@/lib/return-to";
 import { CODE_MINUTES, needsCode, pendingToken, sendLoginCode } from "@/lib/twostep";
 
@@ -67,5 +68,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   }
   recordLogin(id, deviceName(req.headers.get("user-agent")), notify);
   await setSession(id);
+  // Started on Connect itself: back to the page they first tried to open. (A sign-in from the website has its own.)
+  if (!next && u.onboarded) {
+    const after = afterPath(jar.get(AFTER_COOKIE)?.value);
+    jar.delete(AFTER_COOKIE);
+    return NextResponse.redirect(new URL(after, baseUrl()));
+  }
   return NextResponse.redirect(arrival(next, !!u.onboarded));
 }

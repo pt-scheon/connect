@@ -219,7 +219,7 @@ export async function world(opts: { anonymous?: Who[] } = {}) {
     const { teamMessages } = await import("../lib/teamchat");
     const { GET } = await import("../app/api/me/export/route");
     const inboxes = {} as Record<Who, string[]>, exported = {} as Record<Who, string[]>, pages: string[] = [];
-    const Inbox = await page("inbox/page.tsx"), Project = await page("projects/[id]/page.tsx"), Board = await page("page.tsx");
+    const Inbox = await page("inbox/page.tsx"), Project = await page("projects/[id]/page.tsx"), Board = await page("work/page.tsx");
     for (const who of alive()) {
       as(who);
       inboxes[who] = inbox(u(who)).items.map((i) => i.text);

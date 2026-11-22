@@ -48,6 +48,16 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "*.localhost"],
   // Forms can carry one proof file (a certificate or letter, up to 5 MB).
   experimental: { serverActions: { bodySizeLimit: "6mb" } },
+  async redirects() {
+    return [
+      // The board used to be the home page, then /projects. It is part of Work now.
+      { source: "/", has: [{ type: "query", key: "f" }], destination: "/work", permanent: false },
+      { source: "/projects", destination: "/work", permanent: false },
+      // Builders is part of People now.
+      { source: "/builders", destination: "/people", permanent: false },
+      { source: "/builders/:id", destination: "/people/:id", permanent: false },
+    ];
+  },
   async headers() {
     // Chat attachments set their own, stricter headers in app/api/files/[key]/route.ts.
     return [

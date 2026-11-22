@@ -3,7 +3,7 @@ import { isMember } from "./college";
 import type { Row } from "./db";
 import { credentialed, trusted } from "./public-http";
 
-/* Plumbing shared by the signed-in JSON API in app/api/account/*. It is what the showcase (../frontend) calls from the
+/* Plumbing shared by the signed-in JSON API in app/api/account/*. It is what the separate website used to call from the
    browser for sign-in, the profile, inbox, messages and settings, so that nobody has to be sent to Connect's own pages.
 
    Every route answers only a trusted origin (lib/public-http.ts: SHOWCASE_URL, PUBLIC_API_ORIGIN, and any localhost

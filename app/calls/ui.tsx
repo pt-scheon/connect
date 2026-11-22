@@ -48,7 +48,7 @@ export function CallButtons({ to, name, picture = null }: { to: number; name: st
 function Face({ u, size }: { u: Peer; size: number }) {
   // eslint-disable-next-line @next/next/no-img-element
   return u.picture ? <img className="call-face" src={u.picture} alt="" width={size} height={size} referrerPolicy="no-referrer" />
-    : <span className="call-face" style={{ width: size, height: size, fontSize: size / 2.6, background: `hsl(${(u.id * 67) % 360} 55% 42%)` }}>{u.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}</span>;
+    : <span className="call-face" style={{ width: size, height: size, fontSize: size / 2.6, background: `hsl(2 62% ${24 + ((u.id * 7) % 22)}%)` }}>{u.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}</span>;
 }
 
 
@@ -286,6 +286,14 @@ export function CallProvider({ anon = false }: { anon?: boolean }) {
   };
   const acceptRef = useRef(accept); acceptRef.current = accept;
   const decline = () => { const id = state.current.id; if (id) void api({ action: "decline", id }); cleanup(); };
+  // Reload, Back or a link to the other layout would hang up, so ask first while talking.
+  const talking = s.phase === "active" || s.phase === "connecting";
+  useEffect(() => {
+    if (!talking) return;
+    const ask = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [talking]);
   const hangup = () => { const id = state.current.id; if (id) void api({ action: "end", id }); cleanup(state.current.phase === "active" ? "Call ended" : undefined); };
 
   // Quick taps are sent as one update, so they cannot reach the other side out of order.

@@ -2,7 +2,11 @@
 
 The live look of Connect, written down from `app/globals.css` and `app/public.css`. If this file and the CSS disagree, the CSS is right and this file should be fixed.
 
-**Direction:** calm and quiet. The system font, neutral surfaces, one blue for actions, a small set of bright accent colours for status, soft rounded shapes, a pill for every selection, and very light shadows.
+**Direction:** one site in one scheme: red on near-black, Geist, big light headings, mono captions, pills and hairlines.
+There is no light mode. Two root layouts keep two stylesheets apart because they share class names: public pages
+(`app/(site)`, `site.css`) and members' pages (`app/(app)`, `app/globals.css` then `member.css`). The header and footer
+are one component for both (`components/shell`). States differ by lightness and by their words, never by another hue, and
+destructive buttons have a dashed outline. The colour values and names in the sections below describe the older palette.
 
 ## 1. Principles
 
