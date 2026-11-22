@@ -17,7 +17,7 @@ It is also my entry for **Startup Buildathon India 2026 (hack2skill)**. The team
 ## 2. Where things are
 
 - **Code:** `/Users/aadityasheth/connect`
-- **GitHub:** `pt-scheon/connect`, remote `git@github.com:pt-scheon/connect.git` over SSH. Pushing works as `pt-scheon`.
+- **GitHub:** `pt-scheon/connectors`, remote `git@github.com:pt-scheon/connectors.git` over SSH. Pushing works as `pt-scheon`.
 - **Stack:**
   - Next.js 16.4.6 (App Router), React 19, TypeScript, server actions.
   - better-sqlite3: the schema is in `lib/db.ts`; new columns go in `COLUMNS`, which migrates on start.
@@ -88,7 +88,7 @@ It is also my entry for **Startup Buildathon India 2026 (hack2skill)**. The team
    - Keep the localhost entries.
    - This changes my account settings: ask me first, or let me do it.
 2. **Publish the Google sign-in app.** Google Auth Platform → Audience → publish to production, so any Google account can sign in, not just test users. My click.
-3. **GitHub auto-deploy.** The Railway service has `pt-scheon/connect` as its source, but no deploy triggers on push. I need to give Railway's GitHub app access to the repo. Until then, deploy with `railway up`.
+3. **GitHub auto-deploy.** The Railway service has `pt-scheon/connectors` as its source, but no deploy triggers on push. I need to give Railway's GitHub app access to the repo. Until then, deploy with `railway up`.
 4. **`railway.json` retires on 2026-12-01.** Convert it with `railway config migrate` (dry run first, then `--apply`, then `cutover`) so the health check and restart settings carry over.
 5. **Test push and calls on real phones** once sign-in works on the live site: an Android phone in Chrome, and an iPhone with Connect added to the Home Screen (iOS 16.4+).
 6. **Email (optional).** Codes and alerts need `SMTP_URL` (a Gmail app password works) or `RESEND_API_KEY`. Until then, students verify through a college Google sign-in, or admins verify them.
@@ -108,7 +108,7 @@ It is also my entry for **Startup Buildathon India 2026 (hack2skill)**. The team
 ## 7. Access I gave the earlier chat (ask me for each again here)
 
 - Read and write access to `/Users/aadityasheth/connect`, and to `/Users/aadityasheth/Downloads` (that is where the deck template came from).
-- Running commands, including git commit and push to `pt-scheon/connect`. Commit and push only when I ask; I said yes for each finished batch.
+- Running commands, including git commit and push to `pt-scheon/connectors`. Commit and push only when I ask; I said yes for each finished batch.
 - The **built-in browser pane**. It is signed in to my Cloudflare dashboard and my Google Cloud console, and my own tab on `http://localhost:3000` is signed in to my real Connect account. Don't use or sign out that tab.
 - **Railway CLI**, logged in as my account.
 - **GitHub CLI** is installed but **not logged in** (`gh auth login` would be my step).

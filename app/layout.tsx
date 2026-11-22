@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { get } from "@/lib/db";
 import { collegeById, isMember } from "@/lib/college";
+import { hasSampleData } from "@/lib/public";
 import { unreadMessages } from "@/lib/chat";
 import { CallProvider } from "./calls/ui";
 import { BottomNav } from "./bottom-nav";
@@ -84,6 +85,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         {demoMode && <div className="strip"><div className="wrap">Test site with invented sample people. Nothing here is real. The real Connect is at <a href="https://connect-production-77ec4d79.up.railway.app">connect-production-77ec4d79.up.railway.app</a>.</div></div>}
+        {!demoMode && hasSampleData() && <div className="strip"><div className="wrap">Connect is new, so most people, projects and numbers here are invented samples. The colleges are real, but have not joined or endorsed Connect.</div></div>}
         {signedIn && !member && (
           <div className="strip"><div className="wrap">
             {me.role === "alum" ? "Your alumni account is waiting for an admin of your community to approve it."
