@@ -21,13 +21,13 @@ export function frontPath(to: string, appUrl: string, myId?: number): Target {
 }
 
 /* Connect's sign-in cookie only reaches this site when both share a site. Railway gives every service its own
-   (up.railway.app is a public suffix), so there the account pages open on Connect instead. With one domain
+   (up.railway.app is a public suffix, as is run.app on Google Cloud), so there the account pages open on Connect instead. With one domain
    (www.example.in and app.example.in) this turns itself off. */
 export function splitSites(appUrl: string, here: string): boolean {
   let there: string;
   try { there = new URL(appUrl).hostname; } catch { return false; }
   if (there === here) return false;
-  const shared = /\.(up\.railway\.app|vercel\.app|onrender\.com|pages\.dev)$/;
+  const shared = /\.(up\.railway\.app|run\.app|vercel\.app|onrender\.com|pages\.dev)$/;
   if (shared.test(there) || shared.test(here)) return true;
   const base = (h: string) => h.split(".").slice(/\.(co|ac|org|net)\.in$/.test(h) ? -3 : -2).join(".");
   return base(there) !== base(here);
