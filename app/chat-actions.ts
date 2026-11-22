@@ -8,6 +8,7 @@ import { isMember } from "@/lib/college";
 import { allow, notify } from "@/lib/notify";
 import { canMessage, toMsg, type Msg } from "@/lib/chat";
 import { pushMessage } from "@/lib/push";
+import { NAME } from "@/lib/identity";
 export type { Msg } from "@/lib/chat";
 
 /* Direct messages between people at the same college. Both sides must be verified members of it,
@@ -53,7 +54,7 @@ export async function sendMessage(to: number, text: string): Promise<{ message: 
   if (!allow(`dm:${me!.id}`, 30, 60)) return { error: "You are sending a lot. Wait a minute." };
   const first = !get("SELECT 1 FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) LIMIT 1", me!.id, to, to, me!.id);
   const id = Number(run("INSERT INTO messages (from_id, to_id, text, created_at) VALUES (?,?,?,?)", me!.id, to, body, now()).lastInsertRowid);
-  if (first) notify(to, `${me!.name} sent you a message`, `/messages/${me!.id}`);
+  if (first) notify(to, `${NAME} sent you a message`, `/messages/${me!.id}`, me!.id);
   pushMessage(to, me!, body);
   return { message: rows(me!, to, id - 1, 1)[0] };
 }
@@ -115,7 +116,7 @@ export async function inviteToProject(fd: FormData) {
   db.transaction(() => {
     run("INSERT INTO messages (from_id, to_id, text, kind, project_id, created_at) VALUES (?,?,?,?,?,?)",
       me.id, to, `Invited you to join ${r.name} as ${r.title}.${note ? `\n\n${note}` : ""}`, "invite", r.pid, now());
-    notify(to, `${me.name} invited you to apply for ${r.title} on ${r.name}`, `/projects/${r.pid}`);
+    notify(to, `${NAME} invited you to apply for ${r.title} on ${r.name}`, `/projects/${r.pid}`, me.id);
   })();
   pushMessage(to, me, `Invited you to join ${r.name} as ${r.title}`);
   revalidatePath("/", "layout");

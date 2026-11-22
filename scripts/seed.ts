@@ -1,6 +1,7 @@
 /* Wipes the database and fills it with invented sample people and projects for local development.
    Run with: npm run seed            Never run this against real data. */
 import { db, run, now, TABLES } from "../lib/db";
+import { NAME } from "../lib/identity";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to seed in production.");
 
@@ -137,13 +138,13 @@ db.transaction(() => {
   };
   grant("busping", "meera", [[6000, "GPS units for 3 buses", 1], [6000, "Running on all routes for 30 days", 1], [6000, "Handover to transport office", 1]]);
   grant("labslot", "rohan", [[8000, "Working booking flow", 1], [9000, "RFID readers on 5 benches", 0], [8000, "One full semester of use", 0]]);
-  const note = (who: string, text: string, href: string) =>
-    run("INSERT INTO notifications (user_id, text, href, created_at) VALUES (?,?,?,?)", ids[who], text, href, ago(0.01));
-  note("ishaan", "Riya Patil vouched for you", `/u/${ids.ishaan}`);
+  const note = (who: string, text: string, href: string, about?: string) =>
+    run("INSERT INTO notifications (user_id, text, href, created_at, actor_id) VALUES (?,?,?,?,?)", ids[who], text, href, ago(0.01), about ? ids[about] : 0);
+  note("ishaan", `${NAME} vouched for you`, `/u/${ids.ishaan}`, "riya");
   note("ishaan", "HostelFix is ready for review", `/projects/${ids.hostelfix}`);
   note("riya", "HostelFix is ready for review", `/projects/${ids.hostelfix}`);
   note("tanvi", "HostelFix is ready for review", `/projects/${ids.hostelfix}`);
-  note("tanvi", "Priya Nair is waiting for alumni approval", "/admin");
+  note("tanvi", `${NAME} is waiting for alumni approval`, "/admin", "priya");
   run("INSERT INTO calls (alum_id, title, about, amount, min_credit) VALUES (?,?,?,?,?)", ids.meera, "Campus utility grant", "For anything students on campus would use every week.", 30000, 150);
   run("INSERT INTO calls (alum_id, title, about, amount, min_credit) VALUES (?,?,?,?,?)", ids.rohan, "Hardware build grant", "Parts and fabrication for a physical build. Paid per milestone.", 50000, 250);
 

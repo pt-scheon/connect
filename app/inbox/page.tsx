@@ -2,6 +2,7 @@ import Link from "next/link";
 import { all, run, now } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/notify";
+import { lineText } from "@/lib/identity";
 import { RefreshBadges } from "./refresh";
 
 export const metadata = { title: "Inbox" };
@@ -44,7 +45,7 @@ export default async function Inbox() {
           <h2 className="inbox-day">{label}{rows.some(isNew) ? <span className="pill info">{rows.filter(isNew).length} new</span> : null}</h2>
           {rows.map((n) => (
             <Link key={n.id} href={n.href} className={`card lift ${isNew(n) ? "unread" : ""}`}>
-              <span className="row between"><span>{n.text}</span><span className="small muted mono">{timeAgo(n.created_at)}</span></span>
+              <span className="row between"><span>{lineText(n)}</span><span className="small muted mono">{timeAgo(n.created_at)}</span></span>
             </Link>
           ))}
         </section>
