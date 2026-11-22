@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { splitFake } from "@/lib/sample";
 /* Small presentational pieces shared by server and client components. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
@@ -23,7 +24,11 @@ export function PIcon({ id, name, lg, image }: { id: number; name: string; lg?: 
   // eslint-disable-next-line @next/next/no-img-element
   return <img className={`picon pimg c${Math.abs(Number(id) || 0) % 8}${lg ? " lg" : ""}`} src={image || `/api/cover?n=${encodeURIComponent(name.slice(0, 80))}`} alt="" aria-hidden="true" loading="lazy" />;
 }
-export const UserLink = ({ u }: { u: Row }) => <Link href={`/u/${u.id}`}>{u.name}</Link>;
+export function Name({ name }: { name: string }) {
+  const [n, fake] = splitFake(String(name ?? ""));
+  return <>{n}{fake && <small className="fake-tag"> (fake)</small>}</>;
+}
+export const UserLink = ({ u }: { u: Row }) => <Link href={`/u/${u.id}`}><Name name={u.name} /></Link>;
 export function Who({ u }: { u: Row }) {
   return <span className="row nowrap"><Av u={u} /><UserLink u={u} /></span>;
 }

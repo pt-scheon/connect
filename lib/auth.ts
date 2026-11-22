@@ -7,6 +7,7 @@ import { CONSENT_COOKIE } from "./consent";
 import { compute } from "./credit";
 import { competency } from "./skills";
 import { collegeForEmail, isMember } from "./college";
+import { sampleSql } from "./sample";
 
 const prod = process.env.NODE_ENV === "production";
 export const baseUrl = () => process.env.APP_URL || "http://localhost:4000";
@@ -118,7 +119,7 @@ export function autoVerify(userId: number) {
   const u = get("SELECT * FROM users WHERE id=?", userId);
   if (!u || u.verified || u.role !== "student" || !u.email_verified || !u.email) return false;
   const c = collegeForEmail(u.email);
-  if (!c || get("SELECT 1 FROM users WHERE college_email=? AND id<>?", u.email, userId)) return false;
+  if (!c || get(`SELECT 1 FROM users WHERE college_email=? AND id<>? AND NOT ${sampleSql()}`, u.email, userId)) return false;
   run("UPDATE users SET verified=1, college_email=?, college_id=? WHERE id=?", u.email.toLowerCase(), c.id, userId);
   return c.status === "active";
 }

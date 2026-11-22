@@ -7,6 +7,7 @@ import {
 import { setAnonymousMode } from "@/app/identity-actions";
 import { setBlocked } from "@/app/chat-actions";
 import { devLogin } from "@/lib/auth";
+import { sampleSql } from "@/lib/sample";
 import { get } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
   }
 
   // The sample sign-in must name a real person: the action itself would "succeed" and sign nobody in.
-  if (b.action === "dev-sign-in" && (!devLogin || !get("SELECT 1 FROM users WHERE id=? AND suspended=0", Number(b.id)))) {
+  if (b.action === "dev-sign-in" && (!devLogin || !get(`SELECT 1 FROM users WHERE id=? AND ${sampleSql()} AND super=0 AND suspended=0 AND deleted=0`, Number(b.id)))) {
     return problem(req, devLogin ? "No such sample person." : "Sample sign-in is switched off.", devLogin ? 404 : 403);
   }
 

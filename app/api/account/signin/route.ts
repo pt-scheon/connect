@@ -1,4 +1,5 @@
 import { all } from "@/lib/db";
+import { sampleSql } from "@/lib/sample";
 import { demoMode, devLogin } from "@/lib/auth";
 import { PROVIDERS, ready } from "@/lib/oauth";
 import { options, originOk, problem, reply } from "@/lib/account-http";
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
     .map((p) => ({ key: p.key, label: p.label, ready: ready(p) }));
   const people = devLogin
     ? all(`SELECT u.id, u.name, u.picture, u.branch, u.role, u.admin, c.name college FROM users u LEFT JOIN colleges c ON c.id=u.college_id
-           WHERE u.suspended=0 AND COALESCE(u.deleted,0)=0 ORDER BY c.name, u.role DESC, u.name LIMIT 40`)
+           WHERE ${sampleSql("u.sub")} AND u.super=0 AND u.suspended=0 AND u.deleted=0 ORDER BY u.sub LIKE 'seed:%' DESC, u.admin DESC, c.name, u.role DESC, u.name LIMIT 40`)
       .map((u) => ({ id: u.id as number, name: u.name as string, picture: (u.picture || null) as string | null, college: (u.college || null) as string | null,
         role: u.role as string, branch: (u.branch || "") as string, admin: !!u.admin }))
     : [];

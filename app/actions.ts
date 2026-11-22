@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { all, get, run, db, now, type Row } from "@/lib/db";
 import { compute, RULES } from "@/lib/credit";
+import { sampleSql } from "@/lib/sample";
 import { requireUser, currentUser, setSession, clearSession, devLogin, autoVerify, recordLogin } from "@/lib/auth";
 import { addFeedback, answerFeedback } from "@/lib/feedback";
 import { CODE_MINUTES, TRUST_DAYS, checkLoginCode, domainTakesMail, forgetDevices, needsCode, pendingToken, readPending, sendLoginCode, trustDevice } from "@/lib/twostep";
@@ -70,8 +71,9 @@ const open = (p: Row) => p.status === "recruiting" || p.status === "building";
 /* ---------- sign-in, onboarding, verification ---------- */
 export async function devSignIn(fd: FormData) {
   if (!devLogin) redirect("/signin");
-  const u = get("SELECT * FROM users WHERE id=?", Number(fd.get("id")));
-  if (!u) redirect("/");
+  // Only invented people: a real account that ends up in a test copy must never open without its own sign-in.
+  const u = get(`SELECT * FROM users WHERE id=? AND ${sampleSql()} AND super=0 AND suspended=0 AND deleted=0`, Number(fd.get("id")));
+  if (!u) redirect("/signin?err=" + encodeURIComponent("Only fake test accounts can sign in this way."));
   const jar = await cookies();
   // With TWO_STEP_DEV=1 the sample sign-in also stops for a code, so the second step can be tried without Google.
   if (process.env.TWO_STEP_DEV === "1" && needsCode(u, jar.get("td")?.value) && (await sendLoginCode(u))) {

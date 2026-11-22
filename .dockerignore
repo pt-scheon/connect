@@ -11,3 +11,10 @@ prototype
 .claude
 buildathon
 docs
+db
+*.db
+*.db-wal
+*.db-shm
+**/*.db
+fake-db
+uploads

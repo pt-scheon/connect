@@ -973,3 +973,6 @@ body:not(.guest) .foot{background:transparent}
 .rank-chip:hover{text-decoration:none;filter:brightness(1.08)}
 /* Project icons are images now: the team's own, or a cover drawn from the name */
 img.picon.pimg{object-fit:cover;background:var(--sunk);padding:0}
+
+/* "(fake)" beside invented test people */
+.fake-tag{font:500 11px/1 var(--body);letter-spacing:0;color:var(--muted);white-space:nowrap}

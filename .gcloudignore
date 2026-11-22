@@ -1,0 +1,18 @@
+# What `gcloud run deploy --source .` must not upload: secrets, databases and what the app build does not use.
+.git
+node_modules
+.next
+data
+db
+.env*
+!.env.example
+*.db
+*.db-wal
+*.db-shm
+uploads
+frontend
+buildathon
+prototype
+docs
+.claude
+.hallmark

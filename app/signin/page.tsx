@@ -2,16 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { all } from "@/lib/db";
 import { currentUser, demoMode, devLogin } from "@/lib/auth";
+import { sampleSql } from "@/lib/sample";
 import { readyProviders } from "@/lib/oauth";
 import { devSignIn } from "../actions";
 import { Av } from "../ui";
+import { Name } from "../bits";
 import { SignInButtons } from "./buttons";
 
 export const metadata = { title: "Sign in" };
 
 export default async function SignIn() {
   if (await currentUser()) redirect("/");
-  const people = devLogin ? all("SELECT u.*, c.name college FROM users u LEFT JOIN colleges c ON c.id=u.college_id WHERE u.suspended=0 ORDER BY c.name, u.role DESC, u.name LIMIT 40") : [];
+  const people = devLogin ? all(`SELECT u.*, c.name college FROM users u LEFT JOIN colleges c ON c.id=u.college_id WHERE ${sampleSql("u.sub")} AND u.super=0 AND u.suspended=0 AND u.deleted=0 ORDER BY u.sub LIKE 'seed:%' DESC, u.admin DESC, c.name, u.role DESC, u.name LIMIT 40`) : [];
   const missing = devLogin && !demoMode && readyProviders().length < 2;
   return (
     <div className="stack narrow">
@@ -40,7 +42,7 @@ export default async function SignIn() {
           {people.map((u) => (
             <form key={u.id} action={devSignIn} className="row between">
               <input type="hidden" name="id" value={u.id} />
-              <span className="row nowrap"><Av u={u} /><span>{u.name} <span className="muted small">{u.college ?? "no community yet"} · {u.role === "alum" ? "alum" : u.branch}{u.admin ? " · admin" : ""}</span></span></span>
+              <span className="row nowrap"><Av u={u} /><span><Name name={u.name} /> <span className="muted small">{u.college ?? "no community yet"} · {u.role === "alum" ? "alum" : u.branch}{u.admin ? " · admin" : ""}</span></span></span>
               <button className="btn ghost sm">Sign in</button>
             </form>
           ))}

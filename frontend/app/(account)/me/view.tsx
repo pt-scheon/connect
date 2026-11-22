@@ -7,6 +7,7 @@ import { TierBadge } from "@/components/tier";
 import { ProgressChart } from "@/components/progress-chart";
 import { monthYear, pad2 } from "@/lib/api";
 import type { Profile } from "@/lib/account-types";
+import { Name } from "@/components/name";
 
 const STATUS: Record<string, string> = { recruiting: "Recruiting", building: "Building", review: "In review", shipped: "Shipped" };
 const host = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
@@ -39,7 +40,7 @@ export function MeView() {
       <section className="sec dark page-top ac-page">
         <div className="person-head">
           <Face name={p.name} src={p.anonymous ? p.avatar : p.avatar ?? p.picture} className="person-avatar" />
-          <h1 className="mega">{p.name}</h1>
+          <h1 className="mega"><Name name={p.name} /></h1>
         </div>
         <p className="lead page-lead">
           {line}{p.college && <>{line && " · "}<Link href={`/colleges/${p.college.slug}`}>{p.college.name}</Link></>}

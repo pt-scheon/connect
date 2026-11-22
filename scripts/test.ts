@@ -1095,3 +1095,17 @@ test("P8: commissions are rated one way only; there is no way for the doer to ra
   const actions = fs.readFileSync(path.join(__dirname, "../app/actions.ts"), "utf8");
   assert.ok(!/rateClient|rateTheClient/.test(actions));
 });
+
+test("test sign-in only lists invented people, and their names say (fake)", async () => {
+  const { run, all, get, now } = await import("../lib/db");
+  const { sampleSql, splitFake } = await import("../lib/sample");
+  const add = (sub: string, name: string) => Number(run("INSERT INTO users (sub, name, created_at) VALUES (?,?,?)", sub, name, now()).lastInsertRowid);
+  const real = add("google:sample-check", "Real Person"), fake = add("demo:check:1", "Made Up");
+  const listed = all(`SELECT id FROM users WHERE ${sampleSql()}`).map((r) => r.id);
+  assert.ok(listed.includes(fake));
+  assert.ok(!listed.includes(real));
+  assert.equal(get("SELECT name FROM users WHERE id=?", real)!.name, "Real Person");
+  assert.equal(get("SELECT name FROM users WHERE id=?", fake)!.name, "Made Up (fake)");
+  run("UPDATE users SET name='Anon 48213097' WHERE id=?", fake);
+  assert.deepEqual(splitFake(get("SELECT name FROM users WHERE id=?", fake)!.name), ["Anon 48213097", true]);
+});

@@ -5,6 +5,7 @@ import { api, app, monthYear } from "@/lib/api";
 import { Cover } from "@/components/cover";
 import { Avatar } from "@/components/avatar";
 import { TierChip } from "@/components/tier";
+import { Name } from "@/components/name";
 
 // Rendered per request so a build never needs the backend; API responses are still cached (lib/api.ts).
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export default async function ProjectPage({ params }: Props) {
             <li key={m.id} className="row" data-reveal style={{ ["--d" as string]: `${i * 70}ms` }}>
               <Avatar name={m.name} src={m.avatar} className="row-tile" />
               <span className="row-main">
-                <Link href={`/builders/${m.id}`} className="row-title">{m.name}</Link>
+                <Link href={`/builders/${m.id}`} className="row-title"><Name name={m.name} /></Link>
                 <span className="row-sub">{m.role ? `${m.role}. ` : ""}{m.did}</span>
               </span>
               <span className="mono row-meta"><TierChip tier={m.tier} /><br />{m.signedBy ? `Signed by ${m.signedBy}` : "Solo"}</span>

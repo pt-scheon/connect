@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Builder } from "@/lib/api";
 import { Avatar } from "./avatar";
 import { TierBadge, TierChip } from "./tier";
+import { Name } from "@/components/name";
 
 /* Builders as a list with a preview panel that follows the row you hover or focus, like an article index. */
 export function BuilderList({ builders }: { builders: Builder[] }) {
@@ -32,7 +33,7 @@ export function BuilderList({ builders }: { builders: Builder[] }) {
             <Link href={`/builders/${x.id}`} className="index-row" onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)}>
               <span className="mono index-date">{x.classOf ? `Class of ${x.classOf}` : ""}</span>
               <span className="index-main">
-                <span className="index-title">{x.name}{x.anonymous && <span className="mono anon-tag">anonymous</span>}</span>
+                <span className="index-title"><Name name={x.name} />{x.anonymous && <span className="mono anon-tag">anonymous</span>}</span>
                 <span className="index-sub">{[x.branch, x.college.name].filter(Boolean).join(" · ")}. Shipped {x.shipped} of {x.joined} joined.</span>
               </span>
               <span className="index-meta">

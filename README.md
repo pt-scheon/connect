@@ -4,8 +4,20 @@ A network of colleges where students build projects together. Each college is it
 
 ## Run it locally
 
-Run everything from the repository root (see the README there): `npm run setup`, then `npm run dev`, then open
-http://localhost:3000.
+The app is at the top of this repository and the website is in `frontend/`.
+
+```bash
+npm ci
+npm run setup                    # installs the website and makes a working database of invented people
+npm run dev                      # the app, http://localhost:4000
+npm run dev:showcase             # in a second terminal: the website, http://localhost:3000
+```
+
+On http://localhost:4000/signin, pick any fake account to sign in without a password. Tanvi Kulkarni is a college
+admin, Nikhil Gaikwad is unverified and Meera Joshi is an alum. Invented people always show "(fake)" by their name.
+
+Passwordless test sign-in only works in development and on test copies (`DEMO_MODE=1` with "staging" or "demo" in
+the address), and only ever opens invented accounts. Never copy a real database into this repository or an image.
 
 ## Going live
 

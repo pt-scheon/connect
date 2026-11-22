@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { FAKE, sampleSql } from "./sample";
 import { baseDomain, domainOf, guessName, matchCollege, slugify } from "./domains";
 
 const SCHEMA = `
@@ -259,6 +260,17 @@ function migrate(d: Database.Database) {
     d.exec(`CREATE INDEX IF NOT EXISTS ${ix}`);
   assignColleges(d);
   ensureHomeCollege(d);
+  markFakePeople(d);
+}
+
+/* Invented people carry "(fake)" in the name itself, so every page, message, preview and export shows it. The triggers
+   keep it there when one is added by a script or changes to an alias and back. */
+function markFakePeople(d: Database.Database) {
+  const unmarked = (row = "") => `${sampleSql(`${row}sub`)} AND ${row}deleted=0 AND ${row}name NOT LIKE '%${FAKE}'`;
+  const mark = `UPDATE users SET name=name||'${FAKE}'`;
+  d.exec(`${mark} WHERE ${unmarked()}`);
+  for (const [name, when] of [["users_fake_new", "INSERT"], ["users_fake_renamed", "UPDATE OF name"]])
+    d.exec(`CREATE TRIGGER IF NOT EXISTS ${name} AFTER ${when} ON users WHEN ${unmarked("NEW.")} BEGIN ${mark} WHERE id=NEW.id; END`);
 }
 
 /* The college named in COLLEGE_EMAIL_DOMAIN (and COLLEGE_NAME) always exists, so a brand-new server has one to join. */

@@ -5,6 +5,7 @@ import { api, monthYear, pad2 } from "@/lib/api";
 import { Avatar } from "@/components/avatar";
 import { TierBadge } from "@/components/tier";
 import { ProgressChart } from "@/components/progress-chart";
+import { Name } from "@/components/name";
 
 // Rendered per request so a build never needs the backend; API responses are still cached (lib/api.ts).
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export default async function BuilderPage({ params }: Props) {
         <Link href="/builders" className="mono back">← All builders</Link>
         <div className="person-head" data-reveal>
           <Avatar name={b.name} src={b.avatar} className="person-avatar" />
-          <h1 className="mega">{b.name}</h1>
+          <h1 className="mega"><Name name={b.name} /></h1>
         </div>
         <p className="lead page-lead" data-reveal>
           {b.anonymous ? "Anonymous builder" : [b.branch, b.classOf && `class of ${b.classOf}`].filter(Boolean).join(", ")} · <Link href={`/colleges/${b.college.slug}`}>{b.college.name}</Link>

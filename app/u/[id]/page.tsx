@@ -18,6 +18,7 @@ import { Av, F, Pill, Stamp, Who, initials, inr, skillsOf, statusLabel } from ".
 import { tierFor } from "@/lib/tiers";
 import { TierBadge } from "../../tier-badge";
 import { ProgressTab } from "./progress";
+import { Name } from "@/app/bits";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; g?: string }> };
 const find = (id: number) => get("SELECT * FROM users WHERE id=? AND onboarded=1 AND suspended=0", id);
@@ -302,7 +303,7 @@ export default async function Profile({ params, searchParams }: Props) {
         <div className="row" style={{ alignItems: "start" }}>
           <Av u={u} lg />
           <div className="stack tight" style={{ flex: "1 1 240px" }}>
-            <span className="row nowrap name-row"><h1>{u.name}</h1>{!alum && u.verified ? (
+            <span className="row nowrap name-row"><h1><Name name={u.name} /></h1>{!alum && u.verified ? (
               <Link href={`/u/${id}?tab=progress`} className={`rank-chip tier-name tier-${rank.tier.id}`} title={`${rank.tier.name}: ${rank.tier.note}`}>
                 <TierBadge tier={rank.tier} size={24} /><span>{rank.tier.name}</span>
               </Link>) : null}</span>

@@ -408,3 +408,5 @@ a.plain-link:hover span:first-child { color: var(--red); transform: translateX(6
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
   .warp > .cover { transform: none !important; }
 }
+
+.fake-tag { font: 500 12px/1 var(--font-mono); letter-spacing: 0; color: var(--muted); white-space: nowrap; }

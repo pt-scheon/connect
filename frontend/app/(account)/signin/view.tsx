@@ -7,6 +7,7 @@ import { useApi, useSession } from "@/components/session";
 import { Face, Head, Loading, Notice } from "@/components/account-ui";
 import type { SignInOptions } from "@/lib/account-types";
 import { safeNext } from "@/lib/paths";
+import { Name } from "@/components/name";
 
 const GoogleMark = () => (
   <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -95,7 +96,7 @@ export function SignInView() {
               {o.people.map((u) => (
                 <button key={u.id} type="button" className="ac-person" disabled={busy !== null} onClick={() => samplePerson(u.id)}>
                   <Face name={u.name} src={u.picture} />
-                  <span><b>{u.name}</b><span className="sub">{u.college ?? "no community yet"} · {u.role === "alum" ? "alum" : u.branch}{u.admin ? " · admin" : ""}</span></span>
+                  <span><b><Name name={u.name} /></b><span className="sub">{u.college ?? "no community yet"} · {u.role === "alum" ? "alum" : u.branch}{u.admin ? " · admin" : ""}</span></span>
                   <span className="mono muted">{busy === u.id ? "Signing in…" : "Sign in →"}</span>
                 </button>
               ))}
